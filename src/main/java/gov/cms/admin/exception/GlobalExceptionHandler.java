@@ -2,6 +2,7 @@ package gov.cms.admin.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
@@ -20,6 +21,15 @@ public class GlobalExceptionHandler {
         body.put("message", ex.getReason());
         body.put("error", status.getReasonPhrase());
         return ResponseEntity.status(status).body(body);
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Map<String, Object>> handleAccessDeniedException(AccessDeniedException ex) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("status", HttpStatus.FORBIDDEN.value());
+        body.put("message", "没有权限执行该操作");
+        body.put("error", HttpStatus.FORBIDDEN.getReasonPhrase());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
     }
 
     @ExceptionHandler(Exception.class)

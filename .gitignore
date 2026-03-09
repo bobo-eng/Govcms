@@ -19,3 +19,10 @@ Thumbs.db
 # Env
 .env
 .env.local
+
+# Local tooling
+.codex/
+.m2/
+.tools/
+.tmp-ui-ux-pro-max-skill/
+frontend/.npm-cache/

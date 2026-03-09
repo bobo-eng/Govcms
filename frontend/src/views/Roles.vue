@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { message, Modal, Tree } from 'ant-design-vue'
-import { PlusOutlined, EditOutlined, DeleteOutlined, KeyOutlined, CopyOutlined } from '@ant-design/icons-vue'
-import axios from 'axios'
+import { CopyOutlined, DeleteOutlined, EditOutlined, KeyOutlined, PlusOutlined } from '@ant-design/icons-vue'
+import { usePermission } from '../composables/usePermission'
+import api from '../utils/api'
 
 interface Permission {
   id: string
@@ -23,12 +24,13 @@ interface Role {
   permissions?: Permission[]
 }
 
-const api = axios.create({ baseURL: '/api' })
-api.interceptors.request.use(config => {
-  const token = localStorage.getItem('token')
-  if (token) config.headers.Authorization = `Bearer ${token}`
-  return config
-})
+const { hasPermission, hasAllPermissions } = usePermission()
+const canCreateRole = hasPermission('sys:role:create')
+const canUpdateRole = hasPermission('sys:role:update')
+const canDeleteRole = hasPermission('sys:role:delete')
+const canViewPermissionTree = hasPermission('sys:permission:view')
+const canOpenCreateRole = hasAllPermissions(['sys:role:create', 'sys:permission:view'])
+const canOpenEditRole = hasAllPermissions(['sys:role:update', 'sys:permission:view'])
 
 const loading = ref(false)
 const roles = ref<Role[]>([])
@@ -39,6 +41,23 @@ const editingRole = ref<Partial<Role>>({})
 const selectedPermissions = ref<string[]>([])
 const selectedRoleIds = ref<number[]>([])
 const batchLoading = ref(false)
+const treeData = ref<any[]>([])
+
+const ensurePermission = (permissionCode: string, actionName: string) => {
+  if (hasPermission(permissionCode)) {
+    return true
+  }
+  message.warning(`??${actionName}??`)
+  return false
+}
+
+const ensureAllPermissions = (permissionCodes: string[], actionName: string) => {
+  if (hasAllPermissions(permissionCodes)) {
+    return true
+  }
+  message.warning(`??${actionName}??`)
+  return false
+}
 
 const fetchRoles = async () => {
   loading.value = true
@@ -46,24 +65,43 @@ const fetchRoles = async () => {
     const res = await api.get('/roles')
     roles.value = res.data || []
     selectedRoleIds.value = selectedRoleIds.value.filter(id => roles.value.some(role => role.id === id))
-  } catch (e: any) {
-    message.error(e.response?.data?.message || '获取角色列表失败')
+  } catch (error: any) {
+    message.error(error.response?.data?.message || '????????')
   } finally {
     loading.value = false
   }
 }
 
+const convertToTreeData = (items: Permission[]): any[] => {
+  return items.map(item => ({
+    key: item.code,
+    title: item.name,
+    children: item.children?.length ? convertToTreeData(item.children) : [],
+    disableCheckbox: item.type === 'menu'
+  }))
+}
+
 const fetchPermissions = async () => {
+  if (!canViewPermissionTree) {
+    permissions.value = []
+    treeData.value = []
+    return
+  }
+
   try {
     const res = await api.get('/permissions')
     permissions.value = res.data || []
     treeData.value = convertToTreeData(permissions.value)
-  } catch (e: any) {
-    message.error('获取权限列表失败')
+  } catch (error: any) {
+    message.error(error.response?.data?.message || '????????')
   }
 }
 
 const handleAdd = async () => {
+  if (!ensureAllPermissions(['sys:role:create', 'sys:permission:view'], '????')) {
+    return
+  }
+
   await fetchPermissions()
   editingRole.value = { name: '', code: '', description: '', status: 'enabled', sort: 0 }
   selectedPermissions.value = []
@@ -72,27 +110,34 @@ const handleAdd = async () => {
 }
 
 const handleEdit = async (record: Role) => {
+  if (!ensureAllPermissions(['sys:role:update', 'sys:permission:view'], '????')) {
+    return
+  }
+
   await fetchPermissions()
   editingRole.value = { ...record }
-  // Get selected permission codes
-  selectedPermissions.value = record.permissions?.map(p => p.code) || []
+  selectedPermissions.value = record.permissions?.map(permission => permission.code) || []
   isEdit.value = true
   modalVisible.value = true
 }
 
 const handleDelete = (id: number) => {
+  if (!ensurePermission('sys:role:delete', '????')) {
+    return
+  }
+
   Modal.confirm({
-    title: '确认删除',
-    content: '确定要删除该角色吗？',
-    okText: '确认删除',
+    title: '????',
+    content: '??????????',
+    okText: '????',
     okType: 'danger',
     onOk: async () => {
       try {
         await api.delete(`/roles/${id}`)
-        message.success('删除成功')
+        message.success('????')
         fetchRoles()
-      } catch (e: any) {
-        message.error(e.response?.data?.message || '删除失败')
+      } catch (error: any) {
+        message.error(error.response?.data?.message || '????')
       }
     }
   })
@@ -106,7 +151,7 @@ const generateCopyCode = (code: string) => {
 
 const copyRole = async (role: Role) => {
   const payload = {
-    name: `${role.name} - 副本`,
+    name: `${role.name} - ??`,
     code: generateCopyCode(role.code),
     description: role.description,
     status: role.status || 'enabled',
@@ -115,67 +160,86 @@ const copyRole = async (role: Role) => {
 
   const permissionIds = role.permissions?.map(permission => permission.id || permission.code) || []
   const createdRole = await api.post('/roles', payload)
-  if (permissionIds.length) {
+
+  if (permissionIds.length && canUpdateRole) {
     await api.put(`/roles/${createdRole.data.id}/permissions`, permissionIds)
   }
 }
 
 const handleCopy = (record: Role) => {
+  if (!ensurePermission('sys:role:create', '????')) {
+    return
+  }
+
   Modal.confirm({
-    title: '复制角色',
-    content: `确定要复制角色 "${record.name}" 吗？`,
-    okText: '确认复制',
+    title: '????',
+    content: `????????${record.name}???`,
+    okText: '????',
     onOk: async () => {
       try {
         await copyRole(record)
-        message.success('角色复制成功')
+        message.success(canUpdateRole ? '??????' : '??????????????')
         fetchRoles()
-      } catch (e: any) {
-        message.error(e.response?.data?.message || '角色复制失败')
+      } catch (error: any) {
+        message.error(error.response?.data?.message || '??????')
       }
     }
   })
 }
 
 const handleBatchCopy = () => {
+  if (!ensurePermission('sys:role:create', '????')) {
+    return
+  }
+
   if (selectedRoleIds.value.length !== 1) {
-    message.warning('请先选择 1 个角色进行复制')
+    message.warning('???? 1 ???????')
     return
   }
 
   const targetRole = roles.value.find(role => role.id === selectedRoleIds.value[0])
   if (!targetRole) {
-    message.error('未找到选中的角色')
+    message.error('????????')
     return
   }
+
   handleCopy(targetRole)
 }
 
 const handleBatchDelete = () => {
+  if (!ensurePermission('sys:role:delete', '????')) {
+    return
+  }
+
   if (!selectedRoleIds.value.length) {
-    message.warning('请先选择角色')
+    message.warning('??????')
     return
   }
 
   Modal.confirm({
-    title: '批量删除角色',
-    content: `确定要删除选中的 ${selectedRoleIds.value.length} 个角色吗？`,
-    okText: '确认删除',
+    title: '??????',
+    content: `???????? ${selectedRoleIds.value.length} ?????`,
+    okText: '????',
     okType: 'danger',
     onOk: async () => {
-      const result = await Promise.allSettled(selectedRoleIds.value.map(id => api.delete(`/roles/${id}`)))
-      const successCount = result.filter(item => item.status === 'fulfilled').length
-      const failCount = result.length - successCount
+      batchLoading.value = true
+      try {
+        const result = await Promise.allSettled(selectedRoleIds.value.map(id => api.delete(`/roles/${id}`)))
+        const successCount = result.filter(item => item.status === 'fulfilled').length
+        const failCount = result.length - successCount
 
-      if (successCount > 0) {
-        message.success(`已删除 ${successCount} 个角色`)
-      }
-      if (failCount > 0) {
-        message.error(`${failCount} 个角色删除失败`)
-      }
+        if (successCount > 0) {
+          message.success(`??? ${successCount} ???`)
+        }
+        if (failCount > 0) {
+          message.error(`${failCount} ???????`)
+        }
 
-      selectedRoleIds.value = []
-      fetchRoles()
+        selectedRoleIds.value = []
+        fetchRoles()
+      } finally {
+        batchLoading.value = false
+      }
     }
   })
 }
@@ -199,62 +263,53 @@ const toggleSelectRole = (id: number, event: Event) => {
 }
 
 const handleSave = async () => {
+  const requiredPermission = isEdit.value ? 'sys:role:update' : 'sys:role:create'
+  const actionName = isEdit.value ? '????' : '????'
+  if (!ensurePermission(requiredPermission, actionName)) {
+    return
+  }
+
   if (!editingRole.value.name?.trim()) {
-    message.error('请输入角色名称')
+    message.error('???????')
     return
   }
   if (!editingRole.value.code?.trim()) {
-    message.error('请输入角色编码')
+    message.error('???????')
     return
   }
-  
+
   try {
-    const data = {
-      ...editingRole.value,
-      permissionIds: selectedPermissions.value
+    const payload = {
+      ...editingRole.value
     }
-    
+
     if (isEdit.value) {
-      await api.put(`/roles/${editingRole.value.id}`, data)
-      // Update permissions
+      await api.put(`/roles/${editingRole.value.id}`, payload)
       await api.put(`/roles/${editingRole.value.id}/permissions`, selectedPermissions.value)
-      message.success('更新成功')
+      message.success('????')
     } else {
-      await api.post('/roles', data)
-      message.success('创建成功')
+      const createdRole = await api.post('/roles', payload)
+      if (selectedPermissions.value.length && canUpdateRole) {
+        await api.put(`/roles/${createdRole.data.id}/permissions`, selectedPermissions.value)
+      }
+      message.success('????')
+      if (selectedPermissions.value.length && !canUpdateRole) {
+        message.warning('??????????????????????')
+      }
     }
+
     modalVisible.value = false
     fetchRoles()
-  } catch (e: any) {
-    message.error(e.response?.data?.message || '操作失败')
+  } catch (error: any) {
+    message.error(error.response?.data?.message || '????')
   }
 }
 
-// Convert permissions to tree data for Ant Design Tree
-const convertToTreeData = (perms: Permission[]): any[] => {
-  return perms.map(perm => ({
-    key: perm.code,
-    title: perm.name,
-    children: perm.children?.length ? convertToTreeData(perm.children) : [],
-    disableCheckbox: perm.type === 'menu' // Only allow selecting button permissions
-  }))
-}
+type TreeCheckedKeys = Array<string | number> | { checked: Array<string | number>; halfChecked?: Array<string | number> }
 
-const treeData = ref<any[]>([])
-
-// Watch permissions to convert
-onMounted(() => {
-  fetchRoles()
-})
-
-const openModal = async () => {
-  await fetchPermissions()
-  treeData.value = convertToTreeData(permissions.value)
-  modalVisible.value = true
-}
-
-const onCheck = (checkedKeys: string[]) => {
-  selectedPermissions.value = checkedKeys
+const onCheck = (checkedKeys: TreeCheckedKeys) => {
+  const values = Array.isArray(checkedKeys) ? checkedKeys : checkedKeys.checked
+  selectedPermissions.value = values.map(String)
 }
 
 const getStatusClass = (status: string) => {
@@ -262,8 +317,12 @@ const getStatusClass = (status: string) => {
 }
 
 const getStatusText = (status: string) => {
-  return status === 'enabled' ? '启用' : '禁用'
+  return status === 'enabled' ? '??' : '??'
 }
+
+onMounted(() => {
+  fetchRoles()
+})
 </script>
 
 <template>
@@ -274,18 +333,18 @@ const getStatusText = (status: string) => {
         <h1>角色管理</h1>
         <p>管理系统角色和权限分配</p>
       </div>
-      <button class="primary-btn" @click="handleAdd">
+      <button v-if="canOpenCreateRole" class="primary-btn" @click="handleAdd">
         <PlusOutlined />
         <span>新增角色</span>
       </button>
     </div>
 
     <div class="toolbar">
-      <button class="secondary-btn" :disabled="selectedRoleIds.length !== 1" @click="handleBatchCopy">
+      <button v-if="canCreateRole" class="secondary-btn" :disabled="selectedRoleIds.length !== 1 || batchLoading" @click="handleBatchCopy">
         <CopyOutlined />
         复制所选角色
       </button>
-      <button class="secondary-btn danger-btn" :disabled="!selectedRoleIds.length" @click="handleBatchDelete">
+      <button v-if="canDeleteRole" class="secondary-btn danger-btn" :disabled="!selectedRoleIds.length || batchLoading" @click="handleBatchDelete">
         <DeleteOutlined />
         批量删除
       </button>
@@ -341,13 +400,13 @@ const getStatusText = (status: string) => {
             </td>
             <td>
               <div class="action-btns">
-                <button class="action-btn" @click="handleCopy(role)" title="复制">
+                <button class="action-btn" v-if="canCreateRole" @click="handleCopy(role)" title="复制">
                   <CopyOutlined />
                 </button>
-                <button class="action-btn" @click="handleEdit(role)" title="编辑">
+                <button class="action-btn" v-if="canOpenEditRole" @click="handleEdit(role)" title="编辑">
                   <EditOutlined />
                 </button>
-                <button class="action-btn danger" @click="handleDelete(role.id)" title="删除">
+                <button class="action-btn danger" v-if="canDeleteRole" @click="handleDelete(role.id)" title="删除">
                   <DeleteOutlined />
                 </button>
               </div>
@@ -421,7 +480,7 @@ const getStatusText = (status: string) => {
         </div>
         <div class="modal-footer">
           <button class="secondary-btn" @click="modalVisible = false">取消</button>
-          <button class="primary-btn" @click="handleSave">保存</button>
+          <button v-if="isEdit ? canUpdateRole : canCreateRole" class="primary-btn" @click="handleSave">保存</button>
         </div>
       </div>
     </div>

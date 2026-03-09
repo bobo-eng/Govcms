@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { message, Modal } from 'ant-design-vue'
-import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, KeyOutlined, StopOutlined } from '@ant-design/icons-vue'
-import axios from 'axios'
+import { DeleteOutlined, EditOutlined, KeyOutlined, PlusOutlined, SearchOutlined, StopOutlined } from '@ant-design/icons-vue'
+import { usePermission } from '../composables/usePermission'
+import api from '../utils/api'
 
 interface User {
   id: number
@@ -15,30 +16,16 @@ interface User {
   updatedAt?: string
 }
 
-const api = axios.create({ baseURL: '/api' })
-api.interceptors.request.use(config => {
-  const token = localStorage.getItem('token')
-  if (token) config.headers.Authorization = `Bearer ${token}`
-  return config
-})
-
-api.interceptors.response.use(
-  response => response,
-  error => {
-    if (error.response?.status === 401) {
-      message.error('登录已过期，请重新登录')
-      localStorage.removeItem('token')
-      window.location.href = '/login'
-    }
-    return Promise.reject(error)
-  }
-)
+const { hasPermission } = usePermission()
+const canCreateUser = hasPermission('sys:user:create')
+const canUpdateUser = hasPermission('sys:user:update')
+const canDeleteUser = hasPermission('sys:user:delete')
+const canResetPassword = hasPermission('sys:user:reset-password')
 
 const loading = ref(false)
 const users = ref<User[]>([])
 const searchKeyword = ref('')
 const modalVisible = ref(false)
-const passwordModalVisible = ref(false)
 const isEdit = ref(false)
 const editingUser = ref<Partial<User>>({})
 const editingPassword = ref('')
@@ -50,6 +37,14 @@ const pagination = ref({
   total: 0
 })
 
+const ensurePermission = (permissionCode: string, actionName: string) => {
+  if (hasPermission(permissionCode)) {
+    return true
+  }
+  message.warning(`??${actionName}??`)
+  return false
+}
+
 const fetchUsers = async () => {
   loading.value = true
   try {
@@ -59,12 +54,12 @@ const fetchUsers = async () => {
       keyword: searchKeyword.value || undefined
     }
     const res = await api.get('/users', { params })
-    users.value = res.data.content || res.data.content?.content || []
+    users.value = res.data.content || []
     selectedUserIds.value = selectedUserIds.value.filter(id => users.value.some(user => user.id === id))
     pagination.value.total = res.data.totalElements || 0
-  } catch (e: any) {
-    console.error('获取用户列表失败:', e)
-    message.error(e.response?.data?.message || '获取用户列表失败')
+  } catch (error: any) {
+    console.error('????????:', error)
+    message.error(error.response?.data?.message || '????????')
   } finally {
     loading.value = false
   }
@@ -82,6 +77,9 @@ const handlePageChange = (page: number, pageSize: number) => {
 }
 
 const handleAdd = () => {
+  if (!ensurePermission('sys:user:create', '????')) {
+    return
+  }
   editingUser.value = { username: '', email: '', fullName: '', phone: '', enabled: true }
   editingPassword.value = ''
   isEdit.value = false
@@ -89,6 +87,9 @@ const handleAdd = () => {
 }
 
 const handleEdit = (record: User) => {
+  if (!ensurePermission('sys:user:update', '????')) {
+    return
+  }
   editingUser.value = { ...record }
   editingPassword.value = ''
   isEdit.value = true
@@ -96,63 +97,77 @@ const handleEdit = (record: User) => {
 }
 
 const handleDelete = (id: number) => {
+  if (!ensurePermission('sys:user:delete', '????')) {
+    return
+  }
+
   Modal.confirm({
-    title: '确认删除',
-    content: '确定要删除该用户吗？此操作不可撤销。',
-    okText: '确认删除',
+    title: '????',
+    content: '??????????????????',
+    okText: '????',
     okType: 'danger',
     onOk: async () => {
       try {
         await api.delete(`/users/${id}`)
-        message.success('删除成功')
+        message.success('????')
         fetchUsers()
-      } catch (e: any) {
-        message.error(e.response?.data?.message || '删除失败')
+      } catch (error: any) {
+        message.error(error.response?.data?.message || '????')
       }
     }
   })
 }
 
 const handleSave = async () => {
+  const requiredPermission = isEdit.value ? 'sys:user:update' : 'sys:user:create'
+  const actionName = isEdit.value ? '????' : '????'
+  if (!ensurePermission(requiredPermission, actionName)) {
+    return
+  }
+
   if (!editingUser.value.username?.trim()) {
-    message.error('请输入用户名')
+    message.error('??????')
     return
   }
   if (!editingUser.value.email?.trim()) {
-    message.error('请输入邮箱')
+    message.error('?????')
     return
   }
-  
+
   try {
     if (isEdit.value) {
       await api.put(`/users/${editingUser.value.id}`, editingUser.value)
-      message.success('更新成功')
+      message.success('????')
     } else {
       if (!editingPassword.value) {
-        message.error('请输入密码')
+        message.error('?????')
         return
       }
       await api.post('/users', { ...editingUser.value, password: editingPassword.value })
-      message.success('创建成功')
+      message.success('????')
     }
     modalVisible.value = false
     fetchUsers()
-  } catch (e: any) {
-    message.error(e.response?.data?.message || '操作失败')
+  } catch (error: any) {
+    message.error(error.response?.data?.message || '????')
   }
 }
 
 const handleResetPassword = (record: User) => {
+  if (!ensurePermission('sys:user:reset-password', '????')) {
+    return
+  }
+
   Modal.confirm({
-    title: '重置密码',
-    content: `确定要重置用户 "${record.username}" 的密码吗？`,
-    okText: '确认重置',
+    title: '????',
+    content: `????????${record.username}??????`,
+    okText: '????',
     onOk: async () => {
       try {
         await api.post(`/users/${record.id}/reset-password`)
-        message.success('密码已重置为: GovCMS@2026')
-      } catch (e: any) {
-        message.error(e.response?.data?.message || '重置密码失败')
+        message.success('??????: GovCMS@2026')
+      } catch (error: any) {
+        message.error(error.response?.data?.message || '??????')
       }
     }
   })
@@ -179,34 +194,38 @@ const toggleSelectUser = (id: number, event: Event) => {
 }
 
 const handleBatchDisable = () => {
+  if (!ensurePermission('sys:user:update', '????')) {
+    return
+  }
+
   const targetIds = users.value
     .filter(user => selectedUserIds.value.includes(user.id) && user.enabled)
     .map(user => user.id)
 
   if (!selectedUserIds.value.length) {
-    message.warning('请先选择用户')
+    message.warning('??????')
     return
   }
 
   if (!targetIds.length) {
-    message.info('所选用户已全部是禁用状态')
+    message.info('?????????????')
     return
   }
 
   Modal.confirm({
-    title: '批量禁用用户',
-    content: `确定要禁用选中的 ${targetIds.length} 个用户吗？`,
-    okText: '确认禁用',
+    title: '??????',
+    content: `???????? ${targetIds.length} ?????`,
+    okText: '????',
     okType: 'danger',
     onOk: async () => {
       batchLoading.value = true
       try {
         await Promise.all(targetIds.map(id => api.put(`/users/${id}`, { enabled: false })))
-        message.success(`已禁用 ${targetIds.length} 个用户`)
+        message.success(`??? ${targetIds.length} ???`)
         selectedUserIds.value = []
         fetchUsers()
-      } catch (e: any) {
-        message.error(e.response?.data?.message || '批量禁用失败')
+      } catch (error: any) {
+        message.error(error.response?.data?.message || '??????')
       } finally {
         batchLoading.value = false
       }
@@ -215,32 +234,39 @@ const handleBatchDisable = () => {
 }
 
 const handleBatchDelete = () => {
+  if (!ensurePermission('sys:user:delete', '????')) {
+    return
+  }
+
   if (!selectedUserIds.value.length) {
-    message.warning('请先选择用户')
+    message.warning('??????')
     return
   }
 
   Modal.confirm({
-    title: '批量删除用户',
-    content: `确定要删除选中的 ${selectedUserIds.value.length} 个用户吗？此操作不可撤销。`,
-    okText: '确认删除',
+    title: '??????',
+    content: `???????? ${selectedUserIds.value.length} ?????????????`,
+    okText: '????',
     okType: 'danger',
     onOk: async () => {
       batchLoading.value = true
-      const result = await Promise.allSettled(selectedUserIds.value.map(id => api.delete(`/users/${id}`)))
-      const successCount = result.filter(item => item.status === 'fulfilled').length
-      const failCount = result.length - successCount
+      try {
+        const result = await Promise.allSettled(selectedUserIds.value.map(id => api.delete(`/users/${id}`)))
+        const successCount = result.filter(item => item.status === 'fulfilled').length
+        const failCount = result.length - successCount
 
-      if (successCount > 0) {
-        message.success(`已删除 ${successCount} 个用户`)
-      }
-      if (failCount > 0) {
-        message.error(`${failCount} 个用户删除失败，请重试`)
-      }
+        if (successCount > 0) {
+          message.success(`??? ${successCount} ???`)
+        }
+        if (failCount > 0) {
+          message.error(`${failCount} ???????????`)
+        }
 
-      selectedUserIds.value = []
-      fetchUsers()
-      batchLoading.value = false
+        selectedUserIds.value = []
+        fetchUsers()
+      } finally {
+        batchLoading.value = false
+      }
     }
   })
 }
@@ -250,10 +276,12 @@ const getStatusClass = (enabled: boolean) => {
 }
 
 const getStatusText = (enabled: boolean) => {
-  return enabled ? '启用' : '禁用'
+  return enabled ? '??' : '??'
 }
 
-onMounted(() => { fetchUsers() })
+onMounted(() => {
+  fetchUsers()
+})
 </script>
 
 <template>
@@ -264,7 +292,7 @@ onMounted(() => { fetchUsers() })
         <h1>用户管理</h1>
         <p>管理系统用户账号和权限</p>
       </div>
-      <button class="primary-btn" @click="handleAdd">
+      <button v-if="canCreateUser" class="primary-btn" @click="handleAdd">
         <PlusOutlined />
         <span>添加用户</span>
       </button>
@@ -283,11 +311,11 @@ onMounted(() => { fetchUsers() })
         />
       </div>
       <button class="secondary-btn" @click="handleSearch">搜索</button>
-      <button class="secondary-btn" :disabled="!selectedUserIds.length || batchLoading" @click="handleBatchDisable">
+      <button v-if="canUpdateUser" class="secondary-btn" :disabled="!selectedUserIds.length || batchLoading" @click="handleBatchDisable">
         <StopOutlined />
         批量禁用
       </button>
-      <button class="secondary-btn danger-btn" :disabled="!selectedUserIds.length || batchLoading" @click="handleBatchDelete">
+      <button v-if="canDeleteUser" class="secondary-btn danger-btn" :disabled="!selectedUserIds.length || batchLoading" @click="handleBatchDelete">
         <DeleteOutlined />
         批量删除
       </button>
@@ -344,13 +372,13 @@ onMounted(() => { fetchUsers() })
             <td class="date-cell">{{ user.createdAt?.split('T')[0] || '-' }}</td>
             <td>
               <div class="action-btns">
-                <button class="action-btn" @click="handleEdit(user)" title="编辑">
+                <button class="action-btn" v-if="canUpdateUser" @click="handleEdit(user)" title="编辑">
                   <EditOutlined />
                 </button>
-                <button class="action-btn" @click="handleResetPassword(user)" title="重置密码">
+                <button class="action-btn" v-if="canResetPassword" @click="handleResetPassword(user)" title="重置密码">
                   <KeyOutlined />
                 </button>
-                <button class="action-btn danger" @click="handleDelete(user.id)" title="删除">
+                <button class="action-btn danger" v-if="canDeleteUser" @click="handleDelete(user.id)" title="删除">
                   <DeleteOutlined />
                 </button>
               </div>
@@ -444,7 +472,7 @@ onMounted(() => { fetchUsers() })
         </div>
         <div class="modal-footer">
           <button class="secondary-btn" @click="modalVisible = false">取消</button>
-          <button class="primary-btn" @click="handleSave">保存</button>
+          <button v-if="isEdit ? canUpdateUser : canCreateUser" class="primary-btn" @click="handleSave">保存</button>
         </div>
       </div>
     </div>

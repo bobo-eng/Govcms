@@ -2,10 +2,10 @@ package gov.cms.admin.controller;
 
 import gov.cms.admin.dto.MenuTreeNode;
 import gov.cms.admin.entity.Menu;
-import gov.cms.admin.security.JwtUtil;
 import gov.cms.admin.service.MenuService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -26,48 +26,44 @@ import java.util.List;
 public class MenuController {
 
     private final MenuService menuService;
-    private final JwtUtil jwtUtil;
 
-    public MenuController(MenuService menuService, JwtUtil jwtUtil) {
+    public MenuController(MenuService menuService) {
         this.menuService = menuService;
-        this.jwtUtil = jwtUtil;
     }
 
-    /**
-     * Get all menus (admin view)
-     */
     @GetMapping
+    @PreAuthorize("hasAuthority('sys:menu:view')")
     public ResponseEntity<List<MenuTreeNode>> getAllMenus() {
         return ResponseEntity.ok(menuService.getAllMenus());
     }
 
-    /**
-     * Get current user's menus based on permissions
-     */
     @GetMapping("/user")
     public ResponseEntity<List<MenuTreeNode>> getUserMenus() {
-        // Get current username from security context
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        String username = auth.getName();
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String username = authentication.getName();
         return ResponseEntity.ok(menuService.getUserMenus(username));
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('sys:menu:view')")
     public ResponseEntity<Menu> getMenuById(@PathVariable Long id) {
         return ResponseEntity.ok(menuService.getMenuById(id));
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('sys:menu:create')")
     public ResponseEntity<Menu> createMenu(@RequestBody Menu menu) {
         return ResponseEntity.status(HttpStatus.CREATED).body(menuService.createMenu(menu));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('sys:menu:update')")
     public ResponseEntity<Menu> updateMenu(@PathVariable Long id, @RequestBody Menu menu) {
         return ResponseEntity.ok(menuService.updateMenu(id, menu));
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('sys:menu:delete')")
     public ResponseEntity<Void> deleteMenu(@PathVariable Long id) {
         menuService.deleteMenu(id);
         return ResponseEntity.noContent().build();

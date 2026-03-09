@@ -2,8 +2,10 @@ package gov.cms.admin.controller;
 
 import gov.cms.admin.dto.DashboardStats;
 import gov.cms.admin.repository.ArticleRepository;
+import gov.cms.admin.repository.SiteRepository;
 import gov.cms.admin.repository.UserRepository;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -20,46 +22,46 @@ public class DashboardController {
 
     private final ArticleRepository articleRepository;
     private final UserRepository userRepository;
+    private final SiteRepository siteRepository;
 
-    public DashboardController(ArticleRepository articleRepository, UserRepository userRepository) {
+    public DashboardController(ArticleRepository articleRepository, UserRepository userRepository, SiteRepository siteRepository) {
         this.articleRepository = articleRepository;
         this.userRepository = userRepository;
+        this.siteRepository = siteRepository;
     }
 
     @GetMapping("/dashboard")
+    @PreAuthorize("hasAuthority('content:article:view')")
     public ResponseEntity<DashboardStats> getDashboardStats() {
         DashboardStats stats = new DashboardStats();
 
-        // Basic counts
         stats.setArticleCount(articleRepository.count());
         stats.setUserCount(userRepository.count());
-        stats.setSiteCount(1L); // Simplified - single site for MVP
-        stats.setViewCount(articleRepository.count() * 100L); // Mock view count
+        stats.setSiteCount(siteRepository.count());
+        stats.setViewCount(articleRepository.count() * 100L);
         stats.setPendingReviewCount(articleRepository.findAll().stream()
-                .filter(a -> "draft".equals(a.getStatus()))
+                .filter(article -> "draft".equals(article.getStatus()))
                 .count());
 
-        // Recent activities - mock for MVP
         List<DashboardStats.RecentActivity> activities = new ArrayList<>();
-        activities.add(createActivity(1L, "admin", "发布了文章", "关于政务公开的通知", "5分钟前", "publish"));
-        activities.add(createActivity(2L, "admin", "更新了页面", "关于我们", "15分钟前", "edit"));
+        activities.add(createActivity(1L, "admin", "?????", "?????????", "5???", "publish"));
+        activities.add(createActivity(2L, "admin", "?????", "????", "15???", "edit"));
         stats.setRecentActivities(activities);
 
-        // Pending articles
-        List<DashboardStats.PendingArticle> pending = articleRepository.findAll().stream()
-                .filter(a -> "draft".equals(a.getStatus()))
+        List<DashboardStats.PendingArticle> pendingArticles = articleRepository.findAll().stream()
+                .filter(article -> "draft".equals(article.getStatus()))
                 .limit(3)
-                .map(a -> {
-                    DashboardStats.PendingArticle p = new DashboardStats.PendingArticle();
-                    p.setId(a.getId());
-                    p.setTitle(a.getTitle());
-                    p.setType("文章");
-                    p.setAuthor(a.getAuthor());
-                    p.setDate(a.getCreatedAt() != null ? a.getCreatedAt().toString().split("T")[0] : "");
-                    return p;
+                .map(article -> {
+                    DashboardStats.PendingArticle pendingArticle = new DashboardStats.PendingArticle();
+                    pendingArticle.setId(article.getId());
+                    pendingArticle.setTitle(article.getTitle());
+                    pendingArticle.setType("??");
+                    pendingArticle.setAuthor(article.getAuthor());
+                    pendingArticle.setDate(article.getCreatedAt() != null ? article.getCreatedAt().toString().split("T")[0] : "");
+                    return pendingArticle;
                 })
                 .collect(Collectors.toList());
-        stats.setPendingArticles(pending);
+        stats.setPendingArticles(pendingArticles);
 
         return ResponseEntity.ok(stats);
     }

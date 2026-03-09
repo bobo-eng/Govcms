@@ -3,6 +3,7 @@ import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import axios from 'axios'
+import { clearSession, saveSession } from '../utils/session'
 
 const router = useRouter()
 const loading = ref(false)
@@ -17,29 +18,42 @@ const onFinish = async () => {
     message.warning('请输入用户名和密码')
     return
   }
-  
+
   loading.value = true
-  
+
   try {
     const res = await axios.post('/api/auth/login', {
       username: formState.username,
       password: formState.password
     }, { timeout: 10000 })
-    
+
     if (res.data.token) {
-      localStorage.setItem('token', res.data.token)
-      localStorage.setItem('username', res.data.username)
+      clearSession()
+      saveSession({
+        token: res.data.token,
+        username: res.data.username || formState.username,
+        roles: res.data.roles || [],
+        permissions: res.data.permissions || []
+      })
       message.success('登录成功')
       router.push('/dashboard')
+      return
     }
-  } catch (error: any) {
-    if (error.response) {
-      message.error(error.response.data?.message || '用户名或密码错误')
-    } else if (error.request) {
-      message.error('无法连接到服务器')
-    } else {
-      message.error('登录失败')
+
+    message.error(res.data?.message || '登录失败')
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      if (error.response) {
+        message.error(error.response.data?.message || '用户名或密码错误')
+      } else if (error.request) {
+        message.error('无法连接到服务器')
+      } else {
+        message.error('登录失败')
+      }
+      return
     }
+
+    message.error('登录失败')
   } finally {
     loading.value = false
   }

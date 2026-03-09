@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { message, Modal, Tree } from 'ant-design-vue'
-import { PlusOutlined, EditOutlined, DeleteOutlined, FolderOutlined, FolderOpenOutlined } from '@ant-design/icons-vue'
-import axios from 'axios'
+import { computed, onMounted, ref } from 'vue'
+import { message, Modal } from 'ant-design-vue'
+import { DeleteOutlined, EditOutlined, FolderOpenOutlined, FolderOutlined, PlusOutlined } from '@ant-design/icons-vue'
+import { usePermission } from '../composables/usePermission'
+import api from '../utils/api'
 
 interface Menu {
   id: number
@@ -15,7 +16,7 @@ interface Menu {
   visible: boolean
   status: string
   children?: Menu[]
-  _level?: number  // 添加层级字段用于显示缩进
+  _level?: number
 }
 
 interface Permission {
@@ -24,12 +25,13 @@ interface Permission {
   code: string
 }
 
-const api = axios.create({ baseURL: '/api' })
-api.interceptors.request.use(config => {
-  const token = localStorage.getItem('token')
-  if (token) config.headers.Authorization = `Bearer ${token}`
-  return config
-})
+const { hasPermission, hasAllPermissions } = usePermission()
+const canCreateMenu = hasPermission('sys:menu:create')
+const canUpdateMenu = hasPermission('sys:menu:update')
+const canDeleteMenu = hasPermission('sys:menu:delete')
+const canViewPermissionCatalog = hasPermission('sys:permission:view')
+const canOpenCreateMenu = hasAllPermissions(['sys:menu:create', 'sys:permission:view'])
+const canOpenEditMenu = hasAllPermissions(['sys:menu:update', 'sys:permission:view'])
 
 const loading = ref(false)
 const menus = ref<Menu[]>([])
@@ -38,24 +40,32 @@ const modalVisible = ref(false)
 const isEdit = ref(false)
 const editingMenu = ref<Partial<Menu>>({})
 
-// Flatten menus for table display (show all menus including children)
+const ensurePermission = (permissionCode: string, actionName: string) => {
+  if (hasPermission(permissionCode)) {
+    return true
+  }
+  message.warning(`??${actionName}??`)
+  return false
+}
+
+const ensureAllPermissions = (permissionCodes: string[], actionName: string) => {
+  if (hasAllPermissions(permissionCodes)) {
+    return true
+  }
+  message.warning(`??${actionName}??`)
+  return false
+}
+
 const flattenedMenus = computed(() => {
   const result: Menu[] = []
   const flatten = (items: Menu[], level = 0) => {
     items.forEach(item => {
-      // 添加层级信息
-      const menuWithLevel = { 
-        ...item, 
-        _level: level
-      }
-      result.push(menuWithLevel)
-      // 递归处理子菜单
-      if (item.children && item.children.length > 0) {
+      result.push({ ...item, _level: level })
+      if (item.children?.length) {
         flatten(item.children, level + 1)
       }
     })
   }
-  // 后端返回的顺序已经是按父子顺序排列的，直接使用
   flatten(menus.value)
   return result
 })
@@ -65,30 +75,43 @@ const fetchMenus = async () => {
   try {
     const res = await api.get('/menus')
     menus.value = res.data || []
-  } catch (e: any) {
-    message.error(e.response?.data?.message || '获取菜单列表失败')
+  } catch (error: any) {
+    message.error(error.response?.data?.message || '????????')
   } finally {
     loading.value = false
   }
 }
 
 const fetchPermissions = async () => {
+  if (!canViewPermissionCatalog) {
+    permissions.value = []
+    return
+  }
+
   try {
     const res = await api.get('/permissions/all')
     permissions.value = res.data || []
-  } catch (e: any) {
-    message.error('获取权限列表失败')
+  } catch (error: any) {
+    message.error(error.response?.data?.message || '????????')
   }
 }
 
 const handleAdd = async () => {
+  if (!ensureAllPermissions(['sys:menu:create', 'sys:permission:view'], '????')) {
+    return
+  }
+
   await fetchPermissions()
-  editingMenu.value = { name: '', path: '', icon: '', sort: 0, visible: true, status: 'enabled' }
+  editingMenu.value = { name: '', path: '', icon: '', sort: 0, visible: true, status: 'enabled', permissionId: '' }
   isEdit.value = false
   modalVisible.value = true
 }
 
 const handleEdit = async (record: Menu) => {
+  if (!ensureAllPermissions(['sys:menu:update', 'sys:permission:view'], '????')) {
+    return
+  }
+
   await fetchPermissions()
   editingMenu.value = { ...record }
   isEdit.value = true
@@ -96,67 +119,52 @@ const handleEdit = async (record: Menu) => {
 }
 
 const handleDelete = (id: number) => {
+  if (!ensurePermission('sys:menu:delete', '????')) {
+    return
+  }
+
   Modal.confirm({
-    title: '确认删除',
-    content: '确定要删除该菜单吗？',
-    okText: '确认删除',
+    title: '????',
+    content: '??????????',
+    okText: '????',
     okType: 'danger',
     onOk: async () => {
       try {
         await api.delete(`/menus/${id}`)
-        message.success('删除成功')
+        message.success('????')
         fetchMenus()
-      } catch (e: any) {
-        message.error(e.response?.data?.message || '删除失败')
+      } catch (error: any) {
+        message.error(error.response?.data?.message || '????')
       }
     }
   })
 }
 
 const handleSave = async () => {
-  if (!editingMenu.value.name?.trim()) {
-    message.error('请输入菜单名称')
+  const requiredPermission = isEdit.value ? 'sys:menu:update' : 'sys:menu:create'
+  const actionName = isEdit.value ? '????' : '????'
+  if (!ensurePermission(requiredPermission, actionName)) {
     return
   }
-  
-  // path is optional - for group menus (parent menus), path can be empty
-  // Only require path if visible is true (actual clickable menu)
-  
+
+  if (!editingMenu.value.name?.trim()) {
+    message.error('???????')
+    return
+  }
+
   try {
     if (isEdit.value) {
       await api.put(`/menus/${editingMenu.value.id}`, editingMenu.value)
-      message.success('更新成功')
+      message.success('????')
     } else {
       await api.post('/menus', editingMenu.value)
-      message.success('创建成功')
+      message.success('????')
     }
     modalVisible.value = false
     fetchMenus()
-  } catch (e: any) {
-    message.error(e.response?.data?.message || '操作失败')
+  } catch (error: any) {
+    message.error(error.response?.data?.message || '????')
   }
-}
-
-// Convert to tree data for Ant Design Tree
-const menuOptions = ref<any[]>([])
-
-const convertToTreeOptions = (items: Menu[], level = 0): any[] => {
-  return items.map(item => ({
-    key: item.id,
-    title: item.name,
-    value: item.id,
-    children: item.children?.length ? convertToTreeOptions(item.children, level + 1) : []
-  }))
-}
-
-// Add "Top Level" option
-const getMenuTreeOptions = () => {
-  const options = [{ key: 0, title: '顶级菜单', value: 0, children: [] }]
-  const children = convertToTreeOptions(menus.value)
-  if (children.length) {
-    options[0].children = children
-  }
-  return options
 }
 
 const getStatusClass = (status: string) => {
@@ -164,15 +172,15 @@ const getStatusClass = (status: string) => {
 }
 
 const getStatusText = (status: string) => {
-  return status === 'enabled' ? '启用' : '禁用'
+  return status === 'enabled' ? '??' : '??'
 }
 
 const getVisibleText = (visible: boolean) => {
-  return visible ? '显示' : '隐藏'
+  return visible ? '??' : '??'
 }
 
-onMounted(() => { 
-  fetchMenus() 
+onMounted(() => {
+  fetchMenus()
 })
 </script>
 
@@ -184,7 +192,7 @@ onMounted(() => {
         <h1>菜单管理</h1>
         <p>管理系统菜单和权限关联</p>
       </div>
-      <button class="primary-btn" @click="handleAdd">
+      <button v-if="canOpenCreateMenu" class="primary-btn" @click="handleAdd">
         <PlusOutlined />
         <span>新增菜单</span>
       </button>
@@ -234,10 +242,10 @@ onMounted(() => {
             </td>
             <td>
               <div class="action-btns">
-                <button class="action-btn" @click="handleEdit(menu)" title="编辑">
+                <button class="action-btn" v-if="canOpenEditMenu" @click="handleEdit(menu)" title="编辑">
                   <EditOutlined />
                 </button>
-                <button class="action-btn danger" @click="handleDelete(menu.id)" title="删除">
+                <button class="action-btn danger" v-if="canDeleteMenu" @click="handleDelete(menu.id)" title="删除">
                   <DeleteOutlined />
                 </button>
               </div>
@@ -332,7 +340,7 @@ onMounted(() => {
         </div>
         <div class="modal-footer">
           <button class="secondary-btn" @click="modalVisible = false">取消</button>
-          <button class="primary-btn" @click="handleSave">保存</button>
+          <button v-if="isEdit ? canUpdateMenu : canCreateMenu" class="primary-btn" @click="handleSave">保存</button>
         </div>
       </div>
     </div>

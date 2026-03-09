@@ -6,7 +6,7 @@ import {
   PlusOutlined, ClockCircleOutlined, CheckCircleOutlined,
   EditOutlined, CloudUploadOutlined, UserAddOutlined
 } from '@ant-design/icons-vue'
-import axios from 'axios'
+import api from '../utils/api'
 
 interface DashboardStats {
   articleCount: number
@@ -34,13 +34,6 @@ interface PendingArticle {
   author: string
   date: string
 }
-
-const api = axios.create({ baseURL: '/api' })
-api.interceptors.request.use(config => {
-  const token = localStorage.getItem('token')
-  if (token) config.headers.Authorization = `Bearer ${token}`
-  return config
-})
 
 const loading = ref(false)
 const stats = ref<DashboardStats>({

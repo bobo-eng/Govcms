@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { message, Modal } from 'ant-design-vue'
-import { PlusOutlined, SearchOutlined, FolderOutlined, FolderOpenOutlined, LockOutlined, EditOutlined, DeleteOutlined, DownOutlined, RightOutlined } from '@ant-design/icons-vue'
-import axios from 'axios'
+import { DeleteOutlined, DownOutlined, EditOutlined, FolderOutlined, LockOutlined, PlusOutlined, RightOutlined, SearchOutlined } from '@ant-design/icons-vue'
+import { usePermission } from '../composables/usePermission'
+import api from '../utils/api'
 
 interface Permission {
   id: string
@@ -16,177 +17,187 @@ interface Permission {
   children?: Permission[]
 }
 
-const api = axios.create({ baseURL: '/api' })
-api.interceptors.request.use(config => {
-  const token = localStorage.getItem('token')
-  if (token) config.headers.Authorization = `Bearer ${token}`
-  return config
-})
+const { hasPermission } = usePermission()
+const canCreatePermission = hasPermission('sys:permission:create')
+const canUpdatePermission = hasPermission('sys:permission:update')
+const canDeletePermission = hasPermission('sys:permission:delete')
 
 const loading = ref(false)
 const permissions = ref<Permission[]>([])
 const searchKeyword = ref('')
-const expandedKeys = ref<string[]>([])  // 展开的节点
-
-// CRUD 状态
+const expandedKeys = ref<string[]>([])
 const modalVisible = ref(false)
 const isEdit = ref(false)
 const editingPermission = ref<Partial<Permission>>({})
-
-// 权限选项（用于父级选择）
 const permissionOptions = ref<any[]>([])
+
+const ensurePermission = (permissionCode: string, actionName: string) => {
+  if (hasPermission(permissionCode)) {
+    return true
+  }
+  message.warning(`??${actionName}??`)
+  return false
+}
 
 const fetchPermissions = async () => {
   loading.value = true
   try {
     const res = await api.get('/permissions')
     permissions.value = res.data || []
-  } catch (e: any) {
-    message.error(e.response?.data?.message || '获取权限列表失败')
+  } catch (error: any) {
+    message.error(error.response?.data?.message || '????????')
   } finally {
     loading.value = false
   }
 }
 
-// 获取所有权限用于父级选择
 const fetchAllPermissions = async () => {
   try {
     const res = await api.get('/permissions/all')
-    const allPerms = res.data || []
-    // 转换为树形选择器格式
-    permissionOptions.value = convertToOptions(allPerms)
-  } catch (e: any) {
-    message.error('获取权限列表失败')
+    permissionOptions.value = convertToOptions(res.data || [])
+  } catch (error: any) {
+    message.error(error.response?.data?.message || '????????')
   }
 }
 
-const convertToOptions = (perms: Permission[], level = 0): any[] => {
-  return perms.map(p => ({
-    value: p.id,
-    label: '  '.repeat(level) + (level > 0 ? '├─ ' : '') + p.name,
-    children: p.children?.length ? convertToOptions(p.children, level + 1) : []
+const convertToOptions = (items: Permission[], level = 0): any[] => {
+  return items.map(item => ({
+    value: item.id,
+    label: '  '.repeat(level) + (level > 0 ? '?? ' : '') + item.name,
+    children: item.children?.length ? convertToOptions(item.children, level + 1) : []
   }))
 }
 
-// Filter permissions based on search
 const filteredPermissions = () => {
-  if (!searchKeyword.value) return permissions.value
-  
+  if (!searchKeyword.value) {
+    return permissions.value
+  }
+
   const keyword = searchKeyword.value.toLowerCase()
-  return permissions.value.filter(p => 
-    p.name.toLowerCase().includes(keyword) || 
-    p.code.toLowerCase().includes(keyword)
+  return permissions.value.filter(permission =>
+    permission.name.toLowerCase().includes(keyword) || permission.code.toLowerCase().includes(keyword)
   )
 }
 
-// Convert to tree data for display
-const renderPermissionTree = (perms: Permission[], level = 0): any[] => {
-  return perms.map(p => ({
-    key: p.id,
-    title: p.name,
-    code: p.code,
-    type: p.type,
-    path: p.path,
-    icon: p.icon,
+const renderPermissionTree = (items: Permission[], level = 0): any[] => {
+  return items.map(item => ({
+    key: item.id,
+    title: item.name,
+    code: item.code,
+    type: item.type,
+    path: item.path,
+    icon: item.icon,
     level,
-    children: p.children?.length ? renderPermissionTree(p.children, level + 1) : []
+    children: item.children?.length ? renderPermissionTree(item.children, level + 1) : []
   }))
 }
 
 const getTypeTag = (type: string) => {
-  if (type === 'menu') return { text: '菜单', class: 'menu-tag' }
-  if (type === 'button') return { text: '按钮', class: 'button-tag' }
+  if (type === 'menu') return { text: '??', class: 'menu-tag' }
+  if (type === 'button') return { text: '??', class: 'button-tag' }
   if (type === 'api') return { text: 'API', class: 'api-tag' }
   return { text: type, class: '' }
 }
 
-// 新增权限
 const handleAdd = async () => {
+  if (!ensurePermission('sys:permission:create', '????')) {
+    return
+  }
+
   await fetchAllPermissions()
-  editingPermission.value = { 
-    name: '', 
-    code: '', 
-    type: 'menu', 
-    parentId: null, 
-    path: '', 
-    icon: '', 
-    sort: 0 
+  editingPermission.value = {
+    name: '',
+    code: '',
+    type: 'menu',
+    parentId: null,
+    path: '',
+    icon: '',
+    sort: 0
   }
   isEdit.value = false
   modalVisible.value = true
 }
 
-// 编辑权限
 const handleEdit = async (record: Permission) => {
+  if (!ensurePermission('sys:permission:update', '????')) {
+    return
+  }
+
   await fetchAllPermissions()
   editingPermission.value = { ...record }
   isEdit.value = true
   modalVisible.value = true
 }
 
-// 删除权限
 const handleDelete = (id: string) => {
+  if (!ensurePermission('sys:permission:delete', '????')) {
+    return
+  }
+
   Modal.confirm({
-    title: '确认删除',
-    content: '确定要删除该权限吗？',
-    okText: '确认删除',
+    title: '????',
+    content: '??????????',
+    okText: '????',
     okType: 'danger',
     onOk: async () => {
       try {
         await api.delete(`/permissions/${id}`)
-        message.success('删除成功')
+        message.success('????')
         fetchPermissions()
-      } catch (e: any) {
-        message.error(e.response?.data?.message || '删除失败')
+      } catch (error: any) {
+        message.error(error.response?.data?.message || '????')
       }
     }
   })
 }
 
-// 保存权限
 const handleSave = async () => {
+  const requiredPermission = isEdit.value ? 'sys:permission:update' : 'sys:permission:create'
+  const actionName = isEdit.value ? '????' : '????'
+  if (!ensurePermission(requiredPermission, actionName)) {
+    return
+  }
+
   if (!editingPermission.value.name?.trim()) {
-    message.error('请输入权限名称')
+    message.error('???????')
     return
   }
   if (!editingPermission.value.code?.trim()) {
-    message.error('请输入权限编码')
+    message.error('???????')
     return
   }
-  
+
   try {
     if (isEdit.value) {
       await api.put(`/permissions/${editingPermission.value.id}`, editingPermission.value)
-      message.success('更新成功')
+      message.success('????')
     } else {
       await api.post('/permissions', editingPermission.value)
-      message.success('创建成功')
+      message.success('????')
     }
     modalVisible.value = false
     fetchPermissions()
-  } catch (e: any) {
-    message.error(e.response?.data?.message || '操作失败')
+  } catch (error: any) {
+    message.error(error.response?.data?.message || '????')
   }
 }
 
-// 展开/折叠节点
 const toggleExpand = (key: string) => {
-  const idx = expandedKeys.value.indexOf(key)
-  if (idx > -1) {
-    expandedKeys.value.splice(idx, 1)
-  } else {
-    expandedKeys.value.push(key)
+  const index = expandedKeys.value.indexOf(key)
+  if (index > -1) {
+    expandedKeys.value.splice(index, 1)
+    return
   }
+  expandedKeys.value.push(key)
 }
 
-// 递归展开所有节点
 const expandAll = () => {
   const keys: string[] = []
-  const collectKeys = (perms: Permission[]) => {
-    perms.forEach(p => {
-      if (p.children?.length) {
-        keys.push(p.id)
-        collectKeys(p.children)
+  const collectKeys = (items: Permission[]) => {
+    items.forEach(item => {
+      if (item.children?.length) {
+        keys.push(item.id)
+        collectKeys(item.children)
       }
     })
   }
@@ -194,14 +205,13 @@ const expandAll = () => {
   expandedKeys.value = keys
 }
 
-// 折叠所有节点
 const collapseAll = () => {
   expandedKeys.value = []
 }
 
-onMounted(() => { 
-  fetchPermissions()
-  expandAll()  // 默认展开所有
+onMounted(async () => {
+  await fetchPermissions()
+  expandAll()
 })
 </script>
 
@@ -213,7 +223,7 @@ onMounted(() => {
         <h1>权限管理</h1>
         <p>系统权限配置和菜单结构</p>
       </div>
-      <button class="primary-btn" @click="handleAdd">
+      <button v-if="canCreatePermission" class="primary-btn" @click="handleAdd">
         <PlusOutlined />
         <span>新增权限</span>
       </button>
@@ -299,10 +309,10 @@ onMounted(() => {
             </span>
             <span class="item-path">{{ perm.path || '-' }}</span>
             <div class="item-actions">
-              <button class="action-btn" @click="handleEdit(perm)" title="编辑">
+              <button class="action-btn" v-if="canUpdatePermission" @click="handleEdit(perm)" title="编辑">
                 <EditOutlined />
               </button>
-              <button class="action-btn danger" @click="handleDelete(perm.key)" title="删除">
+              <button class="action-btn danger" v-if="canDeletePermission" @click="handleDelete(perm.key)" title="删除">
                 <DeleteOutlined />
               </button>
             </div>
@@ -333,10 +343,10 @@ onMounted(() => {
               </span>
               <span class="item-path">{{ child.path || '-' }}</span>
               <div class="item-actions">
-                <button class="action-btn" @click="handleEdit(child)" title="编辑">
+                <button class="action-btn" v-if="canUpdatePermission" @click="handleEdit(child)" title="编辑">
                   <EditOutlined />
                 </button>
-                <button class="action-btn danger" @click="handleDelete(child.key)" title="删除">
+                <button class="action-btn danger" v-if="canDeletePermission" @click="handleDelete(child.key)" title="删除">
                   <DeleteOutlined />
                 </button>
               </div>
@@ -434,7 +444,7 @@ onMounted(() => {
         </div>
         <div class="modal-footer">
           <button class="secondary-btn" @click="modalVisible = false">取消</button>
-          <button class="primary-btn" @click="handleSave">保存</button>
+          <button v-if="isEdit ? canUpdatePermission : canCreatePermission" class="primary-btn" @click="handleSave">保存</button>
         </div>
       </div>
     </div>

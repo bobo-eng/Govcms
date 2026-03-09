@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { message, Modal } from 'ant-design-vue'
-import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, SearchOutlined, FilterOutlined, ExportOutlined } from '@ant-design/icons-vue'
-import axios from 'axios'
+import { DeleteOutlined, EditOutlined, ExportOutlined, EyeOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons-vue'
+import { usePermission } from '../composables/usePermission'
+import api from '../utils/api'
 
 interface Article {
   id: number
@@ -17,24 +18,11 @@ interface Article {
   updatedAt?: string
 }
 
-const api = axios.create({ baseURL: '/api' })
-api.interceptors.request.use(config => {
-  const token = localStorage.getItem('token')
-  if (token) config.headers.Authorization = `Bearer ${token}`
-  return config
-})
-
-api.interceptors.response.use(
-  response => response,
-  error => {
-    if (error.response?.status === 401) {
-      message.error('登录已过期，请重新登录')
-      localStorage.removeItem('token')
-      window.location.href = '/login'
-    }
-    return Promise.reject(error)
-  }
-)
+const { hasPermission } = usePermission()
+const canCreateArticle = hasPermission('content:article:create')
+const canUpdateArticle = hasPermission('content:article:update')
+const canDeleteArticle = hasPermission('content:article:delete')
+const canPublishArticle = hasPermission('content:article:publish')
 
 const loading = ref(false)
 const articles = ref<Article[]>([])
@@ -50,30 +38,38 @@ const pagination = ref({
   total: 0
 })
 
-const categories = ['新闻动态', '政策法规', '通知公告', '办事指南', '常见问题']
+const categories = ['????', '????', '????', '????', '????']
 const statusOptions = [
-  { value: 'draft', label: '草稿' },
-  { value: 'published', label: '已发布' },
-  { value: 'archived', label: '已归档' }
+  { value: 'draft', label: '??' },
+  { value: 'published', label: '???' },
+  { value: 'archived', label: '???' }
 ]
+
+const ensurePermission = (permissionCode: string, actionName: string) => {
+  if (hasPermission(permissionCode)) {
+    return true
+  }
+  message.warning(`??${actionName}??`)
+  return false
+}
 
 const fetchArticles = async () => {
   loading.value = true
   try {
-    const params: any = {
+    const params: Record<string, any> = {
       page: pagination.value.current - 1,
       size: pagination.value.pageSize
     }
     if (searchKeyword.value) params.keyword = searchKeyword.value
     if (filterCategory.value) params.category = filterCategory.value
     if (filterStatus.value) params.status = filterStatus.value
-    
+
     const res = await api.get('/articles', { params })
     articles.value = res.data.content || []
     pagination.value.total = res.data.totalElements || 0
-  } catch (e: any) {
-    console.error('获取内容列表失败:', e)
-    message.error(e.response?.data?.message || '获取内容列表失败')
+  } catch (error: any) {
+    console.error('????????:', error)
+    message.error(error.response?.data?.message || '????????')
   } finally {
     loading.value = false
   }
@@ -91,99 +87,127 @@ const handlePageChange = (page: number, pageSize: number) => {
 }
 
 const handleAdd = () => {
+  if (!ensurePermission('content:article:create', '????')) {
+    return
+  }
+
   editingArticle.value = { title: '', category: '', author: '', status: 'draft', content: '', summary: '' }
   isEdit.value = false
   modalVisible.value = true
 }
 
 const handleEdit = (record: Article) => {
+  if (!ensurePermission('content:article:update', '????')) {
+    return
+  }
+
   editingArticle.value = { ...record }
   isEdit.value = true
   modalVisible.value = true
 }
 
 const handleDelete = (id: number) => {
+  if (!ensurePermission('content:article:delete', '????')) {
+    return
+  }
+
   Modal.confirm({
-    title: '确认删除',
-    content: '确定要删除该文章吗？此操作不可撤销。',
-    okText: '确认删除',
+    title: '????',
+    content: '??????????????????',
+    okText: '????',
     okType: 'danger',
     onOk: async () => {
       try {
         await api.delete(`/articles/${id}`)
-        message.success('删除成功')
+        message.success('????')
         fetchArticles()
-      } catch (e: any) {
-        message.error(e.response?.data?.message || '删除失败')
+      } catch (error: any) {
+        message.error(error.response?.data?.message || '????')
       }
     }
   })
 }
 
 const handleSave = async () => {
+  const requiredPermission = isEdit.value ? 'content:article:update' : 'content:article:create'
+  const actionName = isEdit.value ? '????' : '????'
+  if (!ensurePermission(requiredPermission, actionName)) {
+    return
+  }
+
   if (!editingArticle.value.title?.trim()) {
-    message.error('请输入标题')
+    message.error('?????')
     return
   }
   if (!editingArticle.value.category) {
-    message.error('请选择分类')
+    message.error('?????')
     return
   }
-  
+
   try {
     if (isEdit.value) {
       await api.put(`/articles/${editingArticle.value.id}`, editingArticle.value)
-      message.success('更新成功')
+      message.success('????')
     } else {
       await api.post('/articles', editingArticle.value)
-      message.success('创建成功')
+      message.success('????')
     }
     modalVisible.value = false
     fetchArticles()
-  } catch (e: any) {
-    message.error(e.response?.data?.message || '操作失败')
+  } catch (error: any) {
+    message.error(error.response?.data?.message || '????')
   }
 }
 
 const handlePublish = async (record: Article) => {
+  if (!ensurePermission('content:article:publish', '????')) {
+    return
+  }
+
   try {
     await api.post(`/articles/${record.id}/publish`)
-    message.success('发布成功')
+    message.success('????')
     fetchArticles()
-  } catch (e: any) {
-    message.error(e.response?.data?.message || '发布失败')
+  } catch (error: any) {
+    message.error(error.response?.data?.message || '????')
   }
 }
 
 const handleUnpublish = async (record: Article) => {
+  if (!ensurePermission('content:article:publish', '????')) {
+    return
+  }
+
   try {
     await api.post(`/articles/${record.id}/unpublish`)
-    message.success('已下架')
+    message.success('???')
     fetchArticles()
-  } catch (e: any) {
-    message.error(e.response?.data?.message || '操作失败')
+  } catch (error: any) {
+    message.error(error.response?.data?.message || '????')
   }
 }
 
 const getStatusClass = (status: string) => {
-  const map: Record<string, string> = {
+  const statusMap: Record<string, string> = {
     published: 'success',
     draft: 'warning',
     archived: 'default'
   }
-  return map[status] || 'default'
+  return statusMap[status] || 'default'
 }
 
 const getStatusText = (status: string) => {
-  const map: Record<string, string> = {
-    published: '已发布',
-    draft: '草稿',
-    archived: '已归档'
+  const statusMap: Record<string, string> = {
+    published: '???',
+    draft: '??',
+    archived: '???'
   }
-  return map[status] || status
+  return statusMap[status] || status
 }
 
-onMounted(() => { fetchArticles() })
+onMounted(() => {
+  fetchArticles()
+})
 </script>
 
 <template>
@@ -194,7 +218,7 @@ onMounted(() => { fetchArticles() })
         <h1>内容管理</h1>
         <p>管理网站文章内容</p>
       </div>
-      <button class="primary-btn" @click="handleAdd">
+      <button v-if="canCreateArticle" class="primary-btn" @click="handleAdd">
         <PlusOutlined />
         <span>新建内容</span>
       </button>
@@ -258,16 +282,16 @@ onMounted(() => { fetchArticles() })
             <td class="date-cell">{{ article.createdAt?.split('T')[0] || '-' }}</td>
             <td>
               <div class="action-btns">
-                <button class="action-btn" @click="handleEdit(article)" title="编辑">
+                <button class="action-btn" v-if="canUpdateArticle" @click="handleEdit(article)" title="编辑">
                   <EditOutlined />
                 </button>
-                <button v-if="article.status === 'draft'" class="action-btn success" @click="handlePublish(article)" title="发布">
+                <button v-if="canPublishArticle && article.status === 'draft'" class="action-btn success" @click="handlePublish(article)" title="发布">
                   <ExportOutlined />
                 </button>
-                <button v-else class="action-btn warning" @click="handleUnpublish(article)" title="下架">
+                <button v-else-if="canPublishArticle" class="action-btn warning" @click="handleUnpublish(article)" title="下架">
                   <ExportOutlined />
                 </button>
-                <button class="action-btn danger" @click="handleDelete(article.id)" title="删除">
+                <button class="action-btn danger" v-if="canDeleteArticle" @click="handleDelete(article.id)" title="删除">
                   <DeleteOutlined />
                 </button>
               </div>
@@ -357,7 +381,7 @@ onMounted(() => { fetchArticles() })
         </div>
         <div class="modal-footer">
           <button class="secondary-btn" @click="modalVisible = false">取消</button>
-          <button class="primary-btn" @click="handleSave">保存</button>
+          <button v-if="isEdit ? canUpdateArticle : canCreateArticle" class="primary-btn" @click="handleSave">保存</button>
         </div>
       </div>
     </div>

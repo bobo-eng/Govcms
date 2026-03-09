@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, h } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { h, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import {
   DashboardOutlined,
   FileTextOutlined,
@@ -18,8 +18,8 @@ import {
   GlobalOutlined,
   CloudOutlined
 } from '@ant-design/icons-vue'
-import { Menu } from 'ant-design-vue'
-import axios from 'axios'
+import api from '../utils/api'
+import { clearSession, getUsername } from '../utils/session'
 
 interface MenuItem {
   key: string
@@ -33,12 +33,11 @@ const router = useRouter()
 const route = useRoute()
 const collapsed = ref(false)
 const loading = ref(true)
-
-// Menu state
 const selectedKeys = ref<string[]>([])
 const openKeys = ref<string[]>([])
+const menuItems = ref<MenuItem[]>([])
+const username = ref(getUsername() || 'Admin')
 
-// Icon mapping
 const iconMap: Record<string, any> = {
   DashboardOutlined,
   FileTextOutlined,
@@ -52,7 +51,6 @@ const iconMap: Record<string, any> = {
   CloudOutlined
 }
 
-// Convert backend menu tree to Ant Design format
 const convertToAntMenu = (menus: any[]): MenuItem[] => {
   return menus.map(menu => {
     const item: MenuItem = {
@@ -61,109 +59,94 @@ const convertToAntMenu = (menus: any[]): MenuItem[] => {
       icon: iconMap[menu.icon] ? h(iconMap[menu.icon]) : undefined,
       path: menu.path
     }
-    
-    // Process children
+
     if (menu.children && menu.children.length > 0) {
       item.children = convertToAntMenu(menu.children)
     }
-    
+
     return item
   })
 }
 
-// Menu items for a-menu
-const menuItems = ref<MenuItem[]>([])
-
-// Fetch user menus from API
 const fetchMenus = async () => {
   loading.value = true
   try {
-    const token = localStorage.getItem('token')
-    const res = await axios.get('/api/menus/user', {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-    
-    // Convert backend tree to Ant Design format
+    const res = await api.get('/menus/user')
     menuItems.value = convertToAntMenu(res.data || [])
-    
-    // Auto expand first level menus
-    const firstLevelKeys = menuItems.value
-      .filter(m => m.children && m.children.length > 0)
-      .map(m => m.key)
-    openKeys.value = firstLevelKeys
-    
-  } catch (e) {
-    console.error('Failed to fetch menus:', e)
+    openKeys.value = menuItems.value
+      .filter(item => item.children && item.children.length > 0)
+      .map(item => item.key)
+  } catch (error) {
+    console.error('Failed to fetch menus:', error)
     menuItems.value = []
   } finally {
     loading.value = false
   }
 }
 
-// Handle menu click
-const handleMenuClick = (info: { key: string }) => {
-  const findPath = (items: MenuItem[], key: string): string | undefined => {
-    for (const item of items) {
-      if (item.key === key) return item.path
-      if (item.children) {
-        const found = findPath(item.children, key)
-        if (found) return found
+const findPathByKey = (items: MenuItem[], key: string): string | undefined => {
+  for (const item of items) {
+    if (item.key === key) {
+      return item.path
+    }
+
+    if (item.children) {
+      const found = findPathByKey(item.children, key)
+      if (found) {
+        return found
       }
     }
-    return undefined
   }
-  
-  const path = findPath(menuItems.value, info.key)
-  if (path && path !== '/') {
-    router.push(path)
+
+  return undefined
+}
+
+const findKeyByPath = (items: MenuItem[], targetPath: string): string | undefined => {
+  for (const item of items) {
+    if (item.path === targetPath) {
+      return item.key
+    }
+
+    if (item.children) {
+      const found = findKeyByPath(item.children, targetPath)
+      if (found) {
+        return found
+      }
+    }
+  }
+
+  return undefined
+}
+
+const updateSelectedKeys = () => {
+  const key = findKeyByPath(menuItems.value, route.path)
+  selectedKeys.value = key ? [key] : []
+}
+
+const handleMenuClick = (info: { key: string }) => {
+  const targetPath = findPathByKey(menuItems.value, info.key)
+  if (targetPath && targetPath !== route.path) {
+    router.push(targetPath)
   }
 }
 
-// Handle submenu open/close
 const handleOpenChange = (keys: string[]) => {
   openKeys.value = keys
 }
 
-// Compute selected key based on current route
-const updateSelectedKeys = () => {
-  const path = route.path
-  const findKey = (items: MenuItem[]): string | undefined => {
-    for (const item of items) {
-      if (item.path === path) return item.key
-      if (item.children) {
-        const found = findKey(item.children)
-        if (found) return found
-      }
-    }
-    return undefined
-  }
-  const key = findKey(menuItems.value)
-  if (key) {
-    selectedKeys.value = [key]
-  }
+const handleLogout = () => {
+  clearSession()
+  router.push('/login')
 }
 
-// Watch route changes
-import { watch } from 'vue'
-// ... existing imports
-
-// Add this after the setup
 watch(() => route.path, () => {
   updateSelectedKeys()
 })
 
-const handleLogout = () => {
-  localStorage.removeItem('token')
-  localStorage.removeItem('username')
-  router.push('/login')
-}
-
-const username = localStorage.getItem('username') || 'Admin'
-
-onMounted(() => {
-  fetchMenus().then(() => {
-    updateSelectedKeys()
-  })
+onMounted(async () => {
+  username.value = getUsername() || 'Admin'
+  await fetchMenus()
+  updateSelectedKeys()
 })
 </script>
 
