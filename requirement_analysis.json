@@ -1,0 +1,259 @@
+{
+  "summary": "政府CMS内容管理系统，**采用SaaS多租户架构**，支持多语言和国产数据库（达梦、人大金仓）。核心功能包括租户管理、多组织管理、用户权限管理、内容管理、站群管理、栏目管理、媒体管理、审批工作流、系统配置和审计日志。**支持多租户独立运营和按需订阅**。不包含政务OA和移动端功能。",
+  "user_stories": [
+    {
+      "id": "US-001",
+      "title": "多组织架构管理",
+      "description": "作为系统管理员，我想要管理多个政府组织机构，以便实现各单位的独立管理和数据隔离。",
+      "acceptance_criteria": [
+        "Given 系统管理员登录 When 创建新组织 Then 组织信息保存成功，包括组织名称、组织编码、联系人、联系电话",
+        "Given 已存在多个组织 When 切换组织上下文 Then 当前用户只能操作所选组织的数据",
+        "Given 组织管理员 When 管理本组织用户 Then 用户数据仅在本组织内可见",
+        "Given 系统管理员 When 禁用组织 Then 该组织所有用户无法登录但数据保留"
+      ],
+      "priority": "high"
+    },
+    {
+      "id": "US-002",
+      "title": "用户与权限管理",
+      "description": "作为组织管理员，我想要管理本组织的用户和角色权限，以便实现精细化的访问控制。",
+      "acceptance_criteria": [
+        "Given 组织管理员 When 创建用户 Then 可设置用户名、密码、真实姓名、岗位、所属部门",
+        "Given 组织管理员 When 分配角色 Then 用户获得对应角色的所有权限",
+        "Given 系统管理员 When 创建角色 Then 可配置角色名称、角色描述、权限集合",
+        "Given 用户 When 登录系统 Then 根据角色显示有权限的功能菜单",
+        "Given 组织管理员 When 重置用户密码 Then 用户下次登录需强制修改密码"
+      ],
+      "priority": "high"
+    },
+    {
+      "id": "US-003",
+      "title": "站群管理",
+      "description": "作为系统管理员，我想要管理多个子站点，以便实现政府门户网站的统一管理和独立发布。",
+      "acceptance_criteria": [
+        "Given 系统管理员 When 创建子站点 Then 可设置站点名称、域名、LOGO、备案号、SEO信息",
+        "Given 组织管理员 When 分配站点 Then 站点与组织关联，数据隔离",
+        "Given 站点管理员 When 配置站点 Then 可设置站点模板、栏目模板、发布规则",
+        "Given 站点管理员 When 查看站点统计 Then 显示访问量、发布文章数等汇总数据"
+      ],
+      "priority": "high"
+    },
+    {
+      "id": "US-004",
+      "title": "栏目管理",
+      "description": "作为站点管理员，我想要管理网站栏目结构，以便组织网站内容层次。",
+      "acceptance_criteria": [
+        "Given 站点管理员 When 创建栏目 Then 可设置栏目名称、栏目类型、栏目路径、访问权限",
+        "Given 站点管理员 When 创建多级栏目 Then 支持无限级栏目树结构",
+        "Given 站点管理员 When 调整栏目顺序 Then 前台展示顺序同步更新",
+        "Given 站点管理员 When 移动栏目 Then 栏目及其下级内容一同迁移",
+        "Given 站点管理员 When 删除栏目 Then 可选择是否删除下属内容"
+      ],
+      "priority": "high"
+    },
+    {
+      "id": "US-005",
+      "title": "内容管理",
+      "description": "作为内容编辑，我想要创建、编辑和发布文章内容，以便向公众提供政务信息。",
+      "acceptance_criteria": [
+        "Given 内容编辑 When 创建文章 Then 可设置标题、作者、来源、摘要、正文、附件",
+        "Given 内容编辑 When 选择发布时间 Then 文章在指定时间自动发布",
+        "Given 内容编辑 When 设置置顶 Then 文章在列表页置顶显示",
+        "Given 内容编辑 When 保存草稿 Then 文章保存在草稿状态可继续编辑",
+        "Given 内容编辑 When 复制文章 Then 可基于现有文章创建新文章",
+        "Given 内容编辑 When 批量操作 Then 支持批量删除、批量移动、批量审核"
+      ],
+      "priority": "high"
+    },
+    {
+      "id": "US-006",
+      "title": "媒体管理",
+      "description": "作为内容编辑，我想要管理图片、视频、文档等媒体文件，以便在内容中引用。",
+      "acceptance_criteria": [
+        "Given 内容编辑 When 上传文件 Then 支持图片、视频、文档、压缩包等格式",
+        "Given 内容编辑 When 上传图片 Then 自动生成缩略图并支持裁剪",
+        "Given 内容编辑 When 查看媒体库 Then 可按类型、日期、组织筛选",
+        "Given 内容编辑 When 引用媒体 Then 自动记录引用次数",
+        "Given 系统管理员 When 配置存储 Then 可选择本地存储或对象存储"
+      ],
+      "priority": "medium"
+    },
+    {
+      "id": "US-007",
+      "title": "审核工作流",
+      "description": "作为内容审批者，我想要通过工作流审核内容，以便确保发布内容的合规性。",
+      "acceptance_criteria": [
+        "Given 系统管理员 When 配置工作流 Then 可设置多级审批流程",
+        "Given 系统管理员 When 设置审批角色 Then 可指定哪些角色可以审批",
+        "Given 内容编辑 When 提交审核 Then 消息通知审批人",
+        "Given 审批人 When 审批内容 Then 可选择通过、驳回、退回修改",
+        "Given 审批人 When 驳回内容 Then 编辑者收到驳回原因并可修改后重新提交",
+        "Given 审批人 When 加签/转审 Then 可将审批权转交其他用户"
+      ],
+      "priority": "high"
+    },
+    {
+      "id": "US-008",
+      "title": "多语言支持",
+      "description": "作为系统管理员，我想要配置多语言界面，以便满足不同语言需求。",
+      "acceptance_criteria": [
+        "Given 系统管理员 When 启用语言 Then 可选择简体中文、繁体中文、英文等",
+        "Given 用户 When 切换语言 Then 界面文字、提示信息同步切换",
+        "Given 内容编辑 When 编写内容 Then 可选择语言版本",
+        "Given 站点管理员 When 配置站点 Then 可设置站点支持的语言列表"
+      ],
+      "priority": "medium"
+    },
+    {
+      "id": "US-009",
+      "title": "系统配置",
+      "description": "作为系统管理员，我想要配置系统参数，以便满足不同业务场景需求。",
+      "acceptance_criteria": [
+        "Given 系统管理员 When 配置参数 Then 可设置系统名称、版权信息、文件上传限制",
+        "Given 系统管理员 When 配置邮件 Then 可设置SMTP服务器用于发送通知",
+        "Given 系统管理员 When 配置安全策略 Then 可设置密码复杂度、登录尝试次数、会话超时",
+        "Given 系统管理员 When 配置缓存 Then 可设置缓存策略和过期时间"
+      ],
+      "priority": "medium"
+    },
+    {
+      "id": "US-010",
+      "title": "审计日志",
+      "description": "作为审计人员，我想要查看系统操作日志，以便追溯用户行为和满足合规要求。",
+      "acceptance_criteria": [
+        "Given 系统 When 用户登录 Then 记录登录时间、IP地址、登录结果",
+        "Given 系统 When 用户操作 Then 记录操作模块、操作类型、操作内容、操作时间",
+        "Given 审计人员 When 查询日志 Then 可按时间、用户、操作类型筛选",
+        "Given 审计人员 When 导出日志 Then 支持Excel格式导出",
+        "Given 系统管理员 When 配置日志策略 Then 可设置日志保留期限"
+      ],
+      "priority": "high"
+    },
+    {
+      "id": "US-011",
+      "title": "租户开通与管理",
+      "description": "作为平台运营管理员，我想要开通和管理多个租户，以便实现SaaS模式的独立运营。",
+      "acceptance_criteria": [
+        "Given 平台管理员 登录系统 When 开通新租户 Then 可设置租户名称、企业信息、联系人、联系手机",
+        "Given 平台管理员 When 设置租户套餐 Then 可选择基础版/专业版/旗舰版并设置配额（用户数、站点数、存储空间）",
+        "Given 平台管理员 When 开通租户 Then 系统自动创建租户专属数据库Schema或独立数据库",
+        "Given 租户管理员 首次登录 When 设置租户配置 Then 可配置租户LOGO、域名、主题颜色",
+        "Given 平台管理员 When 禁用租户 Then 该租户所有用户无法登录但数据保留"
+      ],
+      "priority": "high"
+    },
+    {
+      "id": "US-012",
+      "title": "租户套餐与计费",
+      "description": "作为平台运营管理员，我想要设置不同的租户套餐和计费规则，以便实现按需订阅收费。",
+      "acceptance_criteria": [
+        "Given 平台管理员 When 创建套餐 Then 可设置套餐名称、价格、有效期、功能模块、配额限制",
+        "Given 平台管理员 When 设置计费模式 Then 支持年付/月付/季付多种模式",
+        "Given 租户管理员 When 续费/升级套餐 Then 可在线完成支付并即时生效",
+        "Given 系统 When 租户配额超限 Then 自动提醒并限制超出配额的功能",
+        "Given 平台管理员 When 查看租户消费 Then 可查看各租户的订单记录和账单明细"
+      ],
+      "priority": "high"
+    },
+    {
+      "id": "US-013",
+      "title": "租户数据隔离",
+      "description": "作为平台运营管理员，我需要确保各租户之间的数据完全隔离，以保证数据安全和隐私。",
+      "acceptance_criteria": [
+        "Given 系统运行时 When 租户访问数据 Then 仅返回该租户有权访问的数据",
+        "Given 租户管理员 When 创建组织 Then 组织仅在本租户内可见",
+        "Given 租户管理员 When 创建用户 Then 用户仅归属于本租户",
+        "Given 平台管理员 When 数据迁移 Then 可将租户数据导出/导入",
+        "Given 系统 When 租户注销 Then 按规定保留或删除租户全部数据"
+      ],
+      "priority": "high"
+    },
+    {
+      "id": "US-014",
+      "title": "租户运营统计",
+      "description": "作为平台运营管理员，我想要查看各租户的运营统计数据，以便了解平台整体运营状况。",
+      "acceptance_criteria": [
+        "Given 平台管理员 When 查看平台总览 Then 显示租户总数、活跃租户数、总用户数、总站点数",
+        "Given 平台管理员 When 查看租户详情 Then 显示租户活跃度、功能使用情况、套餐信息",
+        "Given 平台管理员 When 导出统计数据 Then 支持Excel格式导出",
+        "Given 系统 When 租户异常 Then 自动发送告警通知给平台管理员"
+      ],
+      "priority": "medium"
+    }
+  ],
+  "functional_requirements": [
+    "FR1: 多组织管理 - 支持组织的增删改查、组织层级管理、组织数据隔离",
+    "FR2: 用户管理 - 支持用户的增删改查、用户状态管理、密码管理",
+    "FR3: 角色权限管理 - 支持角色的增删改查、权限配置、菜单权限控制",
+    "FR4: 站群管理 - 支持多站点创建、站点配置、站点模板管理",
+    "FR5: 栏目管理 - 支持树形栏目结构、栏目模板、栏目权限设置",
+    "FR6: 内容管理 - 支持文章创建编辑、图文内容、附件管理、标签管理",
+    "FR7: 媒体管理 - 支持文件上传下载、媒体库管理、图片处理、云存储集成",
+    "FR8: 审核工作流 - 支持多级审批、审批流程配置、消息通知、审批历史",
+    "FR9: 多语言 - 支持界面多语言、内容多语言、语言切换",
+    "FR10: 系统配置 - 支持系统参数配置、邮件配置、安全配置、缓存配置",
+    "FR11: 审计日志 - 支持操作日志记录、日志查询、日志导出",
+    "FR12: 数据字典 - 支持枚举类型管理、字典项维护",
+    "FR13: 个人工作台 - 支持待办事项、我的草稿、我的发布统计",
+    "FR14: 租户管理 - 支持租户开通、配置、禁用、注销，租户套餐管理",
+    "FR15: 套餐计费 - 支持多种套餐版本、计费模式（年付/月付）、在线支付、配额管理",
+    "FR16: 数据隔离 - 支持Schema级/数据库级租户隔离，行级安全控制",
+    "FR17: 租户运营后台 - 支持平台运营统计、租户监控、告警通知"
+  ],
+  "non_functional_requirements": [
+    "NFR1: 性能 - 支持1000并发用户，页面响应时间不超过3秒",
+    "NFR2: 可用性 - 系统可用性达到99.9%，支持7x24小时运行",
+    "NFR3: 安全性 - 支持国产密码算法、敏感数据加密、防止SQL注入和XSS攻击",
+    "NFR4: 兼容性 - 支持国产数据库（达梦DM8、人大金仓KingbaseES8）",
+    "NFR5: 可扩展性 - 模块化设计，支持功能插件扩展",
+    "NFR6: 易用性 - 界面简洁清晰，符合政府网站设计规范",
+    "NFR7: 可维护性 - 完善的日志记录、异常处理、配置热加载",
+    "NFR8: 响应式 - 管理后台支持1024px以上分辨率的桌面设备",
+    "NFR9: 多租户隔离 - 各租户数据完全隔离，支持逻辑隔离和物理隔离",
+    "NFR10: 租户性能 - 单租户支持500并发用户，平台支持100+租户同时在线",
+    "NFR11: 弹性扩展 - 支持租户数量增长时系统平滑扩展"
+  ],
+  "constraints": [
+    "C1: 不包含政务OA功能模块",
+    "C2: 不需要开发移动端APP",
+    "C3: 必须支持国产数据库（达梦、人大金仓）",
+    "C4: 技术栈限定为SpringBoot 3.x + Vue3 + MySQL",
+    "C5: 需要满足等保/分保等政府安全要求",
+    "C6: 采用SaaS多租户架构，支持独立部署或云服务部署"
+  ],
+  "assumptions": [
+    "A1: 服务器操作系统为Linux（国产系统如麒麟、统信）",
+    "A2: 部署方式为单机或集群部署，暂不考虑微服务架构",
+    "A3: 文件存储初期使用本地存储，后续可扩展对象存储",
+    "A4: 用户数量预计在1000-10000级别",
+    "A5: 内容发布量预计在10万-100万级别",
+    "A6: 需要与政府统一身份认证平台对接（可选）",
+    "A7: 租户数量预计在10-500家之间",
+    "A8: 每个租户下用户数预计在100-5000人之间",
+    "A9: 平台需要支持7x24小时监控和自动告警"
+  ],
+  "open_questions": [
+    "Q1: 多组织之间是否需要数据共享或内容互通机制？",
+    "Q2: 是否需要与政府统一身份认证平台（如CAS、OAuth2）对接？",
+    "Q3: 是否需要支持静态HTML生成用于SEO？",
+    "Q4: 站群是否需要支持分布式部署？",
+    "Q5: 是否需要内容采集（爬虫）功能？",
+    "Q6: 是否需要支持文档在线预览（如Office、PDF）？",
+    "Q7: 审核工作流是否需要会签（多人同时审批）功能？"
+  ],
+  "complexity_estimate": "high",
+  "suggested_technologies": [
+    "后端: SpringBoot 3.2.x (Java 17)",
+    "后端框架: Spring Security + Spring Data JPA",
+    "数据库: MySQL 8.0 / 达梦DM8 / 人大金仓KingbaseES8",
+    "前端: Vue 3 + TypeScript + Vite",
+    "前端UI: Element Plus 或 Ant Design Vue",
+    "富文本编辑器: wangEditor 或 TinyMCE",
+    "工作流: Flowable 或 自研简单工作流",
+    "缓存: Redis",
+    "文件存储: 本地存储 / MinIO对象存储",
+    "消息队列: RabbitMQ (可选)",
+    "日志: Logback + ELK (可选)",
+    "多租户: MySQL Schema隔离 / PostgreSQL Row-Level Security / 分布式数据库"
+  ]
+}

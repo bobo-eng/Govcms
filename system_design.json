@@ -1,0 +1,3136 @@
+{
+  "overview": "政府CMS内容管理系统 - **采用SaaS多租户架构**，支持多组织、多站点、栏目管理、内容管理、媒体管理、审核工作流、多语言和审计日志。系统基于SpringBoot 3.x + Vue3构建，支持国产数据库（达梦DM8、人大金仓KingbaseES8），满足政府安全要求（等保/分保）。**支持多租户独立运营、套餐计费、数据隔离**。",
+  "architecture_style": "multi_tenant_saas_modular_monolith",
+  "components": [
+    {
+      "name": "租户管理模块",
+      "responsibilities": [
+        "租户开通、配置、禁用、注销",
+        "租户域名/子域名管理",
+        "租户主题/LOGO配置",
+        "租户数据隔离控制"
+      ]
+    },
+    {
+      "name": "套餐计费模块",
+      "responsibilities": [
+        "套餐版本管理（基础/专业/旗舰）",
+        "计费模式配置（年付/月付/季付）",
+        "配额管理（用户数/站点数/存储空间）",
+        "订单管理与在线支付集成"
+      ]
+    },
+    {
+      "name": "平台运营后台",
+      "responsibilities": [
+        "租户运营统计",
+        "平台数据总览",
+        "租户监控与告警",
+        "账单与发票管理"
+      ]
+    },
+    {
+      "name": "租户数据隔离层",
+      "responsibilities": [
+        "租户上下文管理",
+        "行级数据过滤",
+        "Schema/数据库隔离",
+        "跨租户访问控制"
+      ]
+    },
+    {
+      "name": "认证服务模块",
+      "responsibility": "负责用户登录、登出、Token刷新、验证码生成、用户Profile管理",
+      "interfaces": [
+        "POST /api/auth/login",
+        "POST /api/auth/logout",
+        "POST /api/auth/refresh",
+        "GET /api/auth/captcha",
+        "GET /api/auth/profile",
+        "PUT /api/auth/profile"
+      ],
+      "dependencies": [
+        "用户管理模块",
+        "Redis缓存",
+        "组织模块"
+      ]
+    },
+    {
+      "name": "组织管理模块",
+      "responsibility": "管理政府组织机构树形结构、组织数据隔离、部门管理",
+      "interfaces": [
+        "GET /api/organizations",
+        "POST /api/organizations",
+        "GET /api/organizations/{id}",
+        "PUT /api/organizations/{id}",
+        "DELETE /api/organizations/{id}",
+        "GET /api/organizations/tree",
+        "PUT /api/organizations/{id}/move"
+      ],
+      "dependencies": [
+        "认证模块"
+      ]
+    },
+    {
+      "name": "用户管理模块",
+      "responsibility": "管理用户账号、密码重置、用户状态、角色分配",
+      "interfaces": [
+        "GET /api/users",
+        "POST /api/users",
+        "GET /api/users/{id}",
+        "PUT /api/users/{id}",
+        "DELETE /api/users/{id}",
+        "POST /api/users/{id}/reset-password",
+        "PUT /api/users/{id}/assign-roles"
+      ],
+      "dependencies": [
+        "认证模块",
+        "组织模块",
+        "角色模块"
+      ]
+    },
+    {
+      "name": "角色管理模块",
+      "responsibility": "管理角色定义、角色权限配置、菜单权限控制",
+      "interfaces": [
+        "GET /api/roles",
+        "POST /api/roles",
+        "GET /api/roles/{id}",
+        "PUT /api/roles/{id}",
+        "DELETE /api/roles/{id}",
+        "PUT /api/roles/{id}/assign-permissions"
+      ],
+      "dependencies": [
+        "权限模块",
+        "用户模块"
+      ]
+    },
+    {
+      "name": "权限管理模块",
+      "responsibility": "管理权限定义、权限树形结构、菜单权限、按钮权限",
+      "interfaces": [
+        "GET /api/permissions",
+        "GET /api/permissions/tree",
+        "GET /api/permissions/menu"
+      ],
+      "dependencies": []
+    },
+    {
+      "name": "站点管理模块",
+      "responsibility": "管理多站点创建、站点配置、站点模板、站点发布",
+      "interfaces": [
+        "GET /api/sites",
+        "POST /api/sites",
+        "GET /api/sites/{id}",
+        "PUT /api/sites/{id}",
+        "DELETE /api/sites/{id}",
+        "GET /api/sites/{id}/config",
+        "PUT /api/sites/{id}/config",
+        "GET /api/sites/{id}/template",
+        "POST /api/sites/{id}/publish"
+      ],
+      "dependencies": [
+        "组织模块",
+        "栏目模块"
+      ]
+    },
+    {
+      "name": "栏目管理模块",
+      "responsibility": "管理树形栏目结构、栏目模板、栏目权限、栏目排序",
+      "interfaces": [
+        "GET /api/categories",
+        "POST /api/categories",
+        "GET /api/categories/{id}",
+        "PUT /api/categories/{id}",
+        "DELETE /api/categories/{id}",
+        "GET /api/categories/tree",
+        "PUT /api/categories/{id}/sort",
+        "PUT /api/categories/{id}/move"
+      ],
+      "dependencies": [
+        "站点模块",
+        "模板模块"
+      ]
+    },
+    {
+      "name": "内容管理模块",
+      "responsibility": "管理文章内容创建编辑、图文内容、标签管理、版本控制、发布管理",
+      "interfaces": [
+        "GET /api/contents",
+        "POST /api/contents",
+        "GET /api/contents/{id}",
+        "PUT /api/contents/{id}",
+        "DELETE /api/contents/{id}",
+        "POST /api/contents/{id}/publish",
+        "POST /api/contents/{id}/unpublish",
+        "GET /api/contents/{id}/versions",
+        "GET /api/contents/search",
+        "POST /api/contents/{id}/archive"
+      ],
+      "dependencies": [
+        "栏目模块",
+        "媒体模块",
+        "工作流模块",
+        "站点模块"
+      ]
+    },
+    {
+      "name": "媒体管理模块",
+      "responsibility": "管理文件上传下载、媒体库、图片处理、云存储集成、文件夹管理",
+      "interfaces": [
+        "GET /api/media",
+        "POST /api/media/upload",
+        "DELETE /api/media/{id}",
+        "GET /api/media/{id}/preview",
+        "GET /api/media/folders",
+        "POST /api/media/folders",
+        "PUT /api/media/folders/{id}",
+        "DELETE /api/media/folders/{id}"
+      ],
+      "dependencies": [
+        "站点模块",
+        "内容模块"
+      ]
+    },
+    {
+      "name": "工作流模块",
+      "responsibility": "管理审核流程定义、多级审批、消息通知、审批历史",
+      "interfaces": [
+        "GET /api/workflows",
+        "POST /api/workflows",
+        "GET /api/workflows/{id}",
+        "PUT /api/workflows/{id}",
+        "DELETE /api/workflows/{id}",
+        "POST /api/workflows/{id}/submit",
+        "POST /api/workflows/{id}/approve",
+        "POST /api/workflows/{id}/reject",
+        "GET /api/workflows/tasks",
+        "GET /api/workflows/history/{businessId}"
+      ],
+      "dependencies": [
+        "用户模块",
+        "内容模块"
+      ]
+    },
+    {
+      "name": "国际化模块",
+      "responsibility": "管理界面多语言、内容多语言、语言切换、本地化资源",
+      "interfaces": [
+        "GET /api/i18n/locale",
+        "PUT /api/i18n/locale",
+        "GET /api/i18n/resources",
+        "POST /api/i18n/resources",
+        "PUT /api/i18n/resources/{id}",
+        "DELETE /api/i18n/resources/{id}"
+      ],
+      "dependencies": []
+    },
+    {
+      "name": "系统配置模块",
+      "responsibility": "管理系统参数配置、邮件配置、安全配置、缓存配置、数据字典",
+      "interfaces": [
+        "GET /api/config",
+        "PUT /api/config",
+        "GET /api/config/dictionaries",
+        "POST /api/config/dictionaries",
+        "PUT /api/config/dictionaries/{id}",
+        "DELETE /api/config/dictionaries/{id}"
+      ],
+      "dependencies": []
+    },
+    {
+      "name": "审计日志模块",
+      "responsibility": "记录系统操作日志、日志查询、日志导出、统计报表",
+      "interfaces": [
+        "GET /api/audit-logs",
+        "GET /api/audit-logs/export",
+        "GET /api/audit-logs/statistics"
+      ],
+      "dependencies": [
+        "用户模块"
+      ]
+    },
+    {
+      "name": "个人工作台模块",
+      "responsibility": "待办事项、我的草稿、我的发布统计",
+      "interfaces": [
+        "GET /api/dashboard/tasks",
+        "GET /api/dashboard/drafts",
+        "GET /api/dashboard/statistics"
+      ],
+      "dependencies": [
+        "工作流模块",
+        "内容模块"
+      ]
+    }
+  ],
+  "data_flow": [
+    {
+      "from": "前端Vue3应用",
+      "to": "API网关/路由层",
+      "data": "HTTP请求(JSON)",
+      "protocol": "HTTPS"
+    },
+    {
+      "from": "API网关",
+      "to": "认证服务模块",
+      "data": "登录请求",
+      "protocol": "HTTP"
+    },
+    {
+      "from": "认证服务模块",
+      "to": "Redis缓存",
+      "data": "Token存储、验证码",
+      "protocol": "Redis协议"
+    },
+    {
+      "from": "认证服务模块",
+      "to": "用户管理模块",
+      "data": "用户验证请求",
+      "protocol": "内部调用"
+    },
+    {
+      "from": "用户管理模块",
+      "to": "数据库",
+      "data": "用户CRUD操作",
+      "protocol": "JDBC"
+    },
+    {
+      "from": "内容管理模块",
+      "to": "媒体管理模块",
+      "data": "媒体文件引用",
+      "protocol": "内部调用"
+    },
+    {
+      "from": "内容管理模块",
+      "to": "工作流模块",
+      "data": "内容提交审核",
+      "protocol": "内部调用"
+    },
+    {
+      "from": "工作流模块",
+      "to": "审计日志模块",
+      "data": "审批操作记录",
+      "protocol": "内部调用"
+    },
+    {
+      "from": "媒体管理模块",
+      "to": "MinIO/本地存储",
+      "data": "文件二进制数据",
+      "protocol": "S3/HTTP"
+    }
+  ],
+  "api_specs": [
+    {
+      "path": "/api/auth/login",
+      "method": "POST",
+      "description": "用户登录接口，返回JWT令牌",
+      "request_schema": {
+        "username": "string - 用户名",
+        "password": "string - 密码(MD5/SM3加密)",
+        "captchaKey": "string - 验证码Key",
+        "captchaCode": "string - 验证码值"
+      },
+      "response_schema": {
+        "token": "string - JWT令牌",
+        "refreshToken": "string - 刷新令牌",
+        "expiresIn": "integer - 过期时间(秒)",
+        "user": "object - 用户基本信息"
+      }
+    },
+    {
+      "path": "/api/auth/logout",
+      "method": "POST",
+      "description": "用户登出，清除Token",
+      "request_schema": {},
+      "response_schema": {
+        "success": "boolean"
+      }
+    },
+    {
+      "path": "/api/auth/refresh",
+      "method": "POST",
+      "description": "刷新JWT令牌",
+      "request_schema": {
+        "refreshToken": "string - 刷新令牌"
+      },
+      "response_schema": {
+        "token": "string - 新JWT令牌",
+        "refreshToken": "string - 新刷新令牌",
+        "expiresIn": "integer"
+      }
+    },
+    {
+      "path": "/api/auth/captcha",
+      "method": "GET",
+      "description": "获取验证码图片",
+      "request_schema": {},
+      "response_schema": {
+        "captchaKey": "string - 验证码唯一标识",
+        "captchaImage": "string - Base64验证码图片"
+      }
+    },
+    {
+      "path": "/api/auth/profile",
+      "method": "GET",
+      "description": "获取当前用户信息",
+      "request_schema": {},
+      "response_schema": {
+        "id": "string - 用户ID",
+        "username": "string - 用户名",
+        "realName": "string - 真实姓名",
+        "email": "string - 邮箱",
+        "phone": "string - 手机号",
+        "avatar": "string - 头像URL",
+        "organizationId": "string - 组织ID",
+        "organizationName": "string - 组织名称",
+        "roles": "array - 角色列表",
+        "permissions": "array - 权限列表"
+      }
+    },
+    {
+      "path": "/api/auth/profile",
+      "method": "PUT",
+      "description": "更新当前用户个人信息",
+      "request_schema": {
+        "realName": "string - 真实姓名",
+        "email": "string - 邮箱",
+        "phone": "string - 手机号",
+        "avatar": "string - 头像URL"
+      },
+      "response_schema": {
+        "success": "boolean"
+      }
+    },
+    {
+      "path": "/api/organizations",
+      "method": "GET",
+      "description": "获取组织列表（分页）",
+      "request_schema": {
+        "page": "integer - 页码",
+        "pageSize": "integer - 每页条数",
+        "keyword": "string - 搜索关键词"
+      },
+      "response_schema": {
+        "total": "integer - 总数",
+        "list": "array - 组织列表"
+      }
+    },
+    {
+      "path": "/api/organizations",
+      "method": "POST",
+      "description": "创建新组织",
+      "request_schema": {
+        "name": "string - 组织名称",
+        "code": "string - 组织编码",
+        "parentId": "string - 父组织ID",
+        "orderNum": "integer - 排序号",
+        "type": "string - 组织类型(department/office/bureau)",
+        "status": "string - 状态(enabled/disabled)",
+        "description": "string - 描述"
+      },
+      "response_schema": {
+        "id": "string - 组织ID"
+      }
+    },
+    {
+      "path": "/api/organizations/{id}",
+      "method": "GET",
+      "description": "获取组织详情",
+      "request_schema": {},
+      "response_schema": {
+        "id": "string",
+        "name": "string",
+        "code": "string",
+        "parentId": "string",
+        "orderNum": "integer",
+        "type": "string",
+        "status": "string",
+        "description": "string",
+        "children": "array - 子组织"
+      }
+    },
+    {
+      "path": "/api/organizations/{id}",
+      "method": "PUT",
+      "description": "更新组织信息",
+      "request_schema": {
+        "name": "string",
+        "code": "string",
+        "orderNum": "integer",
+        "type": "string",
+        "status": "string",
+        "description": "string"
+      },
+      "response_schema": {
+        "success": "boolean"
+      }
+    },
+    {
+      "path": "/api/organizations/{id}",
+      "method": "DELETE",
+      "description": "删除组织（逻辑删除）",
+      "request_schema": {},
+      "response_schema": {
+        "success": "boolean"
+      }
+    },
+    {
+      "path": "/api/organizations/tree",
+      "method": "GET",
+      "description": "获取组织树形结构",
+      "request_schema": {},
+      "response_schema": {
+        "tree": "array - 树形结构数据"
+      }
+    },
+    {
+      "path": "/api/organizations/{id}/move",
+      "method": "PUT",
+      "description": "移动组织到其他父节点",
+      "request_schema": {
+        "parentId": "string - 新父组织ID"
+      },
+      "response_schema": {
+        "success": "boolean"
+      }
+    },
+    {
+      "path": "/api/users",
+      "method": "GET",
+      "description": "获取用户列表（分页）",
+      "request_schema": {
+        "page": "integer",
+        "pageSize": "integer",
+        "keyword": "string - 搜索关键词",
+        "organizationId": "string - 组织ID",
+        "status": "string - 用户状态"
+      },
+      "response_schema": {
+        "total": "integer",
+        "list": "array - 用户列表"
+      }
+    },
+    {
+      "path": "/api/users",
+      "method": "POST",
+      "description": "创建新用户",
+      "request_schema": {
+        "username": "string - 用户名",
+        "password": "string - 初始密码",
+        "realName": "string - 真实姓名",
+        "email": "string - 邮箱",
+        "phone": "string - 手机号",
+        "organizationId": "string - 所属组织",
+        "roleIds": "array - 角色ID列表",
+        "status": "string - 状态"
+      },
+      "response_schema": {
+        "id": "string - 用户ID"
+      }
+    },
+    {
+      "path": "/api/users/{id}",
+      "method": "GET",
+      "description": "获取用户详情",
+      "request_schema": {},
+      "response_schema": {
+        "id": "string",
+        "username": "string",
+        "realName": "string",
+        "email": "string",
+        "phone": "string",
+        "organizationId": "string",
+        "organizationName": "string",
+        "roles": "array",
+        "status": "string",
+        "createTime": "string",
+        "lastLoginTime": "string"
+      }
+    },
+    {
+      "path": "/api/users/{id}",
+      "method": "PUT",
+      "description": "更新用户信息",
+      "request_schema": {
+        "realName": "string",
+        "email": "string",
+        "phone": "string",
+        "organizationId": "string",
+        "roleIds": "array",
+        "status": "string"
+      },
+      "response_schema": {
+        "success": "boolean"
+      }
+    },
+    {
+      "path": "/api/users/{id}",
+      "method": "DELETE",
+      "description": "删除用户（逻辑删除）",
+      "request_schema": {},
+      "response_schema": {
+        "success": "boolean"
+      }
+    },
+    {
+      "path": "/api/users/{id}/reset-password",
+      "method": "POST",
+      "description": "重置用户密码",
+      "request_schema": {
+        "newPassword": "string - 新密码"
+      },
+      "response_schema": {
+        "success": "boolean"
+      }
+    },
+    {
+      "path": "/api/users/{id}/assign-roles",
+      "method": "PUT",
+      "description": "为用户分配角色",
+      "request_schema": {
+        "roleIds": "array - 角色ID列表"
+      },
+      "response_schema": {
+        "success": "boolean"
+      }
+    },
+    {
+      "path": "/api/roles",
+      "method": "GET",
+      "description": "获取角色列表",
+      "request_schema": {
+        "page": "integer",
+        "pageSize": "integer",
+        "keyword": "string"
+      },
+      "response_schema": {
+        "total": "integer",
+        "list": "array"
+      }
+    },
+    {
+      "path": "/api/roles",
+      "method": "POST",
+      "description": "创建新角色",
+      "request_schema": {
+        "name": "string - 角色名称",
+        "code": "string - 角色编码",
+        "description": "string - 描述",
+        "permissionIds": "array - 权限ID列表",
+        "status": "string - 状态"
+      },
+      "response_schema": {
+        "id": "string"
+      }
+    },
+    {
+      "path": "/api/roles/{id}",
+      "method": "GET",
+      "description": "获取角色详情",
+      "request_schema": {},
+      "response_schema": {
+        "id": "string",
+        "name": "string",
+        "code": "string",
+        "description": "string",
+        "permissions": "array",
+        "status": "string"
+      }
+    },
+    {
+      "path": "/api/roles/{id}",
+      "method": "PUT",
+      "description": "更新角色信息",
+      "request_schema": {
+        "name": "string",
+        "description": "string",
+        "permissionIds": "array",
+        "status": "string"
+      },
+      "response_schema": {
+        "success": "boolean"
+      }
+    },
+    {
+      "path": "/api/roles/{id}",
+      "method": "DELETE",
+      "description": "删除角色",
+      "request_schema": {},
+      "response_schema": {
+        "success": "boolean"
+      }
+    },
+    {
+      "path": "/api/roles/{id}/assign-permissions",
+      "method": "PUT",
+      "description": "为角色分配权限",
+      "request_schema": {
+        "permissionIds": "array"
+      },
+      "response_schema": {
+        "success": "boolean"
+      }
+    },
+    {
+      "path": "/api/permissions",
+      "method": "GET",
+      "description": "获取权限列表",
+      "request_schema": {
+        "type": "string - 权限类型(menu/button/api)"
+      },
+      "response_schema": {
+        "list": "array"
+      }
+    },
+    {
+      "path": "/api/permissions/tree",
+      "method": "GET",
+      "description": "获取权限树形结构",
+      "request_schema": {},
+      "response_schema": {
+        "tree": "array"
+      }
+    },
+    {
+      "path": "/api/sites",
+      "method": "GET",
+      "description": "获取站点列表",
+      "request_schema": {
+        "page": "integer",
+        "pageSize": "integer",
+        "keyword": "string",
+        "organizationId": "string"
+      },
+      "response_schema": {
+        "total": "integer",
+        "list": "array"
+      }
+    },
+    {
+      "path": "/api/sites",
+      "method": "POST",
+      "description": "创建新站点",
+      "request_schema": {
+        "name": "string - 站点名称",
+        "code": "string - 站点编码",
+        "domain": "string - 域名",
+        "organizationId": "string - 所属组织",
+        "description": "string - 描述",
+        "status": "string - 状态"
+      },
+      "response_schema": {
+        "id": "string"
+      }
+    },
+    {
+      "path": "/api/sites/{id}",
+      "method": "GET",
+      "description": "获取站点详情",
+      "request_schema": {},
+      "response_schema": {
+        "id": "string",
+        "name": "string",
+        "code": "string",
+        "domain": "string",
+        "organizationId": "string",
+        "description": "string",
+        "status": "string",
+        "config": "object - 站点配置"
+      }
+    },
+    {
+      "path": "/api/sites/{id}",
+      "method": "PUT",
+      "description": "更新站点信息",
+      "request_schema": {
+        "name": "string",
+        "code": "string",
+        "domain": "string",
+        "description": "string",
+        "status": "string"
+      },
+      "response_schema": {
+        "success": "boolean"
+      }
+    },
+    {
+      "path": "/api/sites/{id}",
+      "method": "DELETE",
+      "description": "删除站点",
+      "request_schema": {},
+      "response_schema": {
+        "success": "boolean"
+      }
+    },
+    {
+      "path": "/api/sites/{id}/config",
+      "method": "GET",
+      "description": "获取站点配置",
+      "request_schema": {},
+      "response_schema": {
+        "config": "object"
+      }
+    },
+    {
+      "path": "/api/sites/{id}/config",
+      "method": "PUT",
+      "description": "更新站点配置",
+      "request_schema": {
+        "config": "object - JSON配置"
+      },
+      "response_schema": {
+        "success": "boolean"
+      }
+    },
+    {
+      "path": "/api/sites/{id}/template",
+      "method": "GET",
+      "description": "获取站点模板",
+      "request_schema": {},
+      "response_schema": {
+        "templates": "array"
+      }
+    },
+    {
+      "path": "/api/sites/{id}/publish",
+      "method": "POST",
+      "description": "发布站点",
+      "request_schema": {},
+      "response_schema": {
+        "success": "boolean",
+        "taskId": "string - 发布任务ID"
+      }
+    },
+    {
+      "path": "/api/categories",
+      "method": "GET",
+      "description": "获取栏目列表",
+      "request_schema": {
+        "siteId": "string - 站点ID",
+        "page": "integer",
+        "pageSize": "integer",
+        "keyword": "string"
+      },
+      "response_schema": {
+        "total": "integer",
+        "list": "array"
+      }
+    },
+    {
+      "path": "/api/categories",
+      "method": "POST",
+      "description": "创建新栏目",
+      "request_schema": {
+        "siteId": "string",
+        "name": "string - 栏目名称",
+        "code": "string - 栏目编码",
+        "parentId": "string - 父栏目ID",
+        "type": "string - 栏目类型(link/list/detail)",
+        "template": "string - 模板路径",
+        "orderNum": "integer - 排序号",
+        "status": "string - 状态",
+        "description": "string"
+      },
+      "response_schema": {
+        "id": "string"
+      }
+    },
+    {
+      "path": "/api/categories/{id}",
+      "method": "GET",
+      "description": "获取栏目详情",
+      "request_schema": {},
+      "response_schema": {
+        "id": "string",
+        "siteId": "string",
+        "name": "string",
+        "code": "string",
+        "parentId": "string",
+        "type": "string",
+        "template": "string",
+        "orderNum": "integer",
+        "status": "string",
+        "description": "string",
+        "children": "array"
+      }
+    },
+    {
+      "path": "/api/categories/{id}",
+      "method": "PUT",
+      "description": "更新栏目信息",
+      "request_schema": {
+        "name": "string",
+        "code": "string",
+        "type": "string",
+        "template": "string",
+        "orderNum": "integer",
+        "status": "string",
+        "description": "string"
+      },
+      "response_schema": {
+        "success": "boolean"
+      }
+    },
+    {
+      "path": "/api/categories/{id}",
+      "method": "DELETE",
+      "description": "删除栏目",
+      "request_schema": {},
+      "response_schema": {
+        "success": "boolean"
+      }
+    },
+    {
+      "path": "/api/categories/tree",
+      "method": "GET",
+      "description": "获取栏目树形结构",
+      "request_schema": {
+        "siteId": "string"
+      },
+      "response_schema": {
+        "tree": "array"
+      }
+    },
+    {
+      "path": "/api/categories/{id}/sort",
+      "method": "PUT",
+      "description": "更新栏目排序",
+      "request_schema": {
+        "orderNums": "object - {childId: orderNum}"
+      },
+      "response_schema": {
+        "success": "boolean"
+      }
+    },
+    {
+      "path": "/api/categories/{id}/move",
+      "method": "PUT",
+      "description": "移动栏目到其他父节点",
+      "request_schema": {
+        "parentId": "string"
+      },
+      "response_schema": {
+        "success": "boolean"
+      }
+    },
+    {
+      "path": "/api/contents",
+      "method": "GET",
+      "description": "获取内容列表",
+      "request_schema": {
+        "siteId": "string",
+        "categoryId": "string",
+        "status": "string - 状态(draft/published/archived)",
+        "keyword": "string",
+        "page": "integer",
+        "pageSize": "integer"
+      },
+      "response_schema": {
+        "total": "integer",
+        "list": "array"
+      }
+    },
+    {
+      "path": "/api/contents",
+      "method": "POST",
+      "description": "创建新内容",
+      "request_schema": {
+        "siteId": "string",
+        "categoryId": "string",
+        "title": "string - 标题",
+        "subtitle": "string - 副标题",
+        "author": "string - 作者",
+        "source": "string - 来源",
+        "content": "string - 正文内容(HTML)",
+        "summary": "string - 摘要",
+        "coverImage": "string - 封面图",
+        "tags": "array - 标签",
+        "attachments": "array - 附件列表",
+        "status": "string - 状态"
+      },
+      "response_schema": {
+        "id": "string"
+      }
+    },
+    {
+      "path": "/api/contents/{id}",
+      "method": "GET",
+      "description": "获取内容详情",
+      "request_schema": {},
+      "response_schema": {
+        "id": "string",
+        "siteId": "string",
+        "categoryId": "string",
+        "title": "string",
+        "subtitle": "string",
+        "author": "string",
+        "source": "string",
+        "content": "string",
+        "summary": "string",
+        "coverImage": "string",
+        "tags": "array",
+        "attachments": "array",
+        "status": "string",
+        "version": "integer",
+        "publishTime": "string",
+        "createUser": "string",
+        "createTime": "string",
+        "updateTime": "string"
+      }
+    },
+    {
+      "path": "/api/contents/{id}",
+      "method": "PUT",
+      "description": "更新内容",
+      "request_schema": {
+        "title": "string",
+        "subtitle": "string",
+        "author": "string",
+        "source": "string",
+        "content": "string",
+        "summary": "string",
+        "coverImage": "string",
+        "tags": "array",
+        "attachments": "array"
+      },
+      "response_schema": {
+        "success": "boolean"
+      }
+    },
+    {
+      "path": "/api/contents/{id}",
+      "method": "DELETE",
+      "description": "删除内容",
+      "request_schema": {},
+      "response_schema": {
+        "success": "boolean"
+      }
+    },
+    {
+      "path": "/api/contents/{id}/publish",
+      "method": "POST",
+      "description": "发布内容",
+      "request_schema": {
+        "publishTime": "string - 定时发布时间"
+      },
+      "response_schema": {
+        "success": "boolean"
+      }
+    },
+    {
+      "path": "/api/contents/{id}/unpublish",
+      "method": "POST",
+      "description": "取消发布内容",
+      "request_schema": {},
+      "response_schema": {
+        "success": "boolean"
+      }
+    },
+    {
+      "path": "/api/contents/{id}/versions",
+      "method": "GET",
+      "description": "获取内容版本历史",
+      "request_schema": {},
+      "response_schema": {
+        "versions": "array"
+      }
+    },
+    {
+      "path": "/api/contents/search",
+      "method": "GET",
+      "description": "搜索内容",
+      "request_schema": {
+        "keyword": "string",
+        "siteId": "string",
+        "categoryId": "string",
+        "page": "integer",
+        "pageSize": "integer"
+      },
+      "response_schema": {
+        "total": "integer",
+        "list": "array"
+      }
+    },
+    {
+      "path": "/api/contents/{id}/archive",
+      "method": "POST",
+      "description": "归档内容",
+      "request_schema": {},
+      "response_schema": {
+        "success": "boolean"
+      }
+    },
+    {
+      "path": "/api/media",
+      "method": "GET",
+      "description": "获取媒体文件列表",
+      "request_schema": {
+        "folderId": "string - 文件夹ID",
+        "siteId": "string",
+        "type": "string - 文件类型(image/video/document)",
+        "keyword": "string",
+        "page": "integer",
+        "pageSize": "integer"
+      },
+      "response_schema": {
+        "total": "integer",
+        "list": "array"
+      }
+    },
+    {
+      "path": "/api/media/upload",
+      "method": "POST",
+      "description": "上传媒体文件",
+      "request_schema": {
+        "file": "file - 文件二进制",
+        "folderId": "string - 目标文件夹",
+        "siteId": "string",
+        "fileName": "string"
+      },
+      "response_schema": {
+        "id": "string",
+        "url": "string",
+        "fileName": "string",
+        "fileSize": "integer",
+        "mimeType": "string"
+      }
+    },
+    {
+      "path": "/api/media/{id}",
+      "method": "DELETE",
+      "description": "删除媒体文件",
+      "request_schema": {},
+      "response_schema": {
+        "success": "boolean"
+      }
+    },
+    {
+      "path": "/api/media/{id}/preview",
+      "method": "GET",
+      "description": "预览媒体文件",
+      "request_schema": {},
+      "response_schema": {
+        "url": "string - 预览URL",
+        "downloadUrl": "string - 下载URL"
+      }
+    },
+    {
+      "path": "/api/media/folders",
+      "method": "GET",
+      "description": "获取文件夹列表",
+      "request_schema": {
+        "siteId": "string",
+        "parentId": "string"
+      },
+      "response_schema": {
+        "folders": "array"
+      }
+    },
+    {
+      "path": "/api/media/folders",
+      "method": "POST",
+      "description": "创建文件夹",
+      "request_schema": {
+        "name": "string",
+        "parentId": "string",
+        "siteId": "string"
+      },
+      "response_schema": {
+        "id": "string"
+      }
+    },
+    {
+      "path": "/api/media/folders/{id}",
+      "method": "PUT",
+      "description": "更新文件夹",
+      "request_schema": {
+        "name": "string"
+      },
+      "response_schema": {
+        "success": "boolean"
+      }
+    },
+    {
+      "path": "/api/media/folders/{id}",
+      "method": "DELETE",
+      "description": "删除文件夹",
+      "request_schema": {},
+      "response_schema": {
+        "success": "boolean"
+      }
+    },
+    {
+      "path": "/api/workflows",
+      "method": "GET",
+      "description": "获取工作流定义列表",
+      "request_schema": {
+        "page": "integer",
+        "pageSize": "integer",
+        "keyword": "string"
+      },
+      "response_schema": {
+        "total": "integer",
+        "list": "array"
+      }
+    },
+    {
+      "path": "/api/workflows",
+      "method": "POST",
+      "description": "创建工作流定义",
+      "request_schema": {
+        "name": "string - 工作流名称",
+        "code": "string - 工作流编码",
+        "description": "string",
+        "nodes": "array - 审批节点配置",
+        "scope": "string - 适用范围"
+      },
+      "response_schema": {
+        "id": "string"
+      }
+    },
+    {
+      "path": "/api/workflows/{id}",
+      "method": "GET",
+      "description": "获取工作流详情",
+      "request_schema": {},
+      "response_schema": {
+        "id": "string",
+        "name": "string",
+        "code": "string",
+        "description": "string",
+        "nodes": "array",
+        "status": "string"
+      }
+    },
+    {
+      "path": "/api/workflows/{id}",
+      "method": "PUT",
+      "description": "更新工作流定义",
+      "request_schema": {
+        "name": "string",
+        "description": "string",
+        "nodes": "array"
+      },
+      "response_schema": {
+        "success": "boolean"
+      }
+    },
+    {
+      "path": "/api/workflows/{id}",
+      "method": "DELETE",
+      "description": "删除工作流定义",
+      "request_schema": {},
+      "response_schema": {
+        "success": "boolean"
+      }
+    },
+    {
+      "path": "/api/workflows/submit",
+      "method": "POST",
+      "description": "提交内容到工作流",
+      "request_schema": {
+        "workflowId": "string",
+        "businessId": "string - 业务ID(内容ID)",
+        "businessType": "string - 业务类型(content)"
+      },
+      "response_schema": {
+        "taskId": "string - 任务ID"
+      }
+    },
+    {
+      "path": "/api/workflows/{taskId}/approve",
+      "method": "POST",
+      "description": "审批通过",
+      "request_schema": {
+        "comment": "string - 审批意见"
+      },
+      "response_schema": {
+        "success": "boolean",
+        "nextTaskId": "string - 下一任务ID"
+      }
+    },
+    {
+      "path": "/api/workflows/{taskId}/reject",
+      "method": "POST",
+      "description": "审批拒绝",
+      "request_schema": {
+        "comment": "string - 拒绝原因"
+      },
+      "response_schema": {
+        "success": "boolean"
+      }
+    },
+    {
+      "path": "/api/workflows/tasks",
+      "method": "GET",
+      "description": "获取待办任务列表",
+      "request_schema": {
+        "page": "integer",
+        "pageSize": "integer",
+        "status": "string - 任务状态"
+      },
+      "response_schema": {
+        "total": "integer",
+        "list": "array"
+      }
+    },
+    {
+      "path": "/api/workflows/history/{businessId}",
+      "method": "GET",
+      "description": "获取业务审批历史",
+      "request_schema": {},
+      "response_schema": {
+        "history": "array"
+      }
+    },
+    {
+      "path": "/api/i18n/locale",
+      "method": "GET",
+      "description": "获取当前语言设置",
+      "request_schema": {},
+      "response_schema": {
+        "locale": "string",
+        "localeName": "string"
+      }
+    },
+    {
+      "path": "/api/i18n/locale",
+      "method": "PUT",
+      "description": "设置当前语言",
+      "request_schema": {
+        "locale": "string - 语言代码(zh_CN/en_US)"
+      },
+      "response_schema": {
+        "success": "boolean"
+      }
+    },
+    {
+      "path": "/api/i18n/resources",
+      "method": "GET",
+      "description": "获取国际化资源",
+      "request_schema": {
+        "locale": "string",
+        "module": "string - 模块"
+      },
+      "response_schema": {
+        "resources": "object - 键值对"
+      }
+    },
+    {
+      "path": "/api/i18n/resources",
+      "method": "POST",
+      "description": "创建国际化资源",
+      "request_schema": {
+        "locale": "string",
+        "module": "string",
+        "key": "string",
+        "value": "string"
+      },
+      "response_schema": {
+        "id": "string"
+      }
+    },
+    {
+      "path": "/api/i18n/resources/{id}",
+      "method": "PUT",
+      "description": "更新国际化资源",
+      "request_schema": {
+        "value": "string"
+      },
+      "response_schema": {
+        "success": "boolean"
+      }
+    },
+    {
+      "path": "/api/i18n/resources/{id}",
+      "method": "DELETE",
+      "description": "删除国际化资源",
+      "request_schema": {},
+      "response_schema": {
+        "success": "boolean"
+      }
+    },
+    {
+      "path": "/api/config",
+      "method": "GET",
+      "description": "获取系统配置",
+      "request_schema": {
+        "group": "string - 配置分组"
+      },
+      "response_schema": {
+        "config": "object"
+      }
+    },
+    {
+      "path": "/api/config",
+      "method": "PUT",
+      "description": "更新系统配置",
+      "request_schema": {
+        "config": "object - 配置键值对"
+      },
+      "response_schema": {
+        "success": "boolean"
+      }
+    },
+    {
+      "path": "/api/config/dictionaries",
+      "method": "GET",
+      "description": "获取数据字典列表",
+      "request_schema": {
+        "page": "integer",
+        "pageSize": "integer",
+        "keyword": "string"
+      },
+      "response_schema": {
+        "total": "integer",
+        "list": "array"
+      }
+    },
+    {
+      "path": "/api/config/dictionaries",
+      "method": "POST",
+      "description": "创建数据字典",
+      "request_schema": {
+        "name": "string - 字典名称",
+        "code": "string - 字典编码",
+        "description": "string",
+        "items": "array - 字典项"
+      },
+      "response_schema": {
+        "id": "string"
+      }
+    },
+    {
+      "path": "/api/config/dictionaries/{id}",
+      "method": "PUT",
+      "description": "更新数据字典",
+      "request_schema": {
+        "name": "string",
+        "description": "string",
+        "items": "array"
+      },
+      "response_schema": {
+        "success": "boolean"
+      }
+    },
+    {
+      "path": "/api/config/dictionaries/{id}",
+      "method": "DELETE",
+      "description": "删除数据字典",
+      "request_schema": {},
+      "response_schema": {
+        "success": "boolean"
+      }
+    },
+    {
+      "path": "/api/audit-logs",
+      "method": "GET",
+      "description": "获取审计日志列表",
+      "request_schema": {
+        "page": "integer",
+        "pageSize": "integer",
+        "userId": "string",
+        "module": "string - 模块",
+        "operation": "string - 操作类型",
+        "startTime": "string - 开始时间",
+        "endTime": "string - 结束时间",
+        "keyword": "string"
+      },
+      "response_schema": {
+        "total": "integer",
+        "list": "array"
+      }
+    },
+    {
+      "path": "/api/audit-logs/export",
+      "method": "GET",
+      "description": "导出审计日志",
+      "request_schema": {
+        "userId": "string",
+        "module": "string",
+        "operation": "string",
+        "startTime": "string",
+        "endTime": "string",
+        "format": "string - 导出格式(excel/csv)"
+      },
+      "response_schema": {
+        "fileUrl": "string - 导出文件URL"
+      }
+    },
+    {
+      "path": "/api/audit-logs/statistics",
+      "method": "GET",
+      "description": "获取审计日志统计",
+      "request_schema": {
+        "startTime": "string",
+        "endTime": "string",
+        "type": "string - 统计类型(daily/monthly/user/module)"
+      },
+      "response_schema": {
+        "statistics": "array"
+      }
+    },
+    {
+      "path": "/api/dashboard/tasks",
+      "method": "GET",
+      "description": "获取待办事项",
+      "request_schema": {
+        "page": "integer",
+        "pageSize": "integer"
+      },
+      "response_schema": {
+        "total": "integer",
+        "list": "array"
+      }
+    },
+    {
+      "path": "/api/dashboard/drafts",
+      "method": "GET",
+      "description": "获取我的草稿",
+      "request_schema": {
+        "page": "integer",
+        "pageSize": "integer"
+      },
+      "response_schema": {
+        "total": "integer",
+        "list": "array"
+      }
+    },
+    {
+      "path": "/api/dashboard/statistics",
+      "method": "GET",
+      "description": "获取我的发布统计",
+      "request_schema": {},
+      "response_schema": {
+        "totalPublished": "integer",
+        "totalDrafts": "integer",
+        "totalViews": "integer",
+        "recentStatistics": "array"
+      }
+    }
+  ],
+  "database_schema": [
+    {
+      "name": "sys_tenant",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(36)",
+          "constraints": "PK"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(100)",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "code",
+          "type": "VARCHAR(50)",
+          "constraints": "NOT NULL UNIQUE"
+        },
+        {
+          "name": "domain",
+          "type": "VARCHAR(100)",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "package_id",
+          "type": "VARCHAR(36)",
+          "constraints": "FK"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(20)",
+          "constraints": "NOT NULL DEFAULT 'active'"
+        },
+        {
+          "name": "expire_date",
+          "type": "DATETIME"
+        },
+        {
+          "name": "logo_url",
+          "type": "VARCHAR(500)"
+        },
+        {
+          "name": "theme_config",
+          "type": "JSON"
+        },
+        {
+          "name": "created_time",
+          "type": "DATETIME",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "updated_time",
+          "type": "DATETIME"
+        }
+      ],
+      "indexes": [
+        "idx_code",
+        "idx_status"
+      ],
+      "relationships": [
+        {
+          "type": "to",
+          "target": "sys_package",
+          "columns": [
+            "package_id",
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sys_package",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(36)",
+          "constraints": "PK"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(50)",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "code",
+          "type": "VARCHAR(20)",
+          "constraints": "NOT NULL UNIQUE"
+        },
+        {
+          "name": "price_monthly",
+          "type": "DECIMAL(10,2)"
+        },
+        {
+          "name": "price_yearly",
+          "type": "DECIMAL(10,2)"
+        },
+        {
+          "name": "max_users",
+          "type": "INT",
+          "constraints": "NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "max_sites",
+          "type": "INT",
+          "constraints": "NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "max_storage_gb",
+          "type": "INT",
+          "constraints": "NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "features",
+          "type": "JSON"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(20)",
+          "constraints": "NOT NULL DEFAULT 'enabled'"
+        },
+        {
+          "name": "created_time",
+          "type": "DATETIME",
+          "constraints": "NOT NULL"
+        }
+      ],
+      "indexes": [
+        "idx_code"
+      ]
+    },
+    {
+      "name": "sys_tenant_order",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(36)",
+          "constraints": "PK"
+        },
+        {
+          "name": "tenant_id",
+          "type": "VARCHAR(36)",
+          "constraints": "FK"
+        },
+        {
+          "name": "package_id",
+          "type": "VARCHAR(36)",
+          "constraints": "FK"
+        },
+        {
+          "name": "order_no",
+          "type": "VARCHAR(50)",
+          "constraints": "NOT NULL UNIQUE"
+        },
+        {
+          "name": "amount",
+          "type": "DECIMAL(10,2)",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "payment_method",
+          "type": "VARCHAR(20)"
+        },
+        {
+          "name": "payment_status",
+          "type": "VARCHAR(20)",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "start_date",
+          "type": "DATETIME",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "end_date",
+          "type": "DATETIME",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "created_time",
+          "type": "DATETIME",
+          "constraints": "NOT NULL"
+        }
+      ],
+      "indexes": [
+        "idx_tenant_id",
+        "idx_order_no"
+      ]
+    },
+    {
+      "name": "sys_organization",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(36)",
+          "constraints": "PK"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(100)",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "code",
+          "type": "VARCHAR(50)",
+          "constraints": "NOT NULL UNIQUE"
+        },
+        {
+          "name": "parent_id",
+          "type": "VARCHAR(36)",
+          "constraints": "FK"
+        },
+        {
+          "name": "level",
+          "type": "INT",
+          "constraints": "NOT NULL DEFAULT 1"
+        },
+        {
+          "name": "type",
+          "type": "VARCHAR(20)",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "order_num",
+          "type": "INT",
+          "constraints": "NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(20)",
+          "constraints": "NOT NULL DEFAULT 'enabled'"
+        },
+        {
+          "name": "description",
+          "type": "VARCHAR(500)"
+        },
+        {
+          "name": "created_by",
+          "type": "VARCHAR(36)"
+        },
+        {
+          "name": "created_time",
+          "type": "DATETIME",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "updated_by",
+          "type": "VARCHAR(36)"
+        },
+        {
+          "name": "updated_time",
+          "type": "DATETIME"
+        },
+        {
+          "name": "deleted",
+          "type": "TINYINT",
+          "constraints": "NOT NULL DEFAULT 0"
+        }
+      ],
+      "indexes": [
+        "idx_parent_id",
+        "idx_code",
+        "idx_status"
+      ],
+      "relationships": [
+        {
+          "type": "self",
+          "columns": [
+            "parent_id",
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sys_user",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(36)",
+          "constraints": "PK"
+        },
+        {
+          "name": "username",
+          "type": "VARCHAR(50)",
+          "constraints": "NOT NULL UNIQUE"
+        },
+        {
+          "name": "password",
+          "type": "VARCHAR(200)",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "real_name",
+          "type": "VARCHAR(50)"
+        },
+        {
+          "name": "email",
+          "type": "VARCHAR(100)"
+        },
+        {
+          "name": "phone",
+          "type": "VARCHAR(20)"
+        },
+        {
+          "name": "avatar",
+          "type": "VARCHAR(500)"
+        },
+        {
+          "name": "organization_id",
+          "type": "VARCHAR(36)",
+          "constraints": "FK"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(20)",
+          "constraints": "NOT NULL DEFAULT 'normal'"
+        },
+        {
+          "name": "password_expired_time",
+          "type": "DATETIME"
+        },
+        {
+          "name": "last_login_time",
+          "type": "DATETIME"
+        },
+        {
+          "name": "created_by",
+          "type": "VARCHAR(36)"
+        },
+        {
+          "name": "created_time",
+          "type": "DATETIME",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "updated_by",
+          "type": "VARCHAR(36)"
+        },
+        {
+          "name": "updated_time",
+          "type": "DATETIME"
+        },
+        {
+          "name": "deleted",
+          "type": "TINYINT",
+          "constraints": "NOT NULL DEFAULT 0"
+        }
+      ],
+      "indexes": [
+        "idx_username",
+        "idx_organization_id",
+        "idx_status"
+      ],
+      "relationships": [
+        {
+          "type": "many-to-one",
+          "columns": [
+            "organization_id",
+            "id"
+          ],
+          "target": "sys_organization"
+        }
+      ]
+    },
+    {
+      "name": "sys_role",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(36)",
+          "constraints": "PK"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(50)",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "code",
+          "type": "VARCHAR(50)",
+          "constraints": "NOT NULL UNIQUE"
+        },
+        {
+          "name": "description",
+          "type": "VARCHAR(200)"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(20)",
+          "constraints": "NOT NULL DEFAULT 'enabled'"
+        },
+        {
+          "name": "created_by",
+          "type": "VARCHAR(36)"
+        },
+        {
+          "name": "created_time",
+          "type": "DATETIME",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "updated_by",
+          "type": "VARCHAR(36)"
+        },
+        {
+          "name": "updated_time",
+          "type": "DATETIME"
+        },
+        {
+          "name": "deleted",
+          "type": "TINYINT",
+          "constraints": "NOT NULL DEFAULT 0"
+        }
+      ],
+      "indexes": [
+        "idx_code",
+        "idx_status"
+      ],
+      "relationships": []
+    },
+    {
+      "name": "sys_user_role",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(36)",
+          "constraints": "PK"
+        },
+        {
+          "name": "user_id",
+          "type": "VARCHAR(36)",
+          "constraints": "NOT NULL FK"
+        },
+        {
+          "name": "role_id",
+          "type": "VARCHAR(36)",
+          "constraints": "NOT NULL FK"
+        },
+        {
+          "name": "created_time",
+          "type": "DATETIME",
+          "constraints": "NOT NULL"
+        }
+      ],
+      "indexes": [
+        "idx_user_id",
+        "idx_role_id",
+        "uk_user_role"
+      ],
+      "relationships": [
+        {
+          "type": "many-to-one",
+          "columns": [
+            "user_id",
+            "id"
+          ],
+          "target": "sys_user"
+        },
+        {
+          "type": "many-to-one",
+          "columns": [
+            "role_id",
+            "id"
+          ],
+          "target": "sys_role"
+        }
+      ]
+    },
+    {
+      "name": "sys_permission",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(36)",
+          "constraints": "PK"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(100)",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "code",
+          "type": "VARCHAR(100)",
+          "constraints": "NOT NULL UNIQUE"
+        },
+        {
+          "name": "type",
+          "type": "VARCHAR(20)",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "parent_id",
+          "type": "VARCHAR(36)"
+        },
+        {
+          "name": "level",
+          "type": "INT",
+          "constraints": "NOT NULL DEFAULT 1"
+        },
+        {
+          "name": "order_num",
+          "type": "INT",
+          "constraints": "NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "path",
+          "type": "VARCHAR(200)"
+        },
+        {
+          "name": "component",
+          "type": "VARCHAR(200)"
+        },
+        {
+          "name": "icon",
+          "type": "VARCHAR(50)"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(20)",
+          "constraints": "NOT NULL DEFAULT 'enabled'"
+        },
+        {
+          "name": "created_by",
+          "type": "VARCHAR(36)"
+        },
+        {
+          "name": "created_time",
+          "type": "DATETIME",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "updated_by",
+          "type": "VARCHAR(36)"
+        },
+        {
+          "name": "updated_time",
+          "type": "DATETIME"
+        },
+        {
+          "name": "deleted",
+          "type": "TINYINT",
+          "constraints": "NOT NULL DEFAULT 0"
+        }
+      ],
+      "indexes": [
+        "idx_parent_id",
+        "idx_code",
+        "idx_type"
+      ],
+      "relationships": [
+        {
+          "type": "self",
+          "columns": [
+            "parent_id",
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "sys_role_permission",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(36)",
+          "constraints": "PK"
+        },
+        {
+          "name": "role_id",
+          "type": "VARCHAR(36)",
+          "constraints": "NOT NULL FK"
+        },
+        {
+          "name": "permission_id",
+          "type": "VARCHAR(36)",
+          "constraints": "NOT NULL FK"
+        },
+        {
+          "name": "created_time",
+          "type": "DATETIME",
+          "constraints": "NOT NULL"
+        }
+      ],
+      "indexes": [
+        "idx_role_id",
+        "idx_permission_id",
+        "uk_role_permission"
+      ],
+      "relationships": [
+        {
+          "type": "many-to-one",
+          "columns": [
+            "role_id",
+            "id"
+          ],
+          "target": "sys_role"
+        },
+        {
+          "type": "many-to-one",
+          "columns": [
+            "permission_id",
+            "id"
+          ],
+          "target": "sys_permission"
+        }
+      ]
+    },
+    {
+      "name": "cms_site",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(36)",
+          "constraints": "PK"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(100)",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "code",
+          "type": "VARCHAR(50)",
+          "constraints": "NOT NULL UNIQUE"
+        },
+        {
+          "name": "domain",
+          "type": "VARCHAR(200)"
+        },
+        {
+          "name": "organization_id",
+          "type": "VARCHAR(36)",
+          "constraints": "FK"
+        },
+        {
+          "name": "config",
+          "type": "TEXT"
+        },
+        {
+          "name": "description",
+          "type": "VARCHAR(500)"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(20)",
+          "constraints": "NOT NULL DEFAULT 'draft'"
+        },
+        {
+          "name": "created_by",
+          "type": "VARCHAR(36)"
+        },
+        {
+          "name": "created_time",
+          "type": "DATETIME",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "updated_by",
+          "type": "VARCHAR(36)"
+        },
+        {
+          "name": "updated_time",
+          "type": "DATETIME"
+        },
+        {
+          "name": "deleted",
+          "type": "TINYINT",
+          "constraints": "NOT NULL DEFAULT 0"
+        }
+      ],
+      "indexes": [
+        "idx_code",
+        "idx_organization_id",
+        "idx_status"
+      ],
+      "relationships": [
+        {
+          "type": "many-to-one",
+          "columns": [
+            "organization_id",
+            "id"
+          ],
+          "target": "sys_organization"
+        }
+      ]
+    },
+    {
+      "name": "cms_category",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(36)",
+          "constraints": "PK"
+        },
+        {
+          "name": "site_id",
+          "type": "VARCHAR(36)",
+          "constraints": "NOT NULL FK"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(100)",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "code",
+          "type": "VARCHAR(50)",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "parent_id",
+          "type": "VARCHAR(36)"
+        },
+        {
+          "name": "level",
+          "type": "INT",
+          "constraints": "NOT NULL DEFAULT 1"
+        },
+        {
+          "name": "path",
+          "type": "VARCHAR(500)"
+        },
+        {
+          "name": "type",
+          "type": "VARCHAR(20)",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "template",
+          "type": "VARCHAR(200)"
+        },
+        {
+          "name": "order_num",
+          "type": "INT",
+          "constraints": "NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(20)",
+          "constraints": "NOT NULL DEFAULT 'enabled'"
+        },
+        {
+          "name": "description",
+          "type": "VARCHAR(500)"
+        },
+        {
+          "name": "created_by",
+          "type": "VARCHAR(36)"
+        },
+        {
+          "name": "created_time",
+          "type": "DATETIME",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "updated_by",
+          "type": "VARCHAR(36)"
+        },
+        {
+          "name": "updated_time",
+          "type": "DATETIME"
+        },
+        {
+          "name": "deleted",
+          "type": "TINYINT",
+          "constraints": "NOT NULL DEFAULT 0"
+        }
+      ],
+      "indexes": [
+        "idx_site_id",
+        "idx_parent_id",
+        "idx_code"
+      ],
+      "relationships": [
+        {
+          "type": "many-to-one",
+          "columns": [
+            "site_id",
+            "id"
+          ],
+          "target": "cms_site"
+        },
+        {
+          "type": "self",
+          "columns": [
+            "parent_id",
+            "id"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "cms_content",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(36)",
+          "constraints": "PK"
+        },
+        {
+          "name": "site_id",
+          "type": "VARCHAR(36)",
+          "constraints": "NOT NULL FK"
+        },
+        {
+          "name": "category_id",
+          "type": "VARCHAR(36)",
+          "constraints": "NOT NULL FK"
+        },
+        {
+          "name": "title",
+          "type": "VARCHAR(200)",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "subtitle",
+          "type": "VARCHAR(200)"
+        },
+        {
+          "name": "author",
+          "type": "VARCHAR(50)"
+        },
+        {
+          "name": "source",
+          "type": "VARCHAR(100)"
+        },
+        {
+          "name": "content",
+          "type": "LONGTEXT"
+        },
+        {
+          "name": "summary",
+          "type": "VARCHAR(500)"
+        },
+        {
+          "name": "cover_image",
+          "type": "VARCHAR(500)"
+        },
+        {
+          "name": "tags",
+          "type": "VARCHAR(500)"
+        },
+        {
+          "name": "attachments",
+          "type": "TEXT"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(20)",
+          "constraints": "NOT NULL DEFAULT 'draft'"
+        },
+        {
+          "name": "version",
+          "type": "INT",
+          "constraints": "NOT NULL DEFAULT 1"
+        },
+        {
+          "name": "view_count",
+          "type": "INT",
+          "constraints": "NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "publish_time",
+          "type": "DATETIME"
+        },
+        {
+          "name": "create_user",
+          "type": "VARCHAR(36)"
+        },
+        {
+          "name": "create_time",
+          "type": "DATETIME",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "updated_by",
+          "type": "VARCHAR(36)"
+        },
+        {
+          "name": "updated_time",
+          "type": "DATETIME"
+        },
+        {
+          "name": "deleted",
+          "type": "TINYINT",
+          "constraints": "NOT NULL DEFAULT 0"
+        }
+      ],
+      "indexes": [
+        "idx_site_id",
+        "idx_category_id",
+        "idx_status",
+        "idx_create_user",
+        "idx_publish_time"
+      ],
+      "relationships": [
+        {
+          "type": "many-to-one",
+          "columns": [
+            "site_id",
+            "id"
+          ],
+          "target": "cms_site"
+        },
+        {
+          "type": "many-to-one",
+          "columns": [
+            "category_id",
+            "id"
+          ],
+          "target": "cms_category"
+        }
+      ]
+    },
+    {
+      "name": "cms_content_version",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(36)",
+          "constraints": "PK"
+        },
+        {
+          "name": "content_id",
+          "type": "VARCHAR(36)",
+          "constraints": "NOT NULL FK"
+        },
+        {
+          "name": "version",
+          "type": "INT",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "title",
+          "type": "VARCHAR(200)"
+        },
+        {
+          "name": "content",
+          "type": "LONGTEXT"
+        },
+        {
+          "name": "diff",
+          "type": "TEXT"
+        },
+        {
+          "name": "create_user",
+          "type": "VARCHAR(36)"
+        },
+        {
+          "name": "create_time",
+          "type": "DATETIME",
+          "constraints": "NOT NULL"
+        }
+      ],
+      "indexes": [
+        "idx_content_id",
+        "idx_version"
+      ],
+      "relationships": [
+        {
+          "type": "many-to-one",
+          "columns": [
+            "content_id",
+            "id"
+          ],
+          "target": "cms_content"
+        }
+      ]
+    },
+    {
+      "name": "cms_media",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(36)",
+          "constraints": "PK"
+        },
+        {
+          "name": "site_id",
+          "type": "VARCHAR(36)",
+          "constraints": "FK"
+        },
+        {
+          "name": "folder_id",
+          "type": "VARCHAR(36)"
+        },
+        {
+          "name": "file_name",
+          "type": "VARCHAR(200)",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "file_path",
+          "type": "VARCHAR(500)",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "file_size",
+          "type": "BIGINT",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "mime_type",
+          "type": "VARCHAR(100)"
+        },
+        {
+          "name": "file_type",
+          "type": "VARCHAR(20)"
+        },
+        {
+          "name": "storage_type",
+          "type": "VARCHAR(20)",
+          "constraints": "NOT NULL DEFAULT 'local'"
+        },
+        {
+          "name": "upload_user",
+          "type": "VARCHAR(36)"
+        },
+        {
+          "name": "create_time",
+          "type": "DATETIME",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "deleted",
+          "type": "TINYINT",
+          "constraints": "NOT NULL DEFAULT 0"
+        }
+      ],
+      "indexes": [
+        "idx_site_id",
+        "idx_folder_id",
+        "idx_file_type"
+      ],
+      "relationships": [
+        {
+          "type": "many-to-one",
+          "columns": [
+            "site_id",
+            "id"
+          ],
+          "target": "cms_site"
+        }
+      ]
+    },
+    {
+      "name": "cms_media_folder",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(36)",
+          "constraints": "PK"
+        },
+        {
+          "name": "site_id",
+          "type": "VARCHAR(36)",
+          "constraints": "FK"
+        },
+        {
+          "name": "parent_id",
+          "type": "VARCHAR(36)"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(100)",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "order_num",
+          "type": "INT",
+          "constraints": "NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "create_user",
+          "type": "VARCHAR(36)"
+        },
+        {
+          "name": "create_time",
+          "type": "DATETIME",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "deleted",
+          "type": "TINYINT",
+          "constraints": "NOT NULL DEFAULT 0"
+        }
+      ],
+      "indexes": [
+        "idx_site_id",
+        "idx_parent_id"
+      ],
+      "relationships": []
+    },
+    {
+      "name": "cms_workflow",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(36)",
+          "constraints": "PK"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(100)",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "code",
+          "type": "VARCHAR(50)",
+          "constraints": "NOT NULL UNIQUE"
+        },
+        {
+          "name": "description",
+          "type": "VARCHAR(500)"
+        },
+        {
+          "name": "nodes",
+          "type": "TEXT",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "scope",
+          "type": "VARCHAR(50)"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(20)",
+          "constraints": "NOT NULL DEFAULT 'enabled'"
+        },
+        {
+          "name": "created_by",
+          "type": "VARCHAR(36)"
+        },
+        {
+          "name": "created_time",
+          "type": "DATETIME",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "updated_by",
+          "type": "VARCHAR(36)"
+        },
+        {
+          "name": "updated_time",
+          "type": "DATETIME"
+        },
+        {
+          "name": "deleted",
+          "type": "TINYINT",
+          "constraints": "NOT NULL DEFAULT 0"
+        }
+      ],
+      "indexes": [
+        "idx_code",
+        "idx_status"
+      ],
+      "relationships": []
+    },
+    {
+      "name": "cms_workflow_task",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(36)",
+          "constraints": "PK"
+        },
+        {
+          "name": "workflow_id",
+          "type": "VARCHAR(36)",
+          "constraints": "NOT NULL FK"
+        },
+        {
+          "name": "business_id",
+          "type": "VARCHAR(36)",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "business_type",
+          "type": "VARCHAR(20)",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "node_id",
+          "type": "VARCHAR(36)",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "node_name",
+          "type": "VARCHAR(100)"
+        },
+        {
+          "name": "assignee",
+          "type": "VARCHAR(36)",
+          "constraints": "FK"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(20)",
+          "constraints": "NOT NULL DEFAULT 'pending'"
+        },
+        {
+          "name": "submit_user",
+          "type": "VARCHAR(36)"
+        },
+        {
+          "name": "submit_time",
+          "type": "DATETIME"
+        },
+        {
+          "name": "approve_time",
+          "type": "DATETIME"
+        },
+        {
+          "name": "comment",
+          "type": "VARCHAR(500)"
+        },
+        {
+          "name": "created_time",
+          "type": "DATETIME",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "updated_time",
+          "type": "DATETIME"
+        }
+      ],
+      "indexes": [
+        "idx_workflow_id",
+        "idx_business_id",
+        "idx_assignee",
+        "idx_status"
+      ],
+      "relationships": [
+        {
+          "type": "many-to-one",
+          "columns": [
+            "workflow_id",
+            "id"
+          ],
+          "target": "cms_workflow"
+        },
+        {
+          "type": "many-to-one",
+          "columns": [
+            "assignee",
+            "id"
+          ],
+          "target": "sys_user"
+        }
+      ]
+    },
+    {
+      "name": "sys_config",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(36)",
+          "constraints": "PK"
+        },
+        {
+          "name": "config_key",
+          "type": "VARCHAR(100)",
+          "constraints": "NOT NULL UNIQUE"
+        },
+        {
+          "name": "config_value",
+          "type": "TEXT"
+        },
+        {
+          "name": "config_group",
+          "type": "VARCHAR(50)"
+        },
+        {
+          "name": "description",
+          "type": "VARCHAR(200)"
+        },
+        {
+          "name": "data_type",
+          "type": "VARCHAR(20)",
+          "constraints": "NOT NULL DEFAULT 'string'"
+        },
+        {
+          "name": "is_system",
+          "type": "TINYINT",
+          "constraints": "NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "created_by",
+          "type": "VARCHAR(36)"
+        },
+        {
+          "name": "created_time",
+          "type": "DATETIME",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "updated_by",
+          "type": "VARCHAR(36)"
+        },
+        {
+          "name": "updated_time",
+          "type": "DATETIME"
+        }
+      ],
+      "indexes": [
+        "idx_config_key",
+        "idx_config_group"
+      ],
+      "relationships": []
+    },
+    {
+      "name": "sys_dictionary",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(36)",
+          "constraints": "PK"
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(50)",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "code",
+          "type": "VARCHAR(50)",
+          "constraints": "NOT NULL UNIQUE"
+        },
+        {
+          "name": "description",
+          "type": "VARCHAR(200)"
+        },
+        {
+          "name": "created_by",
+          "type": "VARCHAR(36)"
+        },
+        {
+          "name": "created_time",
+          "type": "DATETIME",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "updated_by",
+          "type": "VARCHAR(36)"
+        },
+        {
+          "name": "updated_time",
+          "type": "DATETIME"
+        },
+        {
+          "name": "deleted",
+          "type": "TINYINT",
+          "constraints": "NOT NULL DEFAULT 0"
+        }
+      ],
+      "indexes": [
+        "idx_code"
+      ],
+      "relationships": []
+    },
+    {
+      "name": "sys_dictionary_item",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(36)",
+          "constraints": "PK"
+        },
+        {
+          "name": "dictionary_id",
+          "type": "VARCHAR(36)",
+          "constraints": "NOT NULL FK"
+        },
+        {
+          "name": "item_key",
+          "type": "VARCHAR(50)",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "item_value",
+          "type": "VARCHAR(100)",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "order_num",
+          "type": "INT",
+          "constraints": "NOT NULL DEFAULT 0"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(20)",
+          "constraints": "NOT NULL DEFAULT 'enabled'"
+        },
+        {
+          "name": "created_by",
+          "type": "VARCHAR(36)"
+        },
+        {
+          "name": "created_time",
+          "type": "DATETIME",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "updated_by",
+          "type": "VARCHAR(36)"
+        },
+        {
+          "name": "updated_time",
+          "type": "DATETIME"
+        },
+        {
+          "name": "deleted",
+          "type": "TINYINT",
+          "constraints": "NOT NULL DEFAULT 0"
+        }
+      ],
+      "indexes": [
+        "idx_dictionary_id",
+        "idx_item_key"
+      ],
+      "relationships": [
+        {
+          "type": "many-to-one",
+          "columns": [
+            "dictionary_id",
+            "id"
+          ],
+          "target": "sys_dictionary"
+        }
+      ]
+    },
+    {
+      "name": "sys_i18n_resource",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(36)",
+          "constraints": "PK"
+        },
+        {
+          "name": "locale",
+          "type": "VARCHAR(10)",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "module",
+          "type": "VARCHAR(50)",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "resource_key",
+          "type": "VARCHAR(100)",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "resource_value",
+          "type": "VARCHAR(500)",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "created_by",
+          "type": "VARCHAR(36)"
+        },
+        {
+          "name": "created_time",
+          "type": "DATETIME",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "updated_by",
+          "type": "VARCHAR(36)"
+        },
+        {
+          "name": "updated_time",
+          "type": "DATETIME"
+        }
+      ],
+      "indexes": [
+        "idx_locale",
+        "idx_module",
+        "idx_resource_key",
+        "uk_locale_module_key"
+      ],
+      "relationships": []
+    },
+    {
+      "name": "sys_audit_log",
+      "columns": [
+        {
+          "name": "id",
+          "type": "VARCHAR(36)",
+          "constraints": "PK"
+        },
+        {
+          "name": "user_id",
+          "type": "VARCHAR(36)"
+        },
+        {
+          "name": "username",
+          "type": "VARCHAR(50)"
+        },
+        {
+          "name": "real_name",
+          "type": "VARCHAR(50)"
+        },
+        {
+          "name": "module",
+          "type": "VARCHAR(50)",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "operation",
+          "type": "VARCHAR(50)",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "method",
+          "type": "VARCHAR(20)"
+        },
+        {
+          "name": "request_url",
+          "type": "VARCHAR(500)"
+        },
+        {
+          "name": "request_params",
+          "type": "TEXT"
+        },
+        {
+          "name": "response_result",
+          "type": "TEXT"
+        },
+        {
+          "name": "ip_address",
+          "type": "VARCHAR(50)"
+        },
+        {
+          "name": "user_agent",
+          "type": "VARCHAR(500)"
+        },
+        {
+          "name": "status",
+          "type": "VARCHAR(20)",
+          "constraints": "NOT NULL"
+        },
+        {
+          "name": "error_message",
+          "type": "VARCHAR(1000)"
+        },
+        {
+          "name": "execution_time",
+          "type": "INT"
+        },
+        {
+          "name": "create_time",
+          "type": "DATETIME",
+          "constraints": "NOT NULL"
+        }
+      ],
+      "indexes": [
+        "idx_user_id",
+        "idx_module",
+        "idx_operation",
+        "idx_create_time"
+      ],
+      "relationships": []
+    }
+  ],
+  "external_dependencies": [
+    "Redis - Token缓存、验证码存储、会话管理",
+    "MinIO/本地文件系统 - 媒体文件存储",
+    "达梦DM8 - 国产数据库支持",
+    "人大金仓KingbaseES8 - 国产数据库支持"
+  ],
+  "security_considerations": {
+    "租户隔离": "采用Schema级或数据库级数据隔离，确保租户之间数据完全隔离",
+    "访问控制": "租户用户只能访问本租户数据，跨租户访问被严格禁止",
+    "认证授权": "支持多租户SSO，集成本租户目录服务",
+    "审计日志": "记录所有租户操作日志，支持按租户查询",
+    "数据加密": "敏感数据加密存储，传输使用HTTPS",
+    "安全合规": "满足等保/分保要求，支持国产密码算法"
+  },
+  "scalability_plan": "水平扩展策略：1) 应用层采用Docker容器化部署，使用Kubernetes进行自动扩缩容；2) 使用Redis Cluster实现缓存高可用和扩展；3) 数据库采用读写分离+分库分表策略；4) 静态资源使用CDN加速；5) 使用RabbitMQ实现异步消息处理。**多租户支持：租户数量增长时可通过增加数据库实例实现平滑扩展，支持100-500+租户同时在线**。预期支持1000+并发用户/租户，页面响应时间<3秒。",
+  "deployment_strategy": "1) 后端：SpringBoot 3.x应用打包为JAR，使用Docker镜像部署，支持Kubernetes滚动更新；2) 前端：Vue3构建为静态资源，使用Nginx托管，支持CDN加速；3) 数据库：支持MySQL 8.0、达梦DM8、人大金仓KingbaseES8三种数据库，通过配置切换；**多租户部署模式：支持独立数据库、Schema隔离、行级隔离三种模式**；4) 缓存：Redis主从+哨兵模式保证高可用；5) 文件存储：MinIO分布式对象存储或本地文件系统+NAS；6) CI/CD：Jenkins/GitLab CI自动化构建部署。",
+  "risks": [
+    {
+      "risk": "国产数据库兼容性风险 - 达梦/金仓与MySQL语法差异可能导致迁移问题",
+      "impact": "high",
+      "mitigation": "1) 使用Hibernate ORM框架，抽象数据库差异；2) 编写兼容性测试用例，覆盖所有SQL操作；3) 准备MySQL/达梦/金仓三套SQL脚本；4) 使用通用SQL语法，避免数据库特有函数"
+    },
+    {
+      "risk": "多组织数据隔离风险 - 组织间数据泄露可能导致敏感信息外泄",
+      "impact": "high",
+      "mitigation": "1) 应用层实现组织ID过滤，所有查询强制携带组织条件；2) 数据库层使用行级安全策略；3) 定期进行安全审计和渗透测试"
+    },
+    {
+      "risk": "高并发性能风险 - 1000并发下可能出现响应延迟",
+      "impact": "medium",
+      "mitigation": "1) 使用Redis缓存热点数据；2) 数据库读写分离；3) 接口限流和熔断；4) 异步处理非核心流程"
+    },
+    {
+      "risk": "工作流并发审批风险 - 同一任务被多人同时审批",
+      "impact": "medium",
+      "mitigation": "1) 任务锁定机制，审批时锁定任务；2) 数据库乐观锁+重试机制；3) 消息队列保证任务顺序处理"
+    },
+    {
+      "risk": "文件存储单点故障 - 本地存储可能导致文件丢失",
+      "impact": "high",
+      "mitigation": "1) 使用MinIO分布式存储；2) 定期备份；3) 使用NAS网络存储"
+    },
+    {
+      "risk": "等保/分保合规风险 - 不满足政府安全要求",
+      "impact": "high",
+      "mitigation": "1) 使用国产密码算法；2) 完善审计日志；3) 定期安全扫描；4) 聘请专业安全咨询"
+    }
+  ],
+  "multi_tenant_architecture": {
+    "隔离模式": "Schema隔离（推荐）或数据库隔离（高安全）",
+    "租户识别": "通过子域名/自定义域名或租户ID识别",
+    "数据隔离层": "在Repository层实现租户上下文过滤",
+    "配置管理": "租户级别配置与平台级配置分离"
+  }
+}
