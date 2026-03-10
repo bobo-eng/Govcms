@@ -3,6 +3,10 @@ spring:
     name: govcms-admin
   profiles:
     default: local
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
   jpa:
     hibernate:
       ddl-auto: update
@@ -23,3 +27,7 @@ logging:
 jwt:
   secret: govcms-super-secret-jwt-key-please-change-in-production-2026
   expiration: 86400000
+
+app:
+  media:
+    storage-path: ./storage/media

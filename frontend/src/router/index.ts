@@ -1,4 +1,4 @@
-﻿import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory } from 'vue-router'
 import Login from '../views/Login.vue'
 import MainLayout from '../components/MainLayout.vue'
 import Dashboard from '../views/Dashboard.vue'
@@ -8,6 +8,7 @@ import Permissions from '../views/Permissions.vue'
 import Menus from '../views/Menus.vue'
 import Content from '../views/Content.vue'
 import Sites from '../views/Sites.vue'
+import Media from '../views/Media.vue'
 import { clearSession, getToken, hasStoredPermissions } from '../utils/session'
 
 const router = createRouter({
@@ -26,7 +27,8 @@ const router = createRouter({
         { path: 'permissions', name: 'Permissions', component: Permissions },
         { path: 'menus', name: 'Menus', component: Menus },
         { path: 'content', name: 'Content', component: Content },
-        { path: 'sites', name: 'Sites', component: Sites }
+        { path: 'sites', name: 'Sites', component: Sites },
+        { path: 'media', name: 'Media', component: Media }
       ]
     }
   ]

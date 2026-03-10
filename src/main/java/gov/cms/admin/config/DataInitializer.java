@@ -107,7 +107,7 @@ public class DataInitializer {
                 createPermission("site:manage:delete", "????", "site:manage:delete", "button", "site:manage", null, null, 4),
 
                 createPermission("media", "????", "media", "menu", null, "/media", "CloudOutlined", 4),
-                createPermission("media:manage", "???", "media:manage", "menu", "media", "/media/library", "CloudOutlined", 1),
+                createPermission("media:manage", "???", "media:manage", "menu", "media", "/media", "CloudOutlined", 1),
                 createPermission("media:manage:view", "????", "media:manage:view", "button", "media:manage", null, null, 1),
                 createPermission("media:manage:upload", "????", "media:manage:upload", "button", "media:manage", null, null, 2),
                 createPermission("media:manage:delete", "????", "media:manage:delete", "button", "media:manage", null, null, 3)

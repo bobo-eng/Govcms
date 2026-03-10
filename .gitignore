@@ -26,3 +26,6 @@ Thumbs.db
 .tools/
 .tmp-ui-ux-pro-max-skill/
 frontend/.npm-cache/
+
+# Local storage
+storage/
