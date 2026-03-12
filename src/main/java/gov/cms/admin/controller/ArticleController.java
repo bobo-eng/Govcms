@@ -36,8 +36,9 @@ public class ArticleController {
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) Long siteId,
             @PageableDefault(size = 10) Pageable pageable) {
-        return ResponseEntity.ok(articleService.searchArticles(keyword, category, status, pageable));
+        return ResponseEntity.ok(articleService.searchArticles(keyword, category, status, siteId, pageable));
     }
 
     @GetMapping("/{id}")

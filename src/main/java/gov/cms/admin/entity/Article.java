@@ -1,6 +1,14 @@
 package gov.cms.admin.entity;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -10,6 +18,12 @@ public class Article {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column
+    private Long siteId;
+
+    @Column
+    private Long primaryCategoryId;
 
     @Column(nullable = false, length = 500)
     private String title;
@@ -42,6 +56,12 @@ public class Article {
     protected void onCreate() {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
+        if (status == null || status.isBlank()) {
+            status = "draft";
+        }
+        if (views == null) {
+            views = 0;
+        }
     }
 
     @PreUpdate
@@ -49,9 +69,14 @@ public class Article {
         updatedAt = LocalDateTime.now();
     }
 
-    // Getters and Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+
+    public Long getSiteId() { return siteId; }
+    public void setSiteId(Long siteId) { this.siteId = siteId; }
+
+    public Long getPrimaryCategoryId() { return primaryCategoryId; }
+    public void setPrimaryCategoryId(Long primaryCategoryId) { this.primaryCategoryId = primaryCategoryId; }
 
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
