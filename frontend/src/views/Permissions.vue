@@ -35,7 +35,7 @@ const ensurePermission = (permissionCode: string, actionName: string) => {
   if (hasPermission(permissionCode)) {
     return true
   }
-  message.warning(`??${actionName}??`)
+  message.warning(`您没有${actionName}权限`)
   return false
 }
 
@@ -45,7 +45,7 @@ const fetchPermissions = async () => {
     const res = await api.get('/permissions')
     permissions.value = res.data || []
   } catch (error: any) {
-    message.error(error.response?.data?.message || '????????')
+    message.error(error.response?.data?.message || '获取权限列表失败')
   } finally {
     loading.value = false
   }
@@ -56,14 +56,14 @@ const fetchAllPermissions = async () => {
     const res = await api.get('/permissions/all')
     permissionOptions.value = convertToOptions(res.data || [])
   } catch (error: any) {
-    message.error(error.response?.data?.message || '????????')
+    message.error(error.response?.data?.message || '获取全部权限失败')
   }
 }
 
 const convertToOptions = (items: Permission[], level = 0): any[] => {
   return items.map(item => ({
     value: item.id,
-    label: '  '.repeat(level) + (level > 0 ? '?? ' : '') + item.name,
+    label: '  '.repeat(level) + (level > 0 ? '└ ' : '') + item.name,
     children: item.children?.length ? convertToOptions(item.children, level + 1) : []
   }))
 }
@@ -93,14 +93,14 @@ const renderPermissionTree = (items: Permission[], level = 0): any[] => {
 }
 
 const getTypeTag = (type: string) => {
-  if (type === 'menu') return { text: '??', class: 'menu-tag' }
-  if (type === 'button') return { text: '??', class: 'button-tag' }
+  if (type === 'menu') return { text: '菜单', class: 'menu-tag' }
+  if (type === 'button') return { text: '按钮', class: 'button-tag' }
   if (type === 'api') return { text: 'API', class: 'api-tag' }
   return { text: type, class: '' }
 }
 
 const handleAdd = async () => {
-  if (!ensurePermission('sys:permission:create', '????')) {
+  if (!ensurePermission('sys:permission:create', '新增权限')) {
     return
   }
 
@@ -119,7 +119,7 @@ const handleAdd = async () => {
 }
 
 const handleEdit = async (record: Permission) => {
-  if (!ensurePermission('sys:permission:update', '????')) {
+  if (!ensurePermission('sys:permission:update', '编辑权限')) {
     return
   }
 
@@ -130,22 +130,22 @@ const handleEdit = async (record: Permission) => {
 }
 
 const handleDelete = (id: string) => {
-  if (!ensurePermission('sys:permission:delete', '????')) {
+  if (!ensurePermission('sys:permission:delete', '删除权限')) {
     return
   }
 
   Modal.confirm({
-    title: '????',
-    content: '??????????',
-    okText: '????',
+    title: '确认删除',
+    content: '删除后将无法恢复该权限，是否继续？',
+    okText: '确认删除',
     okType: 'danger',
     onOk: async () => {
       try {
         await api.delete(`/permissions/${id}`)
-        message.success('????')
+        message.success('删除成功')
         fetchPermissions()
       } catch (error: any) {
-        message.error(error.response?.data?.message || '????')
+        message.error(error.response?.data?.message || '删除失败')
       }
     }
   })
@@ -153,32 +153,32 @@ const handleDelete = (id: string) => {
 
 const handleSave = async () => {
   const requiredPermission = isEdit.value ? 'sys:permission:update' : 'sys:permission:create'
-  const actionName = isEdit.value ? '????' : '????'
+  const actionName = isEdit.value ? '编辑权限' : '新增权限'
   if (!ensurePermission(requiredPermission, actionName)) {
     return
   }
 
   if (!editingPermission.value.name?.trim()) {
-    message.error('???????')
+    message.error('请输入权限名称')
     return
   }
   if (!editingPermission.value.code?.trim()) {
-    message.error('???????')
+    message.error('请输入权限编码')
     return
   }
 
   try {
     if (isEdit.value) {
       await api.put(`/permissions/${editingPermission.value.id}`, editingPermission.value)
-      message.success('????')
+      message.success('更新成功')
     } else {
       await api.post('/permissions', editingPermission.value)
-      message.success('????')
+      message.success('创建成功')
     }
     modalVisible.value = false
     fetchPermissions()
   } catch (error: any) {
-    message.error(error.response?.data?.message || '????')
+    message.error(error.response?.data?.message || '保存失败')
   }
 }
 
@@ -255,15 +255,15 @@ onMounted(async () => {
     <div class="stats-row">
       <div class="stat-item">
         <span class="stat-value">{{ permissions.length }}</span>
-        <span class="stat-label">权限总数</span>
+          <span class="stat-label">权限总数</span>
       </div>
       <div class="stat-item">
         <span class="stat-value">{{ permissions.filter(p => p.type === 'menu').length }}</span>
-        <span class="stat-label">菜单权限</span>
+          <span class="stat-label">菜单权限</span>
       </div>
       <div class="stat-item">
         <span class="stat-value">{{ permissions.filter(p => p.type === 'button').length }}</span>
-        <span class="stat-label">按钮权限</span>
+          <span class="stat-label">按钮权限</span>
       </div>
     </div>
 
@@ -384,7 +384,7 @@ onMounted(async () => {
               <input 
                 v-model="editingPermission.code"
                 type="text" 
-                placeholder="如: sys:user:add"
+                placeholder="如：sys:user:create"
                 class="form-input"
                 :disabled="isEdit"
               />

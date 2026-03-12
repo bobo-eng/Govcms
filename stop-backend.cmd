@@ -2,9 +2,14 @@
 setlocal
 
 if /i "%~1"=="--no-pause" set "NO_PAUSE=1"
+set "BACKEND_PID="
 
-for /f %%p in ('powershell -NoProfile -Command "$p = Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue ^| Select-Object -ExpandProperty OwningProcess -Unique; if ($p) { $p }"') do set "BACKEND_PID=%%p"
+for /f "tokens=5" %%p in ('netstat -ano ^| findstr ":8080" ^| findstr "LISTENING"') do (
+  set "BACKEND_PID=%%p"
+  goto :pid_found
+)
 
+:pid_found
 if not defined BACKEND_PID (
   echo [INFO] No backend process is listening on port 8080.
   goto :end

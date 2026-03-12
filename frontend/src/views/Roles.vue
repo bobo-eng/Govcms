@@ -47,7 +47,7 @@ const ensurePermission = (permissionCode: string, actionName: string) => {
   if (hasPermission(permissionCode)) {
     return true
   }
-  message.warning(`??${actionName}??`)
+  message.warning(`您没有${actionName}权限`)
   return false
 }
 
@@ -55,7 +55,7 @@ const ensureAllPermissions = (permissionCodes: string[], actionName: string) => 
   if (hasAllPermissions(permissionCodes)) {
     return true
   }
-  message.warning(`??${actionName}??`)
+  message.warning(`您没有${actionName}权限`)
   return false
 }
 
@@ -66,7 +66,7 @@ const fetchRoles = async () => {
     roles.value = res.data || []
     selectedRoleIds.value = selectedRoleIds.value.filter(id => roles.value.some(role => role.id === id))
   } catch (error: any) {
-    message.error(error.response?.data?.message || '????????')
+    message.error(error.response?.data?.message || '获取角色列表失败')
   } finally {
     loading.value = false
   }
@@ -93,12 +93,12 @@ const fetchPermissions = async () => {
     permissions.value = res.data || []
     treeData.value = convertToTreeData(permissions.value)
   } catch (error: any) {
-    message.error(error.response?.data?.message || '????????')
+    message.error(error.response?.data?.message || '获取权限列表失败')
   }
 }
 
 const handleAdd = async () => {
-  if (!ensureAllPermissions(['sys:role:create', 'sys:permission:view'], '????')) {
+  if (!ensureAllPermissions(['sys:role:create', 'sys:permission:view'], '新增角色')) {
     return
   }
 
@@ -110,7 +110,7 @@ const handleAdd = async () => {
 }
 
 const handleEdit = async (record: Role) => {
-  if (!ensureAllPermissions(['sys:role:update', 'sys:permission:view'], '????')) {
+  if (!ensureAllPermissions(['sys:role:update', 'sys:permission:view'], '编辑角色')) {
     return
   }
 
@@ -122,22 +122,22 @@ const handleEdit = async (record: Role) => {
 }
 
 const handleDelete = (id: number) => {
-  if (!ensurePermission('sys:role:delete', '????')) {
+  if (!ensurePermission('sys:role:delete', '删除角色')) {
     return
   }
 
   Modal.confirm({
-    title: '????',
-    content: '??????????',
-    okText: '????',
+    title: '确认删除',
+    content: '删除后将无法恢复该角色，是否继续？',
+    okText: '确认删除',
     okType: 'danger',
     onOk: async () => {
       try {
         await api.delete(`/roles/${id}`)
-        message.success('????')
+        message.success('删除成功')
         fetchRoles()
       } catch (error: any) {
-        message.error(error.response?.data?.message || '????')
+        message.error(error.response?.data?.message || '删除失败')
       }
     }
   })
@@ -151,7 +151,7 @@ const generateCopyCode = (code: string) => {
 
 const copyRole = async (role: Role) => {
   const payload = {
-    name: `${role.name} - ??`,
+    name: `${role.name} - 副本`,
     code: generateCopyCode(role.code),
     description: role.description,
     status: role.status || 'enabled',
@@ -167,39 +167,39 @@ const copyRole = async (role: Role) => {
 }
 
 const handleCopy = (record: Role) => {
-  if (!ensurePermission('sys:role:create', '????')) {
+  if (!ensurePermission('sys:role:create', '复制角色')) {
     return
   }
 
   Modal.confirm({
-    title: '????',
-    content: `????????${record.name}???`,
-    okText: '????',
+    title: '复制角色',
+    content: `确认复制角色“${record.name}”吗？`,
+    okText: '确认复制',
     onOk: async () => {
       try {
         await copyRole(record)
-        message.success(canUpdateRole ? '??????' : '??????????????')
+        message.success(canUpdateRole ? '复制成功' : '复制成功，但当前账号没有分配权限能力')
         fetchRoles()
       } catch (error: any) {
-        message.error(error.response?.data?.message || '??????')
+        message.error(error.response?.data?.message || '复制失败')
       }
     }
   })
 }
 
 const handleBatchCopy = () => {
-  if (!ensurePermission('sys:role:create', '????')) {
+  if (!ensurePermission('sys:role:create', '批量复制')) {
     return
   }
 
   if (selectedRoleIds.value.length !== 1) {
-    message.warning('???? 1 ???????')
+    message.warning('请选择 1 个角色进行复制')
     return
   }
 
   const targetRole = roles.value.find(role => role.id === selectedRoleIds.value[0])
   if (!targetRole) {
-    message.error('????????')
+    message.error('未找到选中的角色')
     return
   }
 
@@ -207,19 +207,19 @@ const handleBatchCopy = () => {
 }
 
 const handleBatchDelete = () => {
-  if (!ensurePermission('sys:role:delete', '????')) {
+  if (!ensurePermission('sys:role:delete', '批量删除')) {
     return
   }
 
   if (!selectedRoleIds.value.length) {
-    message.warning('??????')
+    message.warning('请选择角色')
     return
   }
 
   Modal.confirm({
-    title: '??????',
-    content: `???????? ${selectedRoleIds.value.length} ?????`,
-    okText: '????',
+    title: '批量删除角色',
+    content: `确认删除选中的 ${selectedRoleIds.value.length} 个角色？`,
+    okText: '确认删除',
     okType: 'danger',
     onOk: async () => {
       batchLoading.value = true
@@ -229,10 +229,10 @@ const handleBatchDelete = () => {
         const failCount = result.length - successCount
 
         if (successCount > 0) {
-          message.success(`??? ${successCount} ???`)
+          message.success(`已删除 ${successCount} 个角色`)
         }
         if (failCount > 0) {
-          message.error(`${failCount} ???????`)
+          message.error(`${failCount} 个角色删除失败`)
         }
 
         selectedRoleIds.value = []
@@ -264,17 +264,17 @@ const toggleSelectRole = (id: number, event: Event) => {
 
 const handleSave = async () => {
   const requiredPermission = isEdit.value ? 'sys:role:update' : 'sys:role:create'
-  const actionName = isEdit.value ? '????' : '????'
+  const actionName = isEdit.value ? '编辑角色' : '新增角色'
   if (!ensurePermission(requiredPermission, actionName)) {
     return
   }
 
   if (!editingRole.value.name?.trim()) {
-    message.error('???????')
+    message.error('请输入角色名称')
     return
   }
   if (!editingRole.value.code?.trim()) {
-    message.error('???????')
+    message.error('请输入角色编码')
     return
   }
 
@@ -286,22 +286,22 @@ const handleSave = async () => {
     if (isEdit.value) {
       await api.put(`/roles/${editingRole.value.id}`, payload)
       await api.put(`/roles/${editingRole.value.id}/permissions`, selectedPermissions.value)
-      message.success('????')
+      message.success('更新成功')
     } else {
       const createdRole = await api.post('/roles', payload)
       if (selectedPermissions.value.length && canUpdateRole) {
         await api.put(`/roles/${createdRole.data.id}/permissions`, selectedPermissions.value)
       }
-      message.success('????')
+      message.success('创建成功')
       if (selectedPermissions.value.length && !canUpdateRole) {
-        message.warning('??????????????????????')
+        message.warning('角色已创建，但当前账号没有分配权限能力')
       }
     }
 
     modalVisible.value = false
     fetchRoles()
   } catch (error: any) {
-    message.error(error.response?.data?.message || '????')
+    message.error(error.response?.data?.message || '保存失败')
   }
 }
 
@@ -317,7 +317,7 @@ const getStatusClass = (status: string) => {
 }
 
 const getStatusText = (status: string) => {
-  return status === 'enabled' ? '??' : '??'
+  return status === 'enabled' ? '启用' : '禁用'
 }
 
 onMounted(() => {
@@ -439,7 +439,7 @@ onMounted(() => {
               <input 
                 v-model="editingRole.code"
                 type="text" 
-                placeholder="如: admin, editor"
+                placeholder="如：admin, editor"
                 class="form-input"
                 :disabled="isEdit"
               />

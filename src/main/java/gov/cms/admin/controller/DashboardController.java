@@ -44,8 +44,8 @@ public class DashboardController {
                 .count());
 
         List<DashboardStats.RecentActivity> activities = new ArrayList<>();
-        activities.add(createActivity(1L, "admin", "?????", "?????????", "5???", "publish"));
-        activities.add(createActivity(2L, "admin", "?????", "????", "15???", "edit"));
+        activities.add(createActivity(1L, "admin", "发布文章", "GovCMS 更新公告", "5分钟前", "publish"));
+        activities.add(createActivity(2L, "admin", "编辑内容", "首页轮播文案", "15分钟前", "edit"));
         stats.setRecentActivities(activities);
 
         List<DashboardStats.PendingArticle> pendingArticles = articleRepository.findAll().stream()
@@ -55,7 +55,7 @@ public class DashboardController {
                     DashboardStats.PendingArticle pendingArticle = new DashboardStats.PendingArticle();
                     pendingArticle.setId(article.getId());
                     pendingArticle.setTitle(article.getTitle());
-                    pendingArticle.setType("??");
+                    pendingArticle.setType("文章");
                     pendingArticle.setAuthor(article.getAuthor());
                     pendingArticle.setDate(article.getCreatedAt() != null ? article.getCreatedAt().toString().split("T")[0] : "");
                     return pendingArticle;

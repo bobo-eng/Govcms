@@ -41,7 +41,7 @@ const ensurePermission = (permissionCode: string, actionName: string) => {
   if (hasPermission(permissionCode)) {
     return true
   }
-  message.warning(`??${actionName}??`)
+  message.warning(`您没有${actionName}权限`)
   return false
 }
 
@@ -58,8 +58,8 @@ const fetchUsers = async () => {
     selectedUserIds.value = selectedUserIds.value.filter(id => users.value.some(user => user.id === id))
     pagination.value.total = res.data.totalElements || 0
   } catch (error: any) {
-    console.error('????????:', error)
-    message.error(error.response?.data?.message || '????????')
+    console.error('获取用户列表失败:', error)
+    message.error(error.response?.data?.message || '获取用户列表失败')
   } finally {
     loading.value = false
   }
@@ -77,7 +77,7 @@ const handlePageChange = (page: number, pageSize: number) => {
 }
 
 const handleAdd = () => {
-  if (!ensurePermission('sys:user:create', '????')) {
+  if (!ensurePermission('sys:user:create', '新增用户')) {
     return
   }
   editingUser.value = { username: '', email: '', fullName: '', phone: '', enabled: true }
@@ -87,7 +87,7 @@ const handleAdd = () => {
 }
 
 const handleEdit = (record: User) => {
-  if (!ensurePermission('sys:user:update', '????')) {
+  if (!ensurePermission('sys:user:update', '编辑用户')) {
     return
   }
   editingUser.value = { ...record }
@@ -97,22 +97,22 @@ const handleEdit = (record: User) => {
 }
 
 const handleDelete = (id: number) => {
-  if (!ensurePermission('sys:user:delete', '????')) {
+  if (!ensurePermission('sys:user:delete', '删除用户')) {
     return
   }
 
   Modal.confirm({
-    title: '????',
-    content: '??????????????????',
-    okText: '????',
+    title: '确认删除',
+    content: '删除后将无法恢复该用户，是否继续？',
+    okText: '确认删除',
     okType: 'danger',
     onOk: async () => {
       try {
         await api.delete(`/users/${id}`)
-        message.success('????')
+        message.success('删除成功')
         fetchUsers()
       } catch (error: any) {
-        message.error(error.response?.data?.message || '????')
+        message.error(error.response?.data?.message || '删除失败')
       }
     }
   })
@@ -120,54 +120,54 @@ const handleDelete = (id: number) => {
 
 const handleSave = async () => {
   const requiredPermission = isEdit.value ? 'sys:user:update' : 'sys:user:create'
-  const actionName = isEdit.value ? '????' : '????'
+  const actionName = isEdit.value ? '编辑用户' : '新增用户'
   if (!ensurePermission(requiredPermission, actionName)) {
     return
   }
 
   if (!editingUser.value.username?.trim()) {
-    message.error('??????')
+    message.error('请输入用户名')
     return
   }
   if (!editingUser.value.email?.trim()) {
-    message.error('?????')
+    message.error('请输入邮箱')
     return
   }
 
   try {
     if (isEdit.value) {
       await api.put(`/users/${editingUser.value.id}`, editingUser.value)
-      message.success('????')
+      message.success('更新成功')
     } else {
       if (!editingPassword.value) {
-        message.error('?????')
+        message.error('请输入密码')
         return
       }
       await api.post('/users', { ...editingUser.value, password: editingPassword.value })
-      message.success('????')
+      message.success('创建成功')
     }
     modalVisible.value = false
     fetchUsers()
   } catch (error: any) {
-    message.error(error.response?.data?.message || '????')
+    message.error(error.response?.data?.message || '保存失败')
   }
 }
 
 const handleResetPassword = (record: User) => {
-  if (!ensurePermission('sys:user:reset-password', '????')) {
+  if (!ensurePermission('sys:user:reset-password', '重置密码')) {
     return
   }
 
   Modal.confirm({
-    title: '????',
-    content: `????????${record.username}??????`,
-    okText: '????',
+    title: '重置密码',
+    content: `确认将用户${record.username}的密码重置为默认密码？`,
+    okText: '确认重置',
     onOk: async () => {
       try {
         await api.post(`/users/${record.id}/reset-password`)
-        message.success('??????: GovCMS@2026')
+        message.success('密码已重置为: GovCMS@2026')
       } catch (error: any) {
-        message.error(error.response?.data?.message || '??????')
+        message.error(error.response?.data?.message || '重置密码失败')
       }
     }
   })
@@ -194,7 +194,7 @@ const toggleSelectUser = (id: number, event: Event) => {
 }
 
 const handleBatchDisable = () => {
-  if (!ensurePermission('sys:user:update', '????')) {
+  if (!ensurePermission('sys:user:update', '批量禁用')) {
     return
   }
 
@@ -203,29 +203,29 @@ const handleBatchDisable = () => {
     .map(user => user.id)
 
   if (!selectedUserIds.value.length) {
-    message.warning('??????')
+    message.warning('请选择用户')
     return
   }
 
   if (!targetIds.length) {
-    message.info('?????????????')
+    message.info('所选用户均已处于禁用状态')
     return
   }
 
   Modal.confirm({
-    title: '??????',
-    content: `???????? ${targetIds.length} ?????`,
-    okText: '????',
+    title: '批量禁用用户',
+    content: `确认禁用选中的 ${targetIds.length} 个用户？`,
+    okText: '确认禁用',
     okType: 'danger',
     onOk: async () => {
       batchLoading.value = true
       try {
         await Promise.all(targetIds.map(id => api.put(`/users/${id}`, { enabled: false })))
-        message.success(`??? ${targetIds.length} ???`)
+        message.success(`已禁用 ${targetIds.length} 个用户`)
         selectedUserIds.value = []
         fetchUsers()
       } catch (error: any) {
-        message.error(error.response?.data?.message || '??????')
+        message.error(error.response?.data?.message || '批量禁用失败')
       } finally {
         batchLoading.value = false
       }
@@ -234,19 +234,19 @@ const handleBatchDisable = () => {
 }
 
 const handleBatchDelete = () => {
-  if (!ensurePermission('sys:user:delete', '????')) {
+  if (!ensurePermission('sys:user:delete', '批量删除')) {
     return
   }
 
   if (!selectedUserIds.value.length) {
-    message.warning('??????')
+    message.warning('请选择用户')
     return
   }
 
   Modal.confirm({
-    title: '??????',
-    content: `???????? ${selectedUserIds.value.length} ?????????????`,
-    okText: '????',
+    title: '批量删除用户',
+    content: `确认删除选中的 ${selectedUserIds.value.length} 个用户？此操作不可恢复。`,
+    okText: '确认删除',
     okType: 'danger',
     onOk: async () => {
       batchLoading.value = true
@@ -256,10 +256,10 @@ const handleBatchDelete = () => {
         const failCount = result.length - successCount
 
         if (successCount > 0) {
-          message.success(`??? ${successCount} ???`)
+          message.success(`已删除 ${successCount} 个用户`)
         }
         if (failCount > 0) {
-          message.error(`${failCount} ???????????`)
+          message.error(`${failCount} 个用户删除失败`)
         }
 
         selectedUserIds.value = []
@@ -276,7 +276,7 @@ const getStatusClass = (enabled: boolean) => {
 }
 
 const getStatusText = (enabled: boolean) => {
-  return enabled ? '??' : '??'
+  return enabled ? '启用' : '禁用'
 }
 
 onMounted(() => {

@@ -44,7 +44,7 @@ const ensurePermission = (permissionCode: string, actionName: string) => {
   if (hasPermission(permissionCode)) {
     return true
   }
-  message.warning(`??${actionName}??`)
+  message.warning(`您没有${actionName}权限`)
   return false
 }
 
@@ -52,7 +52,7 @@ const ensureAllPermissions = (permissionCodes: string[], actionName: string) => 
   if (hasAllPermissions(permissionCodes)) {
     return true
   }
-  message.warning(`??${actionName}??`)
+  message.warning(`您没有${actionName}权限`)
   return false
 }
 
@@ -76,7 +76,7 @@ const fetchMenus = async () => {
     const res = await api.get('/menus')
     menus.value = res.data || []
   } catch (error: any) {
-    message.error(error.response?.data?.message || '????????')
+    message.error(error.response?.data?.message || '获取菜单列表失败')
   } finally {
     loading.value = false
   }
@@ -92,12 +92,12 @@ const fetchPermissions = async () => {
     const res = await api.get('/permissions/all')
     permissions.value = res.data || []
   } catch (error: any) {
-    message.error(error.response?.data?.message || '????????')
+    message.error(error.response?.data?.message || '获取权限目录失败')
   }
 }
 
 const handleAdd = async () => {
-  if (!ensureAllPermissions(['sys:menu:create', 'sys:permission:view'], '????')) {
+  if (!ensureAllPermissions(['sys:menu:create', 'sys:permission:view'], '新增菜单')) {
     return
   }
 
@@ -108,7 +108,7 @@ const handleAdd = async () => {
 }
 
 const handleEdit = async (record: Menu) => {
-  if (!ensureAllPermissions(['sys:menu:update', 'sys:permission:view'], '????')) {
+  if (!ensureAllPermissions(['sys:menu:update', 'sys:permission:view'], '编辑菜单')) {
     return
   }
 
@@ -119,22 +119,22 @@ const handleEdit = async (record: Menu) => {
 }
 
 const handleDelete = (id: number) => {
-  if (!ensurePermission('sys:menu:delete', '????')) {
+  if (!ensurePermission('sys:menu:delete', '删除菜单')) {
     return
   }
 
   Modal.confirm({
-    title: '????',
-    content: '??????????',
-    okText: '????',
+    title: '确认删除',
+    content: '删除后将无法恢复该菜单，是否继续？',
+    okText: '确认删除',
     okType: 'danger',
     onOk: async () => {
       try {
         await api.delete(`/menus/${id}`)
-        message.success('????')
+        message.success('删除成功')
         fetchMenus()
       } catch (error: any) {
-        message.error(error.response?.data?.message || '????')
+        message.error(error.response?.data?.message || '删除失败')
       }
     }
   })
@@ -142,28 +142,28 @@ const handleDelete = (id: number) => {
 
 const handleSave = async () => {
   const requiredPermission = isEdit.value ? 'sys:menu:update' : 'sys:menu:create'
-  const actionName = isEdit.value ? '????' : '????'
+  const actionName = isEdit.value ? '编辑菜单' : '新增菜单'
   if (!ensurePermission(requiredPermission, actionName)) {
     return
   }
 
   if (!editingMenu.value.name?.trim()) {
-    message.error('???????')
+    message.error('请输入菜单名称')
     return
   }
 
   try {
     if (isEdit.value) {
       await api.put(`/menus/${editingMenu.value.id}`, editingMenu.value)
-      message.success('????')
+      message.success('更新成功')
     } else {
       await api.post('/menus', editingMenu.value)
-      message.success('????')
+      message.success('创建成功')
     }
     modalVisible.value = false
     fetchMenus()
   } catch (error: any) {
-    message.error(error.response?.data?.message || '????')
+    message.error(error.response?.data?.message || '保存失败')
   }
 }
 
@@ -172,11 +172,11 @@ const getStatusClass = (status: string) => {
 }
 
 const getStatusText = (status: string) => {
-  return status === 'enabled' ? '??' : '??'
+  return status === 'enabled' ? '启用' : '禁用'
 }
 
 const getVisibleText = (visible: boolean) => {
-  return visible ? '??' : '??'
+  return visible ? '显示' : '隐藏'
 }
 
 onMounted(() => {

@@ -10,4 +10,8 @@ import java.util.List;
 public interface PermissionRepository extends JpaRepository<Permission, String> {
 
     List<Permission> findAllByOrderBySortAscIdAsc();
+
+    boolean existsByCodeIgnoreCase(String code);
+
+    boolean existsByCodeIgnoreCaseAndIdNot(String code, String id);
 }
