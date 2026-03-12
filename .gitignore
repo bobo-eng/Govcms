@@ -29,3 +29,7 @@ frontend/.npm-cache/
 
 # Local storage
 storage/
+
+# Temp
+tmp/
+docs/*.docx
