@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
+import java.util.List;
 
 @Repository
 public interface ArticleRepository extends JpaRepository<Article, Long> {
@@ -33,4 +34,11 @@ public interface ArticleRepository extends JpaRepository<Article, Long> {
     long countByPrimaryCategoryId(Long primaryCategoryId);
 
     long countByPrimaryCategoryIdIn(Collection<Long> primaryCategoryIds);
+
+    List<Article> findBySiteIdAndPrimaryCategoryIdAndStatusOrderByCreatedAtDescIdDesc(
+            Long siteId,
+            Long primaryCategoryId,
+            String status,
+            Pageable pageable
+    );
 }

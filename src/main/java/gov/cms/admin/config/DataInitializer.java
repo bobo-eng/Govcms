@@ -102,6 +102,13 @@ public class DataInitializer {
                 createPermission("content:category:update", "编辑栏目", "content:category:update", "button", "content:category", null, null, 3),
                 createPermission("content:category:delete", "删除栏目", "content:category:delete", "button", "content:category", null, null, 4),
 
+                createPermission("template:manage", "????", "template:manage", "menu", "content", "/content/templates", "LayoutOutlined", 3),
+                createPermission("template:manage:view", "????", "template:manage:view", "button", "template:manage", null, null, 1),
+                createPermission("template:manage:create", "????", "template:manage:create", "button", "template:manage", null, null, 2),
+                createPermission("template:manage:update", "????", "template:manage:update", "button", "template:manage", null, null, 3),
+                createPermission("template:manage:bind", "??????", "template:manage:bind", "button", "template:manage", null, null, 4),
+                createPermission("template:manage:preview", "????", "template:manage:preview", "button", "template:manage", null, null, 5),
+                createPermission("template:manage:delete", "????", "template:manage:delete", "button", "template:manage", null, null, 6),
                 createPermission("site", "站点", "site", "menu", null, "/sites", "GlobalOutlined", 3),
                 createPermission("site:manage", "站点管理", "site:manage", "menu", "site", "/sites", "GlobalOutlined", 1),
                 createPermission("site:manage:view", "查看站点", "site:manage:view", "button", "site:manage", null, null, 1),
@@ -169,6 +176,7 @@ public class DataInitializer {
 
         Menu contentMenu = upsertMenu(menuRepository, createMenu("内容管理", "/content", "FileTextOutlined", null, 6, "content"), null);
         upsertMenu(menuRepository, createMenu("栏目管理", "/content/categories", "FolderOutlined", contentMenu.getId(), 1, "content:category"), contentMenu.getId());
+        upsertMenu(menuRepository, createMenu("????", "/content/templates", "LayoutOutlined", contentMenu.getId(), 2, "template:manage"), contentMenu.getId());
 
         upsertMenu(menuRepository, createMenu("站点管理", "/sites", "GlobalOutlined", null, 7, "site:manage"), null);
         upsertMenu(menuRepository, createMenu("媒体管理", "/media", "CloudOutlined", null, 8, "media:manage"), null);

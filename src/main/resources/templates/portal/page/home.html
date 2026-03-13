@@ -1,0 +1,25 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title th:text="${pageTitle}">GovCMS Portal</title>
+  <style>
+    body{margin:0;font-family:Arial,"Microsoft YaHei",sans-serif;background:#f8fafc;color:#0f172a}
+    .page{max-width:1180px;margin:0 auto;padding:24px}.warn{background:#fff7ed;color:#9a3412;padding:12px 16px;border-radius:12px;margin-bottom:16px}
+    .slot{margin-bottom:16px}.block{background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:16px}.nav-links,.quick-nav{display:flex;gap:12px;flex-wrap:wrap}
+    .nav-links a,.quick-nav a,.article-card a{color:#2563eb;text-decoration:none}.article-list{display:grid;gap:12px}.article-card{padding:12px;border:1px solid #e2e8f0;border-radius:12px}
+    .site-header,.site-footer{display:flex;justify-content:space-between;gap:16px;align-items:center}.breadcrumb{font-size:14px;color:#64748b}.content-body{line-height:1.8}
+  </style>
+</head>
+<body class="portal-home">
+  <div class="page">
+    <div th:if="${warnings != null and !warnings.isEmpty()}" class="warn">
+      <div th:each="item : ${warnings}" th:text="${item}">warning</div>
+    </div>
+    <section th:each="slot : ${layoutSlots}" class="slot" th:attr="data-slot=${slot.name}">
+      <div th:utext="${slotHtml[slot.name]}"></div>
+    </section>
+  </div>
+</body>
+</html>

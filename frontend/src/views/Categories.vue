@@ -16,6 +16,7 @@ import {
   updateCategoryStatus,
   type CategoryPayload
 } from '../api/categories'
+import { fetchTemplates, type TemplateItem } from '../api/templates'
 
 interface Site {
   id: number
@@ -94,6 +95,14 @@ interface CategoryRow extends Category {
   displayLevel: number
 }
 
+interface TemplateOption {
+  id: number
+  name: string
+  code: string
+  type: string
+  status: string
+}
+
 const { hasPermission } = usePermission()
 const canCreateCategory = hasPermission('content:category:create')
 const canUpdateCategory = hasPermission('content:category:update')
@@ -115,12 +124,14 @@ const editingCategory = ref<CategoryForm>({})
 const movingCategory = ref<Category | null>(null)
 const moveTargetParentId = ref<number | null>(null)
 const impactData = ref<ImpactResponse | null>(null)
+const templateOptions = ref<TemplateOption[]>([])
 
 const categoryTypeOptions = [
   { value: 'channel', label: '常规栏目' },
   { value: 'single_page', label: '单页栏目' },
   { value: 'external_link', label: '外链栏目' }
 ]
+void categoryTypeOptions
 
 const statusOptions = [
   { value: 'enabled', label: '启用' },
@@ -152,6 +163,8 @@ const flattenTree = (nodes: Category[], level = 0): CategoryRow[] => {
 }
 
 const treeRows = computed(() => flattenTree(treeData.value))
+const listTemplateOptions = computed(() => templateOptions.value.filter(item => item.type === 'column_list'))
+const detailTemplateOptions = computed(() => templateOptions.value.filter(item => item.type === 'content_detail'))
 
 const parentOptions = computed<CategoryOption[]>(() => {
   const excludedIds = movingCategory.value ? getDescendantIds(movingCategory.value.id) : new Set<number>()
@@ -195,6 +208,26 @@ const fetchSites = async () => {
   }
 }
 
+const fetchTemplateOptions = async (siteId?: number | null) => {
+  if (!siteId) {
+    templateOptions.value = []
+    return
+  }
+  try {
+    const res = await fetchTemplates({ siteId, status: 'active' })
+    templateOptions.value = (res.data || []).map((item: TemplateItem) => ({
+      id: item.id,
+      name: item.name,
+      code: item.code,
+      type: item.type,
+      status: item.status
+    }))
+  } catch (error: any) {
+    templateOptions.value = []
+    message.error(error.response?.data?.message || '????????')
+  }
+}
+
 const fetchTree = async () => {
   if (!selectedSiteId.value) {
     treeData.value = []
@@ -234,7 +267,7 @@ const handleSelect = (record: Category) => {
   selectedCategory.value = record
 }
 
-const openAddModal = (parent?: Category | null) => {
+const openAddModal = async (parent?: Category | null) => {
   if (!ensurePermission('content:category:create', '新增栏目')) {
     return
   }
@@ -254,17 +287,20 @@ const openAddModal = (parent?: Category | null) => {
     navVisible: true,
     breadcrumbVisible: true,
     publicVisible: true,
+    listTemplateId: null,
+    detailTemplateId: null,
     aggregationMode: 'manual',
     description: '',
     seoTitle: '',
     seoKeywords: '',
     seoDescription: ''
   }
+  await fetchTemplateOptions(editingCategory.value.siteId)
   isEdit.value = false
   modalVisible.value = true
 }
 
-const openEditModal = (record: Category) => {
+const openEditModal = async (record: Category) => {
   if (!ensurePermission('content:category:update', '编辑栏目')) {
     return
   }
@@ -289,9 +325,18 @@ const openEditModal = (record: Category) => {
     seoKeywords: record.seoKeywords ?? '',
     seoDescription: record.seoDescription ?? ''
   }
+  await fetchTemplateOptions(editingCategory.value.siteId)
   isEdit.value = true
   modalVisible.value = true
 }
+
+const handleEditingSiteChange = async () => {
+  editingCategory.value.parentId = null
+  editingCategory.value.listTemplateId = null
+  editingCategory.value.detailTemplateId = null
+  await fetchTemplateOptions(editingCategory.value.siteId)
+}
+void handleEditingSiteChange
 
 const buildPayload = (): CategoryPayload | null => {
   if (!editingCategory.value.siteId) {
@@ -466,13 +511,15 @@ const handleDelete = (record: Category) => {
   })
 }
 
-watch(selectedSiteId, () => {
+watch(selectedSiteId, async () => {
   selectedCategory.value = null
-  fetchTree()
+  await fetchTemplateOptions(selectedSiteId.value)
+  await fetchTree()
 })
 
 onMounted(async () => {
   await fetchSites()
+  await fetchTemplateOptions(selectedSiteId.value)
   await fetchTree()
 })
 </script>
@@ -630,71 +677,34 @@ onMounted(async () => {
         <div class="modal-body">
           <div class="form-row">
             <div class="form-group">
-              <label>所属站点</label>
-              <select v-model="editingCategory.siteId" class="form-select">
-                <option :value="undefined">请选择站点</option>
-                <option v-for="site in sites" :key="site.id" :value="site.id">{{ site.name }}</option>
+              <label>????</label>
+              <select v-model="editingCategory.aggregationMode" class="form-select">
+                <option v-for="item in aggregationOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
               </select>
             </div>
             <div class="form-group">
-              <label>父栏目</label>
-              <select v-model="editingCategory.parentId" class="form-select">
-                <option :value="null">作为顶级栏目</option>
-                <option v-for="item in allCategories" :key="item.id" :value="item.id">
-                  {{ item.fullPath }}
+              <label>????</label>
+              <select v-model="editingCategory.listTemplateId" class="form-select">
+                <option :value="null">???</option>
+                <option v-for="item in listTemplateOptions" :key="item.id" :value="item.id">
+                  {{ item.name }} ({{ item.code }})
                 </option>
               </select>
             </div>
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label>栏目名称</label>
-              <input v-model="editingCategory.name" type="text" class="form-input" placeholder="请输入栏目名称" />
-            </div>
-            <div class="form-group">
-              <label>栏目编码</label>
-              <input v-model="editingCategory.code" type="text" class="form-input" placeholder="news-center" />
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>栏目类型</label>
-              <select v-model="editingCategory.type" class="form-select">
-                <option v-for="item in categoryTypeOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
+              <label>??????</label>
+              <select v-model="editingCategory.detailTemplateId" class="form-select">
+                <option :value="null">???</option>
+                <option v-for="item in detailTemplateOptions" :key="item.id" :value="item.id">
+                  {{ item.name }} ({{ item.code }})
+                </option>
               </select>
             </div>
             <div class="form-group">
-              <label>路径标识</label>
-              <input v-model="editingCategory.slug" type="text" class="form-input" placeholder="news" />
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>排序</label>
-              <input v-model.number="editingCategory.sortOrder" type="number" class="form-input" />
-            </div>
-            <div class="form-group">
-              <label>状态</label>
-              <select v-model="editingCategory.status" class="form-select">
-                <option v-for="item in statusOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
-              </select>
-            </div>
-          </div>
-          <div class="form-row checkbox-row">
-            <label><input v-model="editingCategory.navVisible" type="checkbox" /> 导航展示</label>
-            <label><input v-model="editingCategory.breadcrumbVisible" type="checkbox" /> 面包屑展示</label>
-            <label><input v-model="editingCategory.publicVisible" type="checkbox" /> 门户可见</label>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>聚合方式</label>
-              <select v-model="editingCategory.aggregationMode" class="form-select">
-                <option v-for="item in aggregationOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>列表模板 ID（可选）</label>
-              <input v-model.number="editingCategory.listTemplateId" type="number" class="form-input" />
+              <label>??????</label>
+              <div class="hint-text">??????????????????? column_list????????? content_detail?</div>
             </div>
           </div>
           <div class="form-group">

@@ -8,6 +8,7 @@ import Permissions from '../views/Permissions.vue'
 import Menus from '../views/Menus.vue'
 import Content from '../views/Content.vue'
 import Categories from '../views/Categories.vue'
+import Templates from '../views/Templates.vue'
 import Sites from '../views/Sites.vue'
 import Media from '../views/Media.vue'
 import { clearSession, getToken, hasStoredPermissions } from '../utils/session'
@@ -29,6 +30,7 @@ const router = createRouter({
         { path: 'menus', name: 'Menus', component: Menus },
         { path: 'content', name: 'Content', component: Content },
         { path: 'content/categories', name: 'Categories', component: Categories },
+        { path: 'content/templates', name: 'Templates', component: Templates },
         { path: 'sites', name: 'Sites', component: Sites },
         { path: 'media', name: 'Media', component: Media }
       ]

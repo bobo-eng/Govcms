@@ -14,7 +14,9 @@ public class CategoryRequest {
     private Boolean breadcrumbVisible;
     private Boolean publicVisible;
     private Long listTemplateId;
+    private boolean listTemplateIdPresent;
     private Long detailTemplateId;
+    private boolean detailTemplateIdPresent;
     private String aggregationMode;
     private String description;
     private String seoTitle;
@@ -44,9 +46,17 @@ public class CategoryRequest {
     public Boolean getPublicVisible() { return publicVisible; }
     public void setPublicVisible(Boolean publicVisible) { this.publicVisible = publicVisible; }
     public Long getListTemplateId() { return listTemplateId; }
-    public void setListTemplateId(Long listTemplateId) { this.listTemplateId = listTemplateId; }
+    public boolean isListTemplateIdPresent() { return listTemplateIdPresent; }
+    public void setListTemplateId(Long listTemplateId) {
+        this.listTemplateId = listTemplateId;
+        this.listTemplateIdPresent = true;
+    }
     public Long getDetailTemplateId() { return detailTemplateId; }
-    public void setDetailTemplateId(Long detailTemplateId) { this.detailTemplateId = detailTemplateId; }
+    public boolean isDetailTemplateIdPresent() { return detailTemplateIdPresent; }
+    public void setDetailTemplateId(Long detailTemplateId) {
+        this.detailTemplateId = detailTemplateId;
+        this.detailTemplateIdPresent = true;
+    }
     public String getAggregationMode() { return aggregationMode; }
     public void setAggregationMode(String aggregationMode) { this.aggregationMode = aggregationMode; }
     public String getDescription() { return description; }

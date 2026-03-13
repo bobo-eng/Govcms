@@ -1,0 +1,23 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title th:text="${pageTitle}">404</title>
+  <style>
+    body{margin:0;font-family:Arial,"Microsoft YaHei",sans-serif;background:#0f172a;color:#f8fafc}.page{max-width:900px;margin:0 auto;padding:48px 24px}
+    .warn{background:#7c2d12;color:#ffedd5;padding:12px 16px;border-radius:12px;margin-bottom:16px}.slot{margin-bottom:16px}.block{background:#1e293b;border:1px solid #334155;border-radius:16px;padding:16px}
+    a{color:#93c5fd;text-decoration:none}
+  </style>
+</head>
+<body class="portal-error-404">
+  <div class="page">
+    <div th:if="${warnings != null and !warnings.isEmpty()}" class="warn">
+      <div th:each="item : ${warnings}" th:text="${item}">warning</div>
+    </div>
+    <section th:each="slot : ${layoutSlots}" class="slot" th:attr="data-slot=${slot.name}">
+      <div th:utext="${slotHtml[slot.name]}"></div>
+    </section>
+  </div>
+</body>
+</html>

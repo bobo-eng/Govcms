@@ -7,9 +7,13 @@ import gov.cms.admin.dto.CategorySortRequest;
 import gov.cms.admin.dto.CategoryStatusUpdateRequest;
 import gov.cms.admin.dto.CategoryTreeNode;
 import gov.cms.admin.entity.Category;
+import gov.cms.admin.entity.Template;
+import gov.cms.admin.entity.TemplateBinding;
 import gov.cms.admin.repository.ArticleRepository;
 import gov.cms.admin.repository.CategoryRepository;
 import gov.cms.admin.repository.SiteRepository;
+import gov.cms.admin.repository.TemplateBindingRepository;
+import gov.cms.admin.repository.TemplateRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,13 +44,19 @@ public class CategoryService {
     private final CategoryRepository categoryRepository;
     private final SiteRepository siteRepository;
     private final ArticleRepository articleRepository;
+    private final TemplateRepository templateRepository;
+    private final TemplateBindingRepository templateBindingRepository;
 
     public CategoryService(CategoryRepository categoryRepository,
                            SiteRepository siteRepository,
-                           ArticleRepository articleRepository) {
+                           ArticleRepository articleRepository,
+                           TemplateRepository templateRepository,
+                           TemplateBindingRepository templateBindingRepository) {
         this.categoryRepository = categoryRepository;
         this.siteRepository = siteRepository;
         this.articleRepository = articleRepository;
+        this.templateRepository = templateRepository;
+        this.templateBindingRepository = templateBindingRepository;
     }
 
     @Transactional(readOnly = true)
@@ -90,7 +100,9 @@ public class CategoryService {
         if (categoryRepository.existsSiblingName(normalized.getSiteId(), normalized.getParentId(), normalized.getName())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "同级栏目名称已存在");
         }
-        return categoryRepository.save(normalized);
+        Category saved = categoryRepository.save(normalized);
+        syncCategoryTemplateBindings(saved, null, null);
+        return saved;
     }
 
     @Transactional
@@ -113,12 +125,15 @@ public class CategoryService {
 
         boolean requiresRefresh = !Objects.equals(existing.getParentId(), normalized.getParentId())
                 || !Objects.equals(existing.getSlug(), normalized.getSlug());
+        Long previousListTemplateId = existing.getListTemplateId();
+        Long previousDetailTemplateId = existing.getDetailTemplateId();
 
         applyMutableFields(existing, normalized);
         Category saved = categoryRepository.save(existing);
         if (requiresRefresh) {
             refreshDescendants(saved.getSiteId(), saved.getId());
         }
+        syncCategoryTemplateBindings(saved, previousListTemplateId, previousDetailTemplateId);
         return saved;
     }
 
@@ -160,14 +175,22 @@ public class CategoryService {
         }
 
         int newLevel = targetParent == null ? 1 : targetParent.getLevel() + 1;
-        int maxChildDepth = calculateMaxDepth(category.getId(), siteCategories, 0);
-        if (newLevel + maxChildDepth - 1 > MAX_LEVEL) {
+        int subtreeDepth = calculateMaxDepth(category.getId(), siteCategories, 0);
+        if (newLevel + subtreeDepth - 1 > MAX_LEVEL) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "移动后栏目层级超过限制");
+        }
+
+        String newFullPath = buildFullPath(targetParent == null ? null : targetParent.getFullPath(), category.getSlug());
+        if (categoryRepository.existsBySiteIdAndFullPathAndIdNot(category.getSiteId(), newFullPath, category.getId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "移动后栏目路径冲突");
+        }
+        if (categoryRepository.existsSiblingNameExcludingId(category.getSiteId(), targetParentId, category.getName(), category.getId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "目标位置存在同名栏目");
         }
 
         category.setParentId(targetParentId);
         category.setLevel(newLevel);
-        category.setFullPath(buildFullPath(targetParent == null ? null : targetParent.getFullPath(), category.getSlug()));
+        category.setFullPath(newFullPath);
         Category saved = categoryRepository.save(category);
         refreshDescendants(saved.getSiteId(), saved.getId());
         return saved;
@@ -188,10 +211,8 @@ public class CategoryService {
         Category category = getCategoryById(id, siteId);
         List<Category> siteCategories = categoryRepository.findBySiteIdOrderBySortOrderAscIdAsc(category.getSiteId());
         List<Category> subtree = collectSubtree(category.getId(), siteCategories);
-        Set<Long> categoryIds = subtree.stream().map(Category::getId).collect(Collectors.toCollection(LinkedHashSet::new));
-        long directArticleCount = articleRepository.countByPrimaryCategoryId(category.getId());
-        long relatedArticleCount = categoryIds.isEmpty() ? 0L : articleRepository.countByPrimaryCategoryIdIn(categoryIds);
-        boolean hasChildren = subtree.size() > 1;
+        Set<Long> subtreeIds = subtree.stream().map(Category::getId).collect(Collectors.toCollection(LinkedHashSet::new));
+        long relatedArticleCount = articleRepository.countByPrimaryCategoryIdIn(subtreeIds);
 
         CategoryImpactResponse response = new CategoryImpactResponse();
         response.setCategoryId(category.getId());
@@ -199,21 +220,18 @@ public class CategoryService {
         response.setFullPath(category.getFullPath());
         response.setSubtreeCount(Math.max(subtree.size() - 1, 0));
         response.setRelatedArticleCount(relatedArticleCount);
-        response.setCanDelete(!hasChildren && directArticleCount == 0);
-        response.setCanMove(true);
-        response.setImpactedPaths(subtree.stream().map(Category::getFullPath).filter(Objects::nonNull).limit(8).collect(Collectors.toList()));
+        response.setImpactedPaths(subtree.stream().map(Category::getFullPath).collect(Collectors.toList()));
 
         List<String> warnings = new ArrayList<>();
-        if (hasChildren) {
-            warnings.add("当前栏目下仍存在子栏目，删除前需先处理子级结构");
-        }
-        if (directArticleCount > 0) {
+        if (relatedArticleCount > 0) {
             warnings.add("当前栏目已关联内容，删除前需先调整内容归属");
         }
-        if (relatedArticleCount > 0) {
-            warnings.add("栏目树调整会影响已归属内容的访问路径和聚合展示");
+        if (subtree.size() > 1) {
+            warnings.add("栏目树调整会影响子栏目路径与模板绑定范围");
         }
         response.setWarnings(warnings);
+        response.setCanDelete(relatedArticleCount == 0 && subtree.size() == 1);
+        response.setCanMove(true);
         return response;
     }
 
@@ -229,6 +247,7 @@ public class CategoryService {
         if (articleRepository.countByPrimaryCategoryId(category.getId()) > 0) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "当前栏目已被内容引用，无法删除");
         }
+        clearCategoryTemplateBindings(category);
         categoryRepository.delete(category);
     }
 
@@ -254,6 +273,12 @@ public class CategoryService {
         Boolean breadcrumbVisible = request.getBreadcrumbVisible() != null ? request.getBreadcrumbVisible() : existing == null ? Boolean.TRUE : existing.getBreadcrumbVisible();
         Boolean publicVisible = request.getPublicVisible() != null ? request.getPublicVisible() : existing == null ? Boolean.TRUE : existing.getPublicVisible();
         Long parentId = request.getParentId() != null || existing == null ? request.getParentId() : existing.getParentId();
+        Long listTemplateId = existing == null
+                ? request.getListTemplateId()
+                : request.isListTemplateIdPresent() ? request.getListTemplateId() : existing.getListTemplateId();
+        Long detailTemplateId = existing == null
+                ? request.getDetailTemplateId()
+                : request.isDetailTemplateIdPresent() ? request.getDetailTemplateId() : existing.getDetailTemplateId();
 
         List<Category> allCategories = siteCategories == null
                 ? categoryRepository.findBySiteIdOrderBySortOrderAscIdAsc(siteId)
@@ -279,6 +304,9 @@ public class CategoryService {
         }
         String fullPath = buildFullPath(parent == null ? null : parent.getFullPath(), slug);
 
+        validateTemplateReference(siteId, listTemplateId, "column_list", "列表模板");
+        validateTemplateReference(siteId, detailTemplateId, "content_detail", "默认详情模板");
+
         Category normalized = new Category();
         normalized.setSiteId(siteId);
         normalized.setParentId(parentId);
@@ -293,8 +321,8 @@ public class CategoryService {
         normalized.setNavVisible(navVisible);
         normalized.setBreadcrumbVisible(breadcrumbVisible);
         normalized.setPublicVisible(publicVisible);
-        normalized.setListTemplateId(request.getListTemplateId() != null ? request.getListTemplateId() : existing == null ? null : existing.getListTemplateId());
-        normalized.setDetailTemplateId(request.getDetailTemplateId() != null ? request.getDetailTemplateId() : existing == null ? null : existing.getDetailTemplateId());
+        normalized.setListTemplateId(listTemplateId);
+        normalized.setDetailTemplateId(detailTemplateId);
         normalized.setAggregationMode(aggregationMode);
         normalized.setDescription(normalizeOptional(request.getDescription(), existing == null ? null : existing.getDescription()));
         normalized.setSeoTitle(normalizeOptional(request.getSeoTitle(), existing == null ? null : existing.getSeoTitle()));
@@ -324,6 +352,104 @@ public class CategoryService {
         target.setSeoTitle(source.getSeoTitle());
         target.setSeoKeywords(source.getSeoKeywords());
         target.setSeoDescription(source.getSeoDescription());
+    }
+
+    private void syncCategoryTemplateBindings(Category category, Long previousListTemplateId, Long previousDetailTemplateId) {
+        Set<Long> affectedTemplateIds = new LinkedHashSet<>();
+        if (previousListTemplateId != null) {
+            affectedTemplateIds.add(previousListTemplateId);
+        }
+        if (previousDetailTemplateId != null) {
+            affectedTemplateIds.add(previousDetailTemplateId);
+        }
+        syncCategoryTemplateBinding(category, category.getListTemplateId(), "column_list", affectedTemplateIds);
+        syncCategoryTemplateBinding(category, category.getDetailTemplateId(), "column_detail_default", affectedTemplateIds);
+        refreshBindingCounts(affectedTemplateIds);
+    }
+
+    private void clearCategoryTemplateBindings(Category category) {
+        Set<Long> affectedTemplateIds = new LinkedHashSet<>();
+        syncCategoryTemplateBinding(category, null, "column_list", affectedTemplateIds);
+        syncCategoryTemplateBinding(category, null, "column_detail_default", affectedTemplateIds);
+        refreshBindingCounts(affectedTemplateIds);
+    }
+
+    private void syncCategoryTemplateBinding(Category category,
+                                             Long templateId,
+                                             String bindingSlot,
+                                             Set<Long> affectedTemplateIds) {
+        List<TemplateBinding> existingBindings = templateBindingRepository
+                .findBySiteIdAndTargetTypeAndTargetIdAndBindingSlotAndStatus(category.getSiteId(), "column", category.getId(), bindingSlot, "active");
+
+        String username = "system";
+        TemplateBinding matchingBinding = null;
+        List<TemplateBinding> dirtyBindings = new ArrayList<>();
+        for (TemplateBinding binding : existingBindings) {
+            if (templateId != null && Objects.equals(binding.getTemplateId(), templateId) && matchingBinding == null) {
+                matchingBinding = binding;
+                continue;
+            }
+            binding.setStatus("inactive");
+            binding.setUpdatedBy(username);
+            dirtyBindings.add(binding);
+            affectedTemplateIds.add(binding.getTemplateId());
+        }
+        if (!dirtyBindings.isEmpty()) {
+            templateBindingRepository.saveAll(dirtyBindings);
+        }
+
+        if (templateId == null) {
+            return;
+        }
+
+        if (matchingBinding == null) {
+            TemplateBinding binding = new TemplateBinding();
+            binding.setSiteId(category.getSiteId());
+            binding.setTemplateId(templateId);
+            binding.setTemplateVersionId(null);
+            binding.setTargetType("column");
+            binding.setTargetId(category.getId());
+            binding.setBindingSlot(bindingSlot);
+            binding.setStatus("active");
+            binding.setCreatedBy(username);
+            binding.setUpdatedBy(username);
+            templateBindingRepository.save(binding);
+        } else {
+            matchingBinding.setTemplateVersionId(null);
+            matchingBinding.setStatus("active");
+            matchingBinding.setUpdatedBy(username);
+            templateBindingRepository.save(matchingBinding);
+        }
+        affectedTemplateIds.add(templateId);
+    }
+
+    private void refreshBindingCounts(Set<Long> templateIds) {
+        for (Long templateId : templateIds) {
+            if (templateId == null) {
+                continue;
+            }
+            templateRepository.findById(templateId).ifPresent(template -> {
+                template.setBindingCount((int) templateBindingRepository.countByTemplateIdAndStatus(templateId, "active"));
+                templateRepository.save(template);
+            });
+        }
+    }
+
+    private void validateTemplateReference(Long siteId, Long templateId, String expectedType, String fieldName) {
+        if (templateId == null) {
+            return;
+        }
+        Template template = templateRepository.findById(templateId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, fieldName + "不存在"));
+        if (!Objects.equals(template.getSiteId(), siteId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, fieldName + "不属于当前站点");
+        }
+        if (!Objects.equals(template.getType(), expectedType)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, fieldName + "类型不匹配");
+        }
+        if (!Objects.equals(template.getStatus(), "active")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, fieldName + "未启用，不能绑定到栏目");
+        }
     }
 
     private void refreshDescendants(Long siteId, Long categoryId) {

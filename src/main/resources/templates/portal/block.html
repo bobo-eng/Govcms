@@ -1,0 +1,81 @@
+﻿<th:block xmlns:th="http://www.thymeleaf.org">
+  <th:block th:switch="${block.type}">
+    <header th:case="'site_header'" class="block site-header">
+      <div class="brand" th:text="${data['siteName']}">GovCMS</div>
+      <nav class="nav-links">
+        <a th:each="item : ${data['navigation']}" th:href="${item['path']}" th:text="${item['name']}">导航</a>
+      </nav>
+    </header>
+
+    <footer th:case="'site_footer'" class="block site-footer">
+      <span th:text="${data['siteName']}">GovCMS</span>
+      <span th:if="${data['domain'] != ''}" th:text="${data['domain']}">example.com</span>
+      <span th:text="${data['year']}">2026</span>
+    </footer>
+
+    <section th:case="'hero'" class="block hero-block">
+      <h1 th:text="${data['title']}">标题</h1>
+      <p th:text="${data['subtitle']}">副标题</p>
+    </section>
+
+    <nav th:case="'nav_links'" class="block quick-nav">
+      <a th:each="item : ${data}" th:href="${item['path']}" th:text="${item['name']}">导航</a>
+    </nav>
+
+    <nav th:case="'quick_links'" class="block quick-nav">
+      <a th:each="item : ${data}" th:href="${item['path']}" th:text="${item['name']}">快捷入口</a>
+    </nav>
+
+    <nav th:case="'breadcrumb'" class="block breadcrumb">
+      <span th:each="item, stat : ${data}">
+        <a th:href="${item['path']}" th:text="${item['name']}">面包屑</a>
+        <span th:if="${!stat.last}"> / </span>
+      </span>
+    </nav>
+
+    <section th:case="'rich_text'" class="block rich-text" th:utext="${data['html']}">
+      富文本
+    </section>
+
+    <section th:case="'column_header'" class="block column-header">
+      <h1 th:text="${data['name']}">栏目标题</h1>
+      <p th:if="${data['description'] != ''}" th:text="${data['description']}">栏目描述</p>
+    </section>
+
+    <section th:case="'article_list'" class="block article-list">
+      <article th:each="item : ${data}" class="article-card">
+        <h3><a th:href="${item['path']}" th:text="${item['title']}">文章标题</a></h3>
+        <p th:text="${item['summary']}">摘要</p>
+        <small>
+          <span th:text="${item['author']}">作者</span>
+          <span th:text="${item['createdAt']}">时间</span>
+        </small>
+      </article>
+      <div th:if="${#lists.isEmpty(data)}" class="empty">暂无内容</div>
+    </section>
+
+    <section th:case="'pagination'" class="block pagination">
+      <span th:text="'第 ' + ${data['currentPage']} + ' 页'">第 1 页</span>
+    </section>
+
+    <header th:case="'content_header'" class="block content-header">
+      <h1 th:text="${data['title']}">内容标题</h1>
+      <p th:if="${data['summary'] != ''}" th:text="${data['summary']}">内容摘要</p>
+    </header>
+
+    <section th:case="'content_meta'" class="block content-meta">
+      <span th:text="${data['author']}">作者</span>
+      <span th:text="${data['updatedAt']}">更新时间</span>
+      <span th:text="${data['views']}">阅读量</span>
+    </section>
+
+    <article th:case="'content_body'" class="block content-body" th:utext="${data['html']}">
+      正文
+    </article>
+
+    <section th:case="'error_message'" class="block error-message">
+      <h1 th:text="${data['title']}">页面不存在</h1>
+      <p th:text="${data['message']}">提示信息</p>
+    </section>
+  </th:block>
+</th:block>
