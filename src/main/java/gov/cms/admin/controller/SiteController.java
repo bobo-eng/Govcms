@@ -1,5 +1,6 @@
 package gov.cms.admin.controller;
 
+import gov.cms.admin.dto.SiteOptionDto;
 import gov.cms.admin.entity.Site;
 import gov.cms.admin.service.SiteService;
 import org.springframework.data.domain.Page;
@@ -20,6 +21,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/sites")
 @CrossOrigin(origins = "*")
@@ -39,6 +42,12 @@ public class SiteController {
             @RequestParam(required = false) Long organizationId,
             @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         return ResponseEntity.ok(siteService.getSites(keyword, status, organizationId, pageable));
+    }
+
+    @GetMapping("/options")
+    @PreAuthorize("hasAnyAuthority('content:article:view','publish:center:view','site:manage:view')")
+    public ResponseEntity<List<SiteOptionDto>> getSiteOptions() {
+        return ResponseEntity.ok(siteService.getSiteOptions());
     }
 
     @GetMapping("/{id}")

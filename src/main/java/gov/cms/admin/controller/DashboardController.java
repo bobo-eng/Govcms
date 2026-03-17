@@ -1,6 +1,7 @@
 package gov.cms.admin.controller;
 
 import gov.cms.admin.dto.DashboardStats;
+import gov.cms.admin.entity.ArticleStatus;
 import gov.cms.admin.repository.ArticleRepository;
 import gov.cms.admin.repository.SiteRepository;
 import gov.cms.admin.repository.UserRepository;
@@ -40,16 +41,16 @@ public class DashboardController {
         stats.setSiteCount(siteRepository.count());
         stats.setViewCount(articleRepository.count() * 100L);
         stats.setPendingReviewCount(articleRepository.findAll().stream()
-                .filter(article -> "draft".equals(article.getStatus()))
+                .filter(article -> article.getStatus() == ArticleStatus.pending_review)
                 .count());
 
         List<DashboardStats.RecentActivity> activities = new ArrayList<>();
-        activities.add(createActivity(1L, "admin", "发布文章", "GovCMS 更新公告", "5分钟前", "publish"));
-        activities.add(createActivity(2L, "admin", "编辑内容", "首页轮播文案", "15分钟前", "edit"));
+        activities.add(createActivity(1L, "admin", "发布任务完成", "GovCMS 内容中心", "5分钟前", "publish"));
+        activities.add(createActivity(2L, "admin", "审核通过", "首页轮播文案", "15分钟前", "review"));
         stats.setRecentActivities(activities);
 
         List<DashboardStats.PendingArticle> pendingArticles = articleRepository.findAll().stream()
-                .filter(article -> "draft".equals(article.getStatus()))
+                .filter(article -> article.getStatus() == ArticleStatus.pending_review)
                 .limit(3)
                 .map(article -> {
                     DashboardStats.PendingArticle pendingArticle = new DashboardStats.PendingArticle();

@@ -1,5 +1,6 @@
 package gov.cms.admin.service;
 
+import gov.cms.admin.dto.SiteOptionDto;
 import gov.cms.admin.entity.Site;
 import gov.cms.admin.repository.SiteRepository;
 import org.springframework.data.domain.Page;
@@ -9,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
@@ -29,9 +31,16 @@ public class SiteService {
         return siteRepository.searchSites(keyword, normalizeStatus(status, true), organizationId, pageable);
     }
 
+    public List<SiteOptionDto> getSiteOptions() {
+        return siteRepository.findAll().stream()
+                .sorted((left, right) -> left.getName().compareToIgnoreCase(right.getName()))
+                .map(site -> new SiteOptionDto(site.getId(), site.getName(), site.getStatus()))
+                .toList();
+    }
+
     public Site getSiteById(Long id) {
         return siteRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "站点不存在"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Site not found."));
     }
 
     @Transactional
@@ -39,10 +48,10 @@ public class SiteService {
         prepareForSave(site);
 
         if (siteRepository.existsByCodeIgnoreCase(site.getCode())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "站点编码已存在");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Site code already exists.");
         }
         if (site.getDomain() != null && siteRepository.existsByDomainIgnoreCase(site.getDomain())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "站点域名已存在");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Site domain already exists.");
         }
 
         return siteRepository.save(site);
@@ -54,10 +63,10 @@ public class SiteService {
         prepareForSave(siteData);
 
         if (siteRepository.existsByCodeIgnoreCaseAndIdNot(siteData.getCode(), id)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "站点编码已存在");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Site code already exists.");
         }
         if (siteData.getDomain() != null && siteRepository.existsByDomainIgnoreCaseAndIdNot(siteData.getDomain(), id)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "站点域名已存在");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Site domain already exists.");
         }
 
         site.setName(siteData.getName());
@@ -77,20 +86,20 @@ public class SiteService {
 
     private void prepareForSave(Site site) {
         if (site == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "站点数据不能为空");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Site payload is required.");
         }
 
         String name = normalizeText(site.getName());
         if (name == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "站点名称不能为空");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Site name is required.");
         }
 
         String code = normalizeCode(site.getCode());
         if (code == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "站点编码不能为空");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Site code is required.");
         }
         if (!CODE_PATTERN.matcher(code).matches()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "站点编码格式不正确");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Site code format is invalid.");
         }
 
         site.setName(name);
@@ -111,7 +120,7 @@ public class SiteService {
             return null;
         }
         if (normalized.contains("://") || normalized.contains("/")) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "站点域名不能包含协议或路径");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Site domain cannot include protocol or path.");
         }
         return normalized.toLowerCase(Locale.ROOT);
     }
@@ -125,7 +134,7 @@ public class SiteService {
             return STATUS_ENABLED;
         }
         if (!STATUS_ENABLED.equals(normalized) && !STATUS_DISABLED.equals(normalized)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "站点状态不正确");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Site status is invalid.");
         }
         return normalized;
     }

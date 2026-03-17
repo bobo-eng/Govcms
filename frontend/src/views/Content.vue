@@ -1,139 +1,111 @@
-﻿<script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
-import { message, Modal } from 'ant-design-vue'
-import { DeleteOutlined, EditOutlined, ExportOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons-vue'
+<script setup lang="ts">
+import { computed, onMounted, ref, watch } from 'vue'
+import { message } from 'ant-design-vue'
+import { useRouter } from 'vue-router'
 import { usePermission } from '../composables/usePermission'
-import api from '../utils/api'
 import { fetchCategories } from '../api/categories'
-
-interface Site {
-  id: number
-  name: string
-  code: string
-  status: string
-}
+import { fetchSiteOptions, type SiteOptionItem } from '../api/sites'
+import {
+  createArticle,
+  deleteArticle,
+  fetchArticleDetail,
+  fetchArticleHistories,
+  fetchArticlePublishCheck,
+  fetchArticles,
+  type ArticleItem,
+  type ArticleLifecycleHistoryItem,
+  type ArticlePayload,
+  type ArticlePublishCheckResponseData,
+  submitArticleReview,
+  updateArticle
+} from '../api/articles'
 
 interface CategoryOption {
   id: number
   name: string
-  fullPath: string
-  siteId: number
-}
-
-interface Article {
-  id: number
-  siteId?: number | null
-  primaryCategoryId?: number | null
-  title: string
-  content?: string
-  summary?: string
-  category: string
-  author: string
-  status: string
-  views: number
-  createdAt: string
-  updatedAt?: string
 }
 
 interface ArticleForm {
   id?: number
   siteId?: number | null
   primaryCategoryId?: number | null
-  title?: string
-  content?: string
-  summary?: string
-  category?: string
-  author?: string
-  status?: string
+  title: string
+  summary: string
+  author: string
+  content: string
 }
 
+const router = useRouter()
 const { hasPermission } = usePermission()
-const canCreateArticle = hasPermission('content:article:create')
-const canUpdateArticle = hasPermission('content:article:update')
-const canDeleteArticle = hasPermission('content:article:delete')
-const canPublishArticle = hasPermission('content:article:publish')
 
 const loading = ref(false)
-const articles = ref<Article[]>([])
-const sites = ref<Site[]>([])
-const categoryOptions = ref<CategoryOption[]>([])
-const searchKeyword = ref('')
-const filterCategory = ref('')
-const filterStatus = ref('')
-const filterSiteId = ref<number | null>(null)
-const modalVisible = ref(false)
+const saving = ref(false)
+const modalOpen = ref(false)
 const isEdit = ref(false)
-const editingArticle = ref<ArticleForm>({})
-const pagination = ref({
-  current: 1,
-  pageSize: 10,
-  total: 0
-})
+const articles = ref<ArticleItem[]>([])
+const sites = ref<SiteOptionItem[]>([])
+const categoryOptions = ref<CategoryOption[]>([])
+const historyItems = ref<ArticleLifecycleHistoryItem[]>([])
+const publishCheck = ref<ArticlePublishCheckResponseData | null>(null)
+const filters = ref({ keyword: '', status: '', siteId: undefined as number | undefined, primaryCategoryId: undefined as number | undefined })
+const pagination = ref({ current: 1, pageSize: 10, total: 0 })
+const form = ref<ArticleForm>({ title: '', summary: '', author: '', content: '', siteId: undefined, primaryCategoryId: undefined })
+
+const canCreate = computed(() => hasPermission('content:article:create'))
+const canUpdate = computed(() => hasPermission('content:article:update'))
+const canDelete = computed(() => hasPermission('content:article:delete'))
+const canSubmit = computed(() => hasPermission('content:article:submit-review'))
+const canHistory = computed(() => hasPermission('content:article:history:view'))
 
 const statusOptions = [
+  { value: '', label: '全部状态' },
   { value: 'draft', label: '草稿' },
+  { value: 'pending_review', label: '待审核' },
+  { value: 'rejected', label: '已驳回' },
+  { value: 'approved', label: '待发布' },
   { value: 'published', label: '已发布' },
-  { value: 'archived', label: '已归档' }
+  { value: 'offline', label: '已下线' }
 ]
 
-const ensurePermission = (permissionCode: string, actionName: string) => {
-  if (hasPermission(permissionCode)) {
-    return true
+const statusLabel = (status?: string) => {
+  const map: Record<string, string> = {
+    draft: '草稿',
+    pending_review: '待审核',
+    rejected: '已驳回',
+    approved: '待发布',
+    published: '已发布',
+    offline: '已下线'
   }
-  message.warning(`暂无${actionName}权限`)
-  return false
+  return status ? (map[status] || status) : '-'
 }
 
-const selectedCategoryName = (categoryId?: number | null) => {
-  if (!categoryId) {
-    return ''
-  }
-  return categoryOptions.value.find(item => item.id === categoryId)?.name || ''
+const loadSites = async () => {
+  const response = await fetchSiteOptions()
+  sites.value = response.data || []
 }
 
-const fetchSites = async () => {
-  try {
-    const res = await api.get('/sites', {
-      params: {
-        page: 0,
-        size: 100,
-        status: 'enabled'
-      }
-    })
-    sites.value = res.data.content || []
-  } catch (error: any) {
-    message.error(error.response?.data?.message || '获取站点列表失败')
-  }
-}
-
-const fetchCategoryOptions = async (siteId?: number | null) => {
+const loadCategories = async (siteId?: number) => {
   if (!siteId) {
     categoryOptions.value = []
     return
   }
-  try {
-    const res = await fetchCategories({ siteId })
-    categoryOptions.value = res.data || []
-  } catch (error: any) {
-    message.error(error.response?.data?.message || '获取栏目列表失败')
-  }
+  const response = await fetchCategories({ siteId })
+  categoryOptions.value = response.data || []
 }
 
-const fetchArticles = async () => {
+const loadArticles = async () => {
   loading.value = true
   try {
-    const params: Record<string, any> = {
+    const response = await fetchArticles({
       page: pagination.value.current - 1,
-      size: pagination.value.pageSize
-    }
-    if (searchKeyword.value.trim()) params.keyword = searchKeyword.value.trim()
-    if (filterCategory.value) params.category = filterCategory.value
-    if (filterStatus.value) params.status = filterStatus.value
-    if (filterSiteId.value) params.siteId = filterSiteId.value
-
-    const res = await api.get('/articles', { params })
-    articles.value = res.data.content || []
-    pagination.value.total = res.data.totalElements || 0
+      size: pagination.value.pageSize,
+      keyword: filters.value.keyword || undefined,
+      status: filters.value.status || undefined,
+      siteId: filters.value.siteId,
+      primaryCategoryId: filters.value.primaryCategoryId
+    })
+    articles.value = response.data.content || []
+    pagination.value.total = response.data.totalElements || 0
   } catch (error: any) {
     message.error(error.response?.data?.message || '获取内容列表失败')
   } finally {
@@ -141,219 +113,197 @@ const fetchArticles = async () => {
   }
 }
 
-const handleSearch = () => {
-  pagination.value.current = 1
-  fetchArticles()
+const resetForm = () => {
+  form.value = { title: '', summary: '', author: '', content: '', siteId: filters.value.siteId, primaryCategoryId: undefined }
+  historyItems.value = []
+  publishCheck.value = null
 }
 
-const handlePageChange = (page: number, pageSize: number) => {
-  pagination.value.current = page
-  pagination.value.pageSize = pageSize
-  fetchArticles()
-}
-
-const openAddModal = async () => {
-  if (!ensurePermission('content:article:create', '新增内容')) {
+const openCreate = async () => {
+  if (!canCreate.value) {
+    message.warning('没有新增内容权限')
     return
-  }
-  editingArticle.value = {
-    title: '',
-    siteId: filterSiteId.value,
-    primaryCategoryId: null,
-    category: '',
-    author: '',
-    status: 'draft',
-    content: '',
-    summary: ''
   }
   isEdit.value = false
-  if (editingArticle.value.siteId) {
-    await fetchCategoryOptions(editingArticle.value.siteId)
+  resetForm()
+  if (form.value.siteId) {
+    await loadCategories(form.value.siteId || undefined)
   }
-  modalVisible.value = true
+  modalOpen.value = true
 }
 
-const openEditModal = async (record: Article) => {
-  if (!ensurePermission('content:article:update', '编辑内容')) {
+const openEdit = async (record: ArticleItem) => {
+  if (!canUpdate.value && !canHistory.value) {
+    message.warning('没有查看内容详情权限')
     return
   }
-  editingArticle.value = {
-    ...record,
-    siteId: record.siteId ?? null,
-    primaryCategoryId: record.primaryCategoryId ?? null,
-    category: record.category || ''
-  }
-  if (editingArticle.value.siteId) {
-    await fetchCategoryOptions(editingArticle.value.siteId)
-  }
-  isEdit.value = true
-  modalVisible.value = true
-}
-
-const handleEditingSiteChange = async () => {
-  editingArticle.value.primaryCategoryId = null
-  editingArticle.value.category = ''
-  await fetchCategoryOptions(editingArticle.value.siteId)
-}
-
-const buildPayload = () => {
-  const title = editingArticle.value.title?.trim()
-  if (!title) {
-    message.error('请输入标题')
-    return null
-  }
-  if (!editingArticle.value.siteId) {
-    message.error('请选择站点')
-    return null
-  }
-  if (!editingArticle.value.primaryCategoryId) {
-    message.error('请选择栏目')
-    return null
-  }
-  return {
-    title,
-    siteId: editingArticle.value.siteId,
-    primaryCategoryId: editingArticle.value.primaryCategoryId,
-    category: selectedCategoryName(editingArticle.value.primaryCategoryId),
-    author: editingArticle.value.author?.trim() || '',
-    status: editingArticle.value.status || 'draft',
-    content: editingArticle.value.content?.trim() || '',
-    summary: editingArticle.value.summary?.trim() || ''
-  }
-}
-
-const handleSave = async () => {
-  const requiredPermission = isEdit.value ? 'content:article:update' : 'content:article:create'
-  const actionName = isEdit.value ? '编辑内容' : '新增内容'
-  if (!ensurePermission(requiredPermission, actionName)) {
-    return
-  }
-  const payload = buildPayload()
-  if (!payload) {
-    return
-  }
-
   try {
-    if (isEdit.value && editingArticle.value.id) {
-      await api.put(`/articles/${editingArticle.value.id}`, payload)
+    const [detailResponse, historyResponse] = await Promise.all([
+      fetchArticleDetail(record.id),
+      hasPermission('content:article:history:view') ? fetchArticleHistories(record.id) : Promise.resolve({ data: [] })
+    ])
+    const detail = detailResponse.data
+    isEdit.value = true
+    form.value = {
+      id: detail.id,
+      siteId: detail.siteId ?? undefined,
+      primaryCategoryId: detail.primaryCategoryId ?? undefined,
+      title: detail.title || '',
+      summary: detail.summary || '',
+      author: detail.author || '',
+      content: detail.content || ''
+    }
+    historyItems.value = historyResponse.data || []
+    publishCheck.value = null
+    if (detail.siteId) {
+      await loadCategories(detail.siteId)
+    }
+    modalOpen.value = true
+  } catch (error: any) {
+    message.error(error.response?.data?.message || '获取内容详情失败')
+  }
+}
+
+const save = async () => {
+  if (!form.value.title.trim()) {
+    message.warning('请输入标题')
+    return
+  }
+  if (!form.value.siteId) {
+    message.warning('请选择站点')
+    return
+  }
+  if (!form.value.primaryCategoryId) {
+    message.warning('请选择栏目')
+    return
+  }
+  saving.value = true
+  const payload: ArticlePayload = {
+    title: form.value.title.trim(),
+    summary: form.value.summary?.trim() || null,
+    author: form.value.author?.trim() || null,
+    content: form.value.content || '',
+    siteId: form.value.siteId,
+    primaryCategoryId: form.value.primaryCategoryId
+  }
+  try {
+    if (isEdit.value && form.value.id) {
+      await updateArticle(form.value.id, payload)
       message.success('内容更新成功')
     } else {
-      await api.post('/articles', payload)
+      await createArticle(payload)
       message.success('内容创建成功')
     }
-    modalVisible.value = false
-    fetchArticles()
+    modalOpen.value = false
+    await loadArticles()
   } catch (error: any) {
     message.error(error.response?.data?.message || '保存内容失败')
+  } finally {
+    saving.value = false
   }
 }
 
-const handleDelete = (record: Article) => {
-  if (!ensurePermission('content:article:delete', '删除内容')) {
+const removeArticle = async (record: ArticleItem) => {
+  if (!canDelete.value) {
+    message.warning('没有删除权限')
     return
   }
-  Modal.confirm({
-    title: '删除内容',
-    content: `确认删除“${record.title}”吗？`,
-    okText: '确认删除',
-    okType: 'danger',
-    onOk: async () => {
-      try {
-        await api.delete(`/articles/${record.id}`)
-        message.success('内容删除成功')
-        fetchArticles()
-      } catch (error: any) {
-        message.error(error.response?.data?.message || '删除内容失败')
-      }
+  if (!window.confirm(`确认删除《${record.title}》吗？`)) {
+    return
+  }
+  try {
+    await deleteArticle(record.id)
+    message.success('删除成功')
+    await loadArticles()
+  } catch (error: any) {
+    message.error(error.response?.data?.message || '删除失败')
+  }
+}
+
+const submitReviewAction = async (record: ArticleItem) => {
+  if (!canSubmit.value) {
+    message.warning('没有提交审核权限')
+    return
+  }
+  try {
+    await submitArticleReview(record.id)
+    message.success('提交审核成功')
+    await loadArticles()
+  } catch (error: any) {
+    message.error(error.response?.data?.message || '提交审核失败')
+  }
+}
+
+const viewPublishCheck = async (record: ArticleItem) => {
+  try {
+    const response = await fetchArticlePublishCheck(record.id)
+    publishCheck.value = response.data
+    if (!modalOpen.value) {
+      await openEdit(record)
+      publishCheck.value = response.data
+    }
+  } catch (error: any) {
+    message.error(error.response?.data?.message || '获取发布检查失败')
+  }
+}
+
+const gotoPublish = (record: ArticleItem, mode: 'incremental' | 'offline') => {
+  router.push({
+    path: '/content/publish',
+    query: {
+      siteId: String(record.siteId || ''),
+      unitType: 'content',
+      unitId: String(record.id),
+      mode
     }
   })
 }
 
-const handlePublish = async (record: Article) => {
-  if (!ensurePermission('content:article:publish', '发布内容')) {
-    return
+watch(() => form.value.siteId, async siteId => {
+  await loadCategories(siteId || undefined)
+  if (!categoryOptions.value.some(item => item.id === form.value.primaryCategoryId)) {
+    form.value.primaryCategoryId = undefined
   }
-  try {
-    await api.post(`/articles/${record.id}/publish`)
-    message.success('内容发布成功')
-    fetchArticles()
-  } catch (error: any) {
-    message.error(error.response?.data?.message || '发布内容失败')
-  }
-}
-
-const handleUnpublish = async (record: Article) => {
-  if (!ensurePermission('content:article:publish', '下线内容')) {
-    return
-  }
-  try {
-    await api.post(`/articles/${record.id}/unpublish`)
-    message.success('内容已下线')
-    fetchArticles()
-  } catch (error: any) {
-    message.error(error.response?.data?.message || '下线内容失败')
-  }
-}
-
-const getStatusText = (status: string) => {
-  const mapping: Record<string, string> = {
-    draft: '草稿',
-    published: '已发布',
-    archived: '已归档'
-  }
-  return mapping[status] || status
-}
-
-watch(filterSiteId, async value => {
-  filterCategory.value = ''
-  await fetchCategoryOptions(value)
-  fetchArticles()
 })
 
-watch(
-  () => editingArticle.value.primaryCategoryId,
-  value => {
-    editingArticle.value.category = selectedCategoryName(value)
+watch(() => filters.value.siteId, async siteId => {
+  await loadCategories(siteId || undefined)
+  if (!categoryOptions.value.some(item => item.id === filters.value.primaryCategoryId)) {
+    filters.value.primaryCategoryId = undefined
   }
-)
+})
 
 onMounted(async () => {
-  await fetchSites()
-  await fetchArticles()
+  await loadSites()
+  await loadCategories(filters.value.siteId)
+  await loadArticles()
 })
 </script>
 
 <template>
-  <div class="content-page">
+  <div class="page-shell">
     <div class="page-header">
-      <div class="header-left">
-        <h1>内容管理</h1>
-        <p>管理文章内容，并为其配置站点和栏目归属</p>
+      <div>
+        <h2>内容中心</h2>
+        <p>按六态生命周期管理内容，提交审核后进入审核工作区，正式发布统一收口到发布中心。</p>
       </div>
-      <button v-if="canCreateArticle" class="primary-btn" @click="openAddModal">
-        <PlusOutlined />
-        <span>新建内容</span>
-      </button>
+      <button class="primary-btn" :disabled="!canCreate" @click="openCreate">新建内容</button>
     </div>
 
     <div class="toolbar">
-      <select v-model="filterSiteId" class="filter-select">
-        <option :value="null">全部站点</option>
+      <input v-model="filters.keyword" class="input" placeholder="关键词搜索" @keyup.enter="loadArticles" />
+      <select v-model="filters.siteId" class="input small-select">
+        <option :value="undefined">全部站点</option>
         <option v-for="site in sites" :key="site.id" :value="site.id">{{ site.name }}</option>
       </select>
-      <select v-model="filterCategory" class="filter-select" @change="handleSearch">
-        <option value="">全部栏目</option>
-        <option v-for="item in categoryOptions" :key="item.id" :value="item.name">{{ item.fullPath }}</option>
+      <select v-model="filters.primaryCategoryId" class="input small-select">
+        <option :value="undefined">全部栏目</option>
+        <option v-for="item in categoryOptions" :key="item.id" :value="item.id">{{ item.name }}</option>
       </select>
-      <select v-model="filterStatus" class="filter-select" @change="handleSearch">
-        <option value="">全部状态</option>
-        <option v-for="item in statusOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
+      <select v-model="filters.status" class="input small-select">
+        <option v-for="item in statusOptions" :key="item.value || 'all'" :value="item.value">{{ item.label }}</option>
       </select>
-      <div class="search-box">
-        <SearchOutlined class="search-icon" />
-        <input v-model="searchKeyword" type="text" class="search-input" placeholder="搜索标题或正文" @keyup.enter="handleSearch" />
-      </div>
-      <button class="secondary-btn" @click="handleSearch">查询</button>
+      <button class="secondary-btn" @click="loadArticles">查询</button>
     </div>
 
     <div class="table-card">
@@ -361,397 +311,161 @@ onMounted(async () => {
         <thead>
           <tr>
             <th>标题</th>
-            <th>站点</th>
             <th>栏目</th>
-            <th>作者</th>
             <th>状态</th>
-            <th>浏览量</th>
-            <th>创建时间</th>
+            <th>版本</th>
+            <th>更新时间</th>
             <th>操作</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-if="!loading && articles.length === 0">
-            <td colspan="8" class="empty-row">暂无内容</td>
+          <tr v-if="loading">
+            <td colspan="6" class="empty-row">加载中...</td>
           </tr>
-          <tr v-for="article in articles" :key="article.id">
-            <td>{{ article.title }}</td>
-            <td>{{ sites.find(site => site.id === article.siteId)?.name || '-' }}</td>
-            <td>{{ article.category || '-' }}</td>
-            <td>{{ article.author || '-' }}</td>
+          <tr v-else-if="!articles.length">
+            <td colspan="6" class="empty-row">暂无数据</td>
+          </tr>
+          <tr v-for="item in articles" :key="item.id">
             <td>
-              <span :class="['status-tag', article.status]">{{ getStatusText(article.status) }}</span>
+              <div class="title-cell">{{ item.title }}</div>
+              <div class="sub-text">{{ item.author || '未填写作者' }}</div>
             </td>
-            <td>{{ article.views }}</td>
-            <td>{{ article.createdAt?.replace('T', ' ').slice(0, 19) }}</td>
+            <td>{{ item.category || '-' }}</td>
+            <td><span :class="['status-chip', item.status]">{{ statusLabel(item.status) }}</span></td>
+            <td>r{{ item.currentRevision || 1 }}</td>
+            <td>{{ item.updatedAt ? item.updatedAt.replace('T', ' ').slice(0, 16) : '-' }}</td>
             <td>
-              <div class="action-btns">
-                <button v-if="canUpdateArticle" class="action-btn" @click="openEditModal(article)" title="编辑">
-                  <EditOutlined />
-                </button>
-                <button v-if="canPublishArticle && article.status === 'draft'" class="action-btn success" @click="handlePublish(article)" title="发布">
-                  <ExportOutlined />
-                </button>
-                <button v-else-if="canPublishArticle && article.status === 'published'" class="action-btn warning" @click="handleUnpublish(article)" title="下线">
-                  <ExportOutlined />
-                </button>
-                <button v-if="canDeleteArticle" class="action-btn danger" @click="handleDelete(article)" title="删除">
-                  <DeleteOutlined />
-                </button>
+              <div class="actions">
+                <button class="link-btn" @click="openEdit(item)">详情</button>
+                <button v-if="canUpdate && (item.status === 'draft' || item.status === 'rejected')" class="link-btn" @click="openEdit(item)">编辑</button>
+                <button v-if="canDelete && (item.status === 'draft' || item.status === 'rejected')" class="link-btn danger" @click="removeArticle(item)">删除</button>
+                <button v-if="canSubmit && (item.status === 'draft' || item.status === 'rejected')" class="link-btn" @click="submitReviewAction(item)">提交审核</button>
+                <button v-if="item.status === 'approved'" class="link-btn" @click="gotoPublish(item, 'incremental')">去发布中心</button>
+                <button v-if="item.status === 'published'" class="link-btn warning" @click="gotoPublish(item, 'offline')">下线</button>
+                <button class="link-btn" @click="viewPublishCheck(item)">发布检查</button>
               </div>
             </td>
           </tr>
         </tbody>
       </table>
+    </div>
 
-      <div class="pagination">
-        <span class="pagination-total">共 {{ pagination.total }} 条</span>
-        <div class="pagination-controls">
-          <button class="page-btn" :disabled="pagination.current === 1" @click="handlePageChange(pagination.current - 1, pagination.pageSize)">上一页</button>
-          <span class="page-info">{{ pagination.current }} / {{ Math.ceil(pagination.total / pagination.pageSize) || 1 }}</span>
-          <button class="page-btn" :disabled="pagination.current >= Math.ceil(pagination.total / pagination.pageSize)" @click="handlePageChange(pagination.current + 1, pagination.pageSize)">下一页</button>
-        </div>
+    <div class="pagination-row">
+      <span>共 {{ pagination.total }} 条</span>
+      <div class="actions">
+        <button class="secondary-btn" :disabled="pagination.current <= 1" @click="pagination.current -= 1; loadArticles()">上一页</button>
+        <span>第 {{ pagination.current }} 页</span>
+        <button class="secondary-btn" :disabled="pagination.current * pagination.pageSize >= pagination.total" @click="pagination.current += 1; loadArticles()">下一页</button>
       </div>
     </div>
 
-    <div class="modal-overlay" v-if="modalVisible" @click.self="modalVisible = false">
-      <div class="modal-content large">
-        <div class="modal-header">
-          <h3>{{ isEdit ? '编辑内容' : '新建内容' }}</h3>
-          <button class="close-btn" @click="modalVisible = false">×</button>
-        </div>
-        <div class="modal-body">
-          <div class="form-group">
-            <label>标题</label>
-            <input v-model="editingArticle.title" type="text" class="form-input" placeholder="请输入文章标题" />
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>站点</label>
-              <select v-model="editingArticle.siteId" class="form-select" @change="handleEditingSiteChange">
-                <option :value="null">请选择站点</option>
+    <a-modal v-model:open="modalOpen" :title="isEdit ? '内容详情 / 编辑' : '新建内容'" width="980px" :footer="null" destroy-on-close>
+      <div class="modal-grid">
+        <div class="form-panel">
+          <div class="form-grid">
+            <label>
+              <span>站点</span>
+              <select v-model="form.siteId" class="input">
+                <option :value="undefined">请选择站点</option>
                 <option v-for="site in sites" :key="site.id" :value="site.id">{{ site.name }}</option>
               </select>
-            </div>
-            <div class="form-group">
-              <label>栏目</label>
-              <select v-model="editingArticle.primaryCategoryId" class="form-select">
-                <option :value="null">请选择栏目</option>
-                <option v-for="item in categoryOptions" :key="item.id" :value="item.id">{{ item.fullPath }}</option>
+            </label>
+            <label>
+              <span>栏目</span>
+              <select v-model="form.primaryCategoryId" class="input">
+                <option :value="undefined">请选择栏目</option>
+                <option v-for="item in categoryOptions" :key="item.id" :value="item.id">{{ item.name }}</option>
               </select>
-            </div>
+            </label>
+            <label class="full-row">
+              <span>标题</span>
+              <input v-model="form.title" class="input" placeholder="请输入标题" />
+            </label>
+            <label>
+              <span>作者</span>
+              <input v-model="form.author" class="input" placeholder="作者" />
+            </label>
+            <label>
+              <span>摘要</span>
+              <input v-model="form.summary" class="input" placeholder="摘要" />
+            </label>
+            <label class="full-row">
+              <span>正文</span>
+              <textarea v-model="form.content" class="textarea" rows="10" placeholder="请输入正文"></textarea>
+            </label>
           </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>作者</label>
-              <input v-model="editingArticle.author" type="text" class="form-input" placeholder="请输入作者" />
-            </div>
-            <div class="form-group">
-              <label>状态</label>
-              <select v-model="editingArticle.status" class="form-select">
-                <option v-for="item in statusOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
-              </select>
-            </div>
-          </div>
-          <div class="form-group">
-            <label>摘要</label>
-            <textarea v-model="editingArticle.summary" class="form-textarea" rows="3" placeholder="请输入摘要"></textarea>
-          </div>
-          <div class="form-group">
-            <label>正文</label>
-            <textarea v-model="editingArticle.content" class="form-textarea" rows="8" placeholder="请输入正文"></textarea>
+          <div class="footer-actions">
+            <button class="secondary-btn" @click="modalOpen = false">关闭</button>
+            <button v-if="isEdit && form.id" class="secondary-btn" @click="viewPublishCheck({ id: form.id, siteId: form.siteId, title: form.title, status: 'draft' } as ArticleItem)">发布检查</button>
+            <button v-if="!isEdit || canUpdate" class="primary-btn" :disabled="saving" @click="save">{{ saving ? '保存中...' : '保存' }}</button>
           </div>
         </div>
-        <div class="modal-footer">
-          <button class="secondary-btn" @click="modalVisible = false">取消</button>
-          <button class="primary-btn" @click="handleSave">保存</button>
+        <div class="side-panel">
+          <div class="side-card">
+            <div class="side-title">发布检查</div>
+            <div v-if="publishCheck" class="check-box">
+              <div :class="['status-chip', publishCheck.publishable ? 'published' : 'rejected']">{{ publishCheck.publishable ? '可发布' : '不可发布' }}</div>
+              <div class="sub-text">模板：{{ publishCheck.templateName || '未解析' }}</div>
+              <ul>
+                <li v-for="item in publishCheck.reasons" :key="`reason-${item}`">{{ item }}</li>
+                <li v-for="item in publishCheck.warnings" :key="`warn-${item}`">{{ item }}</li>
+              </ul>
+            </div>
+            <div v-else class="empty-side">点击“发布检查”查看当前内容是否满足正式发布条件。</div>
+          </div>
+          <div class="side-card">
+            <div class="side-title">流转历史</div>
+            <div v-if="historyItems.length" class="history-list">
+              <div v-for="item in historyItems.slice(0, 6)" :key="item.id" class="history-item">
+                <div>{{ item.action }} · {{ item.operatorName }}</div>
+                <div class="sub-text">{{ item.fromStatus || '-' }} → {{ item.toStatus || '-' }}</div>
+                <div class="sub-text">{{ item.createdAt?.replace('T', ' ').slice(0, 16) }}</div>
+                <div v-if="item.reason" class="sub-text">{{ item.reason }}</div>
+              </div>
+            </div>
+            <div v-else class="empty-side">暂无流转记录</div>
+          </div>
         </div>
       </div>
-    </div>
+    </a-modal>
   </div>
 </template>
 
 <style scoped>
-.content-page {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.page-header,
-.toolbar,
-.table-card {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  padding: 20px;
-}
-
-.page-header,
-.toolbar,
-.modal-header,
-.modal-footer,
-.form-row {
-  display: flex;
-  align-items: center;
-}
-
-.page-header,
-.modal-header,
-.modal-footer {
-  justify-content: space-between;
-}
-
-.header-left h1 {
-  margin: 0;
-  color: #0f172a;
-}
-
-.header-left p {
-  margin: 6px 0 0;
-  color: #64748b;
-}
-
-.toolbar {
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.filter-select,
-.form-select,
-.form-input,
-.search-input,
-.form-textarea {
-  width: 100%;
-  border: 1px solid #cbd5e1;
-  border-radius: 10px;
-  padding: 10px 12px;
-  font-size: 14px;
-  box-sizing: border-box;
-}
-
-.filter-select {
-  width: 220px;
-}
-
-.search-box {
-  position: relative;
-  min-width: 240px;
-  flex: 1;
-}
-
-.search-icon {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: #94a3b8;
-}
-
-.search-input {
-  padding-left: 38px;
-}
-
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.data-table th,
-.data-table td {
-  padding: 14px 12px;
-  border-bottom: 1px solid #e2e8f0;
-  text-align: left;
-}
-
-.empty-row {
-  text-align: center;
-  color: #94a3b8;
-}
-
-.status-tag {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-}
-
-.status-tag.published {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.status-tag.draft {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.status-tag.archived {
-  background: #e2e8f0;
-  color: #334155;
-}
-
-.action-btns {
-  display: flex;
-  gap: 8px;
-}
-
-.action-btn,
-.primary-btn,
-.secondary-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border-radius: 10px;
-  border: none;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.action-btn {
-  width: 34px;
-  height: 34px;
-  background: #f8fafc;
-  color: #1e293b;
-}
-
-.action-btn.success {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.action-btn.warning {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.action-btn.danger {
-  background: #fee2e2;
-  color: #b91c1c;
-}
-
-.primary-btn,
-.secondary-btn {
-  padding: 10px 16px;
-}
-
-.primary-btn {
-  background: #2563eb;
-  color: #ffffff;
-}
-
-.secondary-btn,
-.page-btn {
-  background: #f1f5f9;
-  color: #0f172a;
-}
-
-.pagination {
-  margin-top: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.pagination-total,
-.page-info {
-  color: #64748b;
-}
-
-.pagination-controls {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.page-btn {
-  border: none;
-  border-radius: 8px;
-  padding: 8px 12px;
-  cursor: pointer;
-}
-
-.page-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 999;
-}
-
-.modal-content {
-  width: min(760px, calc(100vw - 32px));
-  background: #ffffff;
-  border-radius: 16px;
-  overflow: hidden;
-}
-
-.modal-content.large {
-  width: min(920px, calc(100vw - 32px));
-}
-
-.modal-header,
-.modal-footer {
-  padding: 18px 20px;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.modal-footer {
-  border-top: 1px solid #e2e8f0;
-  border-bottom: none;
-  gap: 12px;
-}
-
-.modal-body {
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  max-height: 70vh;
-  overflow-y: auto;
-}
-
-.close-btn {
-  border: none;
-  background: transparent;
-  font-size: 24px;
-  cursor: pointer;
-  color: #64748b;
-}
-
-.form-row {
-  gap: 16px;
-}
-
-.form-row > .form-group {
-  flex: 1;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-@media (max-width: 960px) {
-  .form-row,
-  .toolbar,
-  .pagination {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .pagination-controls {
-    justify-content: space-between;
-  }
-}
+.page-shell { display: flex; flex-direction: column; gap: 16px; }
+.page-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.page-header h2 { margin: 0; }
+.page-header p { margin: 6px 0 0; color: #64748b; }
+.toolbar, .actions, .pagination-row, .footer-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.table-card, .side-card, .form-panel { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px; }
+.data-table { width: 100%; border-collapse: collapse; }
+.data-table th, .data-table td { padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
+.empty-row { text-align: center; color: #94a3b8; padding: 40px 0; }
+.title-cell { font-weight: 600; }
+.sub-text { color: #64748b; font-size: 12px; }
+.input, .textarea { width: 100%; border: 1px solid #cbd5e1; border-radius: 10px; padding: 10px 12px; box-sizing: border-box; }
+.small-select { min-width: 160px; }
+.primary-btn, .secondary-btn, .link-btn { border: none; border-radius: 10px; padding: 10px 14px; cursor: pointer; }
+.primary-btn { background: #2563eb; color: #fff; }
+.secondary-btn { background: #e2e8f0; color: #0f172a; }
+.link-btn { background: transparent; color: #2563eb; padding: 0; }
+.link-btn.danger { color: #dc2626; }
+.link-btn.warning { color: #b45309; }
+.status-chip { display: inline-flex; padding: 4px 10px; border-radius: 999px; font-size: 12px; }
+.status-chip.draft { background: #e2e8f0; color: #334155; }
+.status-chip.pending_review { background: #fef3c7; color: #92400e; }
+.status-chip.rejected { background: #fee2e2; color: #991b1b; }
+.status-chip.approved { background: #dbeafe; color: #1d4ed8; }
+.status-chip.published { background: #dcfce7; color: #166534; }
+.status-chip.offline { background: #f3e8ff; color: #6b21a8; }
+.modal-grid { display: grid; grid-template-columns: 1.3fr 0.9fr; gap: 16px; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-grid label { display: flex; flex-direction: column; gap: 8px; }
+.full-row { grid-column: 1 / -1; }
+.side-panel { display: flex; flex-direction: column; gap: 16px; }
+.side-title { font-weight: 600; margin-bottom: 10px; }
+.history-list { display: flex; flex-direction: column; gap: 10px; }
+.history-item, .check-box, .empty-side { background: #f8fafc; border-radius: 12px; padding: 12px; }
+.pagination-row { justify-content: space-between; }
+@media (max-width: 1100px) { .modal-grid { grid-template-columns: 1fr; } .form-grid { grid-template-columns: 1fr; } }
 </style>

@@ -1,4 +1,4 @@
-﻿import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory } from 'vue-router'
 import Login from '../views/Login.vue'
 import MainLayout from '../components/MainLayout.vue'
 import Dashboard from '../views/Dashboard.vue'
@@ -7,6 +7,8 @@ import Roles from '../views/Roles.vue'
 import Permissions from '../views/Permissions.vue'
 import Menus from '../views/Menus.vue'
 import Content from '../views/Content.vue'
+import Review from '../views/Review.vue'
+import PublishCenter from '../views/PublishCenter.vue'
 import Categories from '../views/Categories.vue'
 import Templates from '../views/Templates.vue'
 import Sites from '../views/Sites.vue'
@@ -29,6 +31,8 @@ const router = createRouter({
         { path: 'permissions', name: 'Permissions', component: Permissions },
         { path: 'menus', name: 'Menus', component: Menus },
         { path: 'content', name: 'Content', component: Content },
+        { path: 'content/review', name: 'Review', component: Review },
+        { path: 'content/publish', name: 'PublishCenter', component: PublishCenter },
         { path: 'content/categories', name: 'Categories', component: Categories },
         { path: 'content/templates', name: 'Templates', component: Templates },
         { path: 'sites', name: 'Sites', component: Sites },

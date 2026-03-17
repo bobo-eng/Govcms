@@ -1,6 +1,7 @@
 package gov.cms.admin.entity;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -40,13 +41,47 @@ public class Article {
     @Column(length = 100)
     private String author;
 
-    @Column(length = 20)
-    private String status = "draft";
+    @Convert(converter = ArticleStatusConverter.class)
+    @Column(nullable = false, length = 30)
+    private ArticleStatus status = ArticleStatus.draft;
 
     @Column(nullable = false)
     private Integer views = 0;
 
+    @Column
+    private LocalDateTime submittedAt;
+
+    @Column(length = 100)
+    private String submittedBy;
+
+    @Column
+    private LocalDateTime approvedAt;
+
+    @Column(length = 100)
+    private String approvedBy;
+
+    @Column
+    private LocalDateTime publishedAt;
+
+    @Column(length = 100)
+    private String publishedBy;
+
+    @Column
+    private LocalDateTime offlineAt;
+
+    @Column(length = 100)
+    private String offlineBy;
+
+    @Column(length = 1000)
+    private String rejectionReason;
+
+    @Column(length = 1000)
+    private String offlineReason;
+
     @Column(nullable = false)
+    private Integer currentRevision = 1;
+
+    @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @Column(nullable = false)
@@ -54,19 +89,32 @@ public class Article {
 
     @PrePersist
     protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
-        if (status == null || status.isBlank()) {
-            status = "draft";
+        LocalDateTime now = LocalDateTime.now();
+        createdAt = now;
+        updatedAt = now;
+        if (status == null) {
+            status = ArticleStatus.draft;
         }
         if (views == null) {
             views = 0;
+        }
+        if (currentRevision == null || currentRevision < 1) {
+            currentRevision = 1;
         }
     }
 
     @PreUpdate
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
+        if (status == null) {
+            status = ArticleStatus.draft;
+        }
+        if (views == null) {
+            views = 0;
+        }
+        if (currentRevision == null || currentRevision < 1) {
+            currentRevision = 1;
+        }
     }
 
     public Long getId() { return id; }
@@ -93,11 +141,45 @@ public class Article {
     public String getAuthor() { return author; }
     public void setAuthor(String author) { this.author = author; }
 
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
+    public ArticleStatus getStatus() { return status; }
+    public void setStatus(ArticleStatus status) { this.status = status; }
+    public void setStatus(String status) { this.status = ArticleStatus.fromNullable(status); }
 
     public Integer getViews() { return views; }
     public void setViews(Integer views) { this.views = views; }
+
+    public LocalDateTime getSubmittedAt() { return submittedAt; }
+    public void setSubmittedAt(LocalDateTime submittedAt) { this.submittedAt = submittedAt; }
+
+    public String getSubmittedBy() { return submittedBy; }
+    public void setSubmittedBy(String submittedBy) { this.submittedBy = submittedBy; }
+
+    public LocalDateTime getApprovedAt() { return approvedAt; }
+    public void setApprovedAt(LocalDateTime approvedAt) { this.approvedAt = approvedAt; }
+
+    public String getApprovedBy() { return approvedBy; }
+    public void setApprovedBy(String approvedBy) { this.approvedBy = approvedBy; }
+
+    public LocalDateTime getPublishedAt() { return publishedAt; }
+    public void setPublishedAt(LocalDateTime publishedAt) { this.publishedAt = publishedAt; }
+
+    public String getPublishedBy() { return publishedBy; }
+    public void setPublishedBy(String publishedBy) { this.publishedBy = publishedBy; }
+
+    public LocalDateTime getOfflineAt() { return offlineAt; }
+    public void setOfflineAt(LocalDateTime offlineAt) { this.offlineAt = offlineAt; }
+
+    public String getOfflineBy() { return offlineBy; }
+    public void setOfflineBy(String offlineBy) { this.offlineBy = offlineBy; }
+
+    public String getRejectionReason() { return rejectionReason; }
+    public void setRejectionReason(String rejectionReason) { this.rejectionReason = rejectionReason; }
+
+    public String getOfflineReason() { return offlineReason; }
+    public void setOfflineReason(String offlineReason) { this.offlineReason = offlineReason; }
+
+    public Integer getCurrentRevision() { return currentRevision; }
+    public void setCurrentRevision(Integer currentRevision) { this.currentRevision = currentRevision; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

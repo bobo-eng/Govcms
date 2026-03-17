@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import gov.cms.admin.dto.RenderContextSnapshot;
 import gov.cms.admin.dto.RenderRequest;
 import gov.cms.admin.entity.Article;
+import gov.cms.admin.entity.ArticleStatus;
 import gov.cms.admin.entity.Category;
 import gov.cms.admin.entity.Site;
 import gov.cms.admin.entity.Template;
@@ -127,12 +128,12 @@ public class RenderContextAssembler {
             if (previewArticle.getPrimaryCategoryId() != null) {
                 previewCategory = categoryRepository.findByIdAndSiteId(previewArticle.getPrimaryCategoryId(), request.getSiteId()).orElse(null);
             }
-            if (!"published".equalsIgnoreCase(previewArticle.getStatus())) {
+            if (!(previewArticle.getStatus() == ArticleStatus.approved || previewArticle.getStatus() == ArticleStatus.published)) {
                 if (MODE_PUBLISH.equals(mode)) {
-                    blockingReasons.add("content status is not published");
+                    blockingReasons.add("content status is not approved or published");
                 } else {
                     warnings.add("Content is not published; preview stays in controlled mode only.");
-                    blockingReasons.add("content status is not published");
+                    blockingReasons.add("content status is not approved or published");
                 }
             }
         } else {
@@ -180,6 +181,9 @@ public class RenderContextAssembler {
                 pageType,
                 sourceType,
                 mode,
+                request.getIncludeArticleIds(),
+                request.getExcludeArticleIds(),
+                request.getOperation(),
                 warnings
         );
 
@@ -320,6 +324,9 @@ public class RenderContextAssembler {
                                                                       String pageType,
                                                                       String sourceType,
                                                                       String mode,
+                                                                      List<Long> includeArticleIds,
+                                                                      List<Long> excludeArticleIds,
+                                                                      String operation,
                                                                       List<String> warnings) {
         JsonNode root = readJson(blockSchema, "blockSchema");
         JsonNode blocksNode = root.path("blocks");
@@ -354,7 +361,7 @@ public class RenderContextAssembler {
             block.setType(type);
             block.setSlot(slot);
             block.setProps(props);
-            block.setData(resolveBlockData(type, props, site, siteCategories, previewCategory, previewArticle, pageType, sourceType, mode));
+            block.setData(resolveBlockData(type, props, site, siteCategories, previewCategory, previewArticle, pageType, sourceType, mode, includeArticleIds, excludeArticleIds, operation));
             blocks.add(block);
         }
         return blocks;
@@ -368,7 +375,10 @@ public class RenderContextAssembler {
                                     Article previewArticle,
                                     String pageType,
                                     String sourceType,
-                                    String mode) {
+                                    String mode,
+                                    List<Long> includeArticleIds,
+                                    List<Long> excludeArticleIds,
+                                    String operation) {
         return switch (type) {
             case "site_header" -> Map.of(
                     "siteName", site.getName(),
@@ -392,7 +402,7 @@ public class RenderContextAssembler {
                     "description", previewCategory == null ? "" : nullToEmpty(previewCategory.getDescription()),
                     "fullPath", previewCategory == null ? "" : nullToEmpty(previewCategory.getFullPath())
             );
-            case "article_list" -> buildArticleList(site, siteCategories, previewCategory, pageType, mode, props);
+            case "article_list" -> buildArticleList(site, siteCategories, previewCategory, previewArticle, pageType, sourceType, mode, operation, includeArticleIds, excludeArticleIds, props);
             case "pagination" -> buildPaginationData(props);
             case "content_header" -> Map.of(
                     "title", previewArticle == null ? "" : nullToEmpty(previewArticle.getTitle()),
@@ -408,8 +418,8 @@ public class RenderContextAssembler {
                     "html", sanitizeHtml(previewArticle == null ? "" : previewArticle.getContent())
             );
             case "error_message" -> Map.of(
-                    "title", firstNonBlank(asString(props.get("title")), "页面不存在"),
-                    "message", firstNonBlank(asString(props.get("message")), "您访问的页面暂时无法找到。")
+                    "title", firstNonBlank(asString(props.get("title")), "Page Not Found"),
+                    "message", firstNonBlank(asString(props.get("message")), "The requested page is not available at the moment.")
             );
             default -> Collections.emptyMap();
         };
@@ -418,8 +428,13 @@ public class RenderContextAssembler {
     private List<Map<String, Object>> buildArticleList(Site site,
                                                        List<Category> siteCategories,
                                                        Category previewCategory,
+                                                       Article previewArticle,
                                                        String pageType,
+                                                       String sourceType,
                                                        String mode,
+                                                       String operation,
+                                                       List<Long> includeArticleIds,
+                                                       List<Long> excludeArticleIds,
                                                        Map<String, Object> props) {
         int size = clamp(parseInt(props.get("size"), 10), 1, 20);
         List<Article> articles;
@@ -427,11 +442,31 @@ public class RenderContextAssembler {
             articles = articleRepository.findBySiteIdAndPrimaryCategoryIdAndStatusOrderByCreatedAtDescIdDesc(
                     site.getId(),
                     previewCategory.getId(),
-                    "published",
+                    ArticleStatus.published,
                     PageRequest.of(0, size)
             );
         } else {
-            articles = articleRepository.searchArticles(null, null, "published", site.getId(), PageRequest.of(0, size)).getContent();
+            articles = articleRepository.searchArticles(null, null, ArticleStatus.published, site.getId(), null, PageRequest.of(0, size)).getContent();
+        }
+        if (MODE_PUBLISH.equals(mode)) {
+            if (includeArticleIds != null && !includeArticleIds.isEmpty()) {
+                List<Article> includedArticles = articleRepository.findAllById(includeArticleIds).stream()
+                        .filter(article -> Objects.equals(article.getSiteId(), site.getId()))
+                        .filter(article -> article.getStatus() == ArticleStatus.approved || article.getStatus() == ArticleStatus.published)
+                        .filter(article -> previewCategory == null || Objects.equals(article.getPrimaryCategoryId(), previewCategory.getId()))
+                        .toList();
+                Map<Long, Article> merged = new LinkedHashMap<>();
+                for (Article article : articles) {
+                    merged.put(article.getId(), article);
+                }
+                for (Article article : includedArticles) {
+                    merged.put(article.getId(), article);
+                }
+                articles = new ArrayList<>(merged.values());
+            }
+            if (excludeArticleIds != null && !excludeArticleIds.isEmpty()) {
+                articles = articles.stream().filter(article -> !excludeArticleIds.contains(article.getId())).toList();
+            }
         }
         if (articles.isEmpty() && MODE_PREVIEW.equals(mode)) {
             Category category = previewCategory == null ? buildSampleCategory(site.getId()) : previewCategory;
@@ -646,7 +681,7 @@ public class RenderContextAssembler {
         Category category = new Category();
         category.setId(0L);
         category.setSiteId(siteId);
-        category.setName("示例栏目");
+        category.setName("Sample Column");
         category.setCode("sample-column");
         category.setSlug("sample-column");
         category.setFullPath("/sample-column");
@@ -656,7 +691,7 @@ public class RenderContextAssembler {
         category.setNavVisible(true);
         category.setBreadcrumbVisible(true);
         category.setPublicVisible(true);
-        category.setDescription("用于预览的示例栏目");
+        category.setDescription("Sample category for controlled preview.");
         return category;
     }
 
@@ -665,12 +700,12 @@ public class RenderContextAssembler {
         article.setId(0L);
         article.setSiteId(siteId);
         article.setPrimaryCategoryId(categoryId);
-        article.setTitle("示例内容标题");
-        article.setSummary("这是用于预览和渲染测试的示例摘要。");
-        article.setContent("<p>这是用于渲染服务的示例正文。</p>");
-        article.setCategory("示例栏目");
+        article.setTitle("Sample content title");
+        article.setSummary("This is a sample summary for controlled preview and render testing.");
+        article.setContent("<p>This is sample body content for render testing.</p>");
+        article.setCategory("Sample Category");
         article.setAuthor("system");
-        article.setStatus("published");
+        article.setStatus(ArticleStatus.published);
         article.setViews(128);
         article.setCreatedAt(LocalDateTime.now().minusDays(1));
         article.setUpdatedAt(LocalDateTime.now());

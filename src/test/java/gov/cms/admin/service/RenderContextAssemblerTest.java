@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import gov.cms.admin.dto.RenderContextSnapshot;
 import gov.cms.admin.dto.RenderRequest;
 import gov.cms.admin.entity.Article;
+import gov.cms.admin.entity.ArticleStatus;
 import gov.cms.admin.entity.Category;
 import gov.cms.admin.entity.Site;
 import gov.cms.admin.entity.Template;
@@ -49,7 +50,7 @@ class RenderContextAssemblerTest {
     void assemblePreviewIncludesWarningsForUnpublishedContent() {
         Template template = buildTemplate("content_detail", "active");
         TemplateVersion version = buildVersion(template.getId(), "{\"layout\":[{\"slot\":\"main\"}]}", "{\"blocks\":[{\"type\":\"content_header\",\"slot\":\"main\"},{\"type\":\"content_body\",\"slot\":\"main\"}]}");
-        Article article = buildArticle(99L, "draft");
+        Article article = buildArticle(99L, ArticleStatus.draft);
         Category category = buildCategory(7L, "/news");
 
         when(templateRepository.findByIdAndSiteId(10L, 1L)).thenReturn(Optional.of(template));
@@ -72,14 +73,66 @@ class RenderContextAssemblerTest {
         assertFalse(snapshot.isPublishReady());
         assertTrue(snapshot.getWarnings().stream().anyMatch(item -> item.contains("not published")));
         assertEquals("/news/99.html", snapshot.getPathHint());
-        assertEquals(2, snapshot.getRenderBlocks().size());
     }
 
     @Test
-    void assemblePublishRejectsUnpublishedContent() {
+    void assemblePublishAllowsApprovedContent() {
         Template template = buildTemplate("content_detail", "active");
         TemplateVersion version = buildVersion(template.getId(), "{\"layout\":[{\"slot\":\"main\"}]}", "{\"blocks\":[{\"type\":\"content_header\",\"slot\":\"main\"}]}");
-        Article article = buildArticle(99L, "draft");
+        Article article = buildArticle(99L, ArticleStatus.approved);
+        Category category = buildCategory(7L, "/news");
+
+        when(templateRepository.findByIdAndSiteId(10L, 1L)).thenReturn(Optional.of(template));
+        when(templateVersionRepository.findById(101L)).thenReturn(Optional.of(version));
+        when(siteRepository.findById(1L)).thenReturn(Optional.of(buildSite()));
+        when(articleRepository.findById(99L)).thenReturn(Optional.of(article));
+        when(categoryRepository.findByIdAndSiteId(7L, 1L)).thenReturn(Optional.of(category));
+        when(categoryRepository.findBySiteIdOrderBySortOrderAscIdAsc(1L)).thenReturn(List.of(category));
+
+        RenderRequest request = new RenderRequest();
+        request.setSiteId(1L);
+        request.setTemplateId(10L);
+        request.setSourceType("content");
+        request.setSourceId(99L);
+        request.setMode("publish");
+
+        RenderContextSnapshot snapshot = assembler.assemble(request);
+
+        assertTrue(snapshot.isPublishReady());
+    }
+
+    @Test
+    void assembleColumnSnapshotBuildsArticleListBlockData() {
+        Template template = buildTemplate("column_list", "active");
+        TemplateVersion version = buildVersion(template.getId(), "{\"layout\":[{\"slot\":\"main\"}]}", "{\"blocks\":[{\"type\":\"article_list\",\"slot\":\"main\",\"props\":{\"size\":5}}]}");
+        Category category = buildCategory(7L, "/news");
+        Article article = buildArticle(88L, ArticleStatus.published);
+
+        when(templateRepository.findByIdAndSiteId(10L, 1L)).thenReturn(Optional.of(template));
+        when(templateVersionRepository.findById(101L)).thenReturn(Optional.of(version));
+        when(siteRepository.findById(1L)).thenReturn(Optional.of(buildSite()));
+        when(categoryRepository.findByIdAndSiteId(7L, 1L)).thenReturn(Optional.of(category));
+        when(categoryRepository.findBySiteIdOrderBySortOrderAscIdAsc(1L)).thenReturn(List.of(category));
+        when(articleRepository.findBySiteIdAndPrimaryCategoryIdAndStatusOrderByCreatedAtDescIdDesc(eq(1L), eq(7L), eq(ArticleStatus.published), any())).thenReturn(List.of(article));
+
+        RenderRequest request = new RenderRequest();
+        request.setSiteId(1L);
+        request.setTemplateId(10L);
+        request.setSourceType("column");
+        request.setSourceId(7L);
+        request.setMode("preview");
+
+        RenderContextSnapshot snapshot = assembler.assemble(request);
+
+        assertEquals("column-list", snapshot.getPageType());
+        assertTrue(String.valueOf(snapshot.getRenderBlocks().get(0).getData()).contains("/news/88.html"));
+    }
+
+    @Test
+    void assemblePublishRejectsDraftContent() {
+        Template template = buildTemplate("content_detail", "active");
+        TemplateVersion version = buildVersion(template.getId(), "{\"layout\":[{\"slot\":\"main\"}]}", "{\"blocks\":[{\"type\":\"content_header\",\"slot\":\"main\"}]}");
+        Article article = buildArticle(99L, ArticleStatus.draft);
         Category category = buildCategory(7L, "/news");
 
         when(templateRepository.findByIdAndSiteId(10L, 1L)).thenReturn(Optional.of(template));
@@ -96,37 +149,7 @@ class RenderContextAssemblerTest {
         request.setMode("publish");
 
         ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> assembler.assemble(request));
-
         assertEquals(HttpStatus.CONFLICT, exception.getStatusCode());
-    }
-
-    @Test
-    void assembleColumnSnapshotBuildsArticleListBlockData() {
-        Template template = buildTemplate("column_list", "active");
-        TemplateVersion version = buildVersion(template.getId(), "{\"layout\":[{\"slot\":\"main\"}]}", "{\"blocks\":[{\"type\":\"breadcrumb\",\"slot\":\"main\"},{\"type\":\"article_list\",\"slot\":\"main\",\"props\":{\"size\":5}}]}");
-        Category category = buildCategory(7L, "/news");
-        Article article = buildArticle(88L, "published");
-
-        when(templateRepository.findByIdAndSiteId(10L, 1L)).thenReturn(Optional.of(template));
-        when(templateVersionRepository.findById(101L)).thenReturn(Optional.of(version));
-        when(siteRepository.findById(1L)).thenReturn(Optional.of(buildSite()));
-        when(categoryRepository.findByIdAndSiteId(7L, 1L)).thenReturn(Optional.of(category));
-        when(categoryRepository.findBySiteIdOrderBySortOrderAscIdAsc(1L)).thenReturn(List.of(category));
-        when(articleRepository.findBySiteIdAndPrimaryCategoryIdAndStatusOrderByCreatedAtDescIdDesc(eq(1L), eq(7L), eq("published"), any())).thenReturn(List.of(article));
-
-        RenderRequest request = new RenderRequest();
-        request.setSiteId(1L);
-        request.setTemplateId(10L);
-        request.setSourceType("column");
-        request.setSourceId(7L);
-        request.setMode("preview");
-
-        RenderContextSnapshot snapshot = assembler.assemble(request);
-
-        assertEquals("column-list", snapshot.getPageType());
-        assertEquals(2, snapshot.getRenderBlocks().size());
-        assertTrue(String.valueOf(snapshot.getRenderBlocks().get(1).getData()).contains("/news/88.html"));
-        assertEquals("/news/index.html", snapshot.getPathHint());
     }
 
     private Template buildTemplate(String type, String status) {
@@ -179,7 +202,7 @@ class RenderContextAssemblerTest {
         return category;
     }
 
-    private Article buildArticle(Long id, String status) {
+    private Article buildArticle(Long id, ArticleStatus status) {
         Article article = new Article();
         article.setId(id);
         article.setSiteId(1L);

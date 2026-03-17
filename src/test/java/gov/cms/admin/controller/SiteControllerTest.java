@@ -2,6 +2,7 @@ package gov.cms.admin.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import gov.cms.admin.config.SecurityConfig;
+import gov.cms.admin.dto.SiteOptionDto;
 import gov.cms.admin.entity.Site;
 import gov.cms.admin.security.JwtAuthenticationFilter;
 import gov.cms.admin.service.CustomUserDetailsService;
@@ -22,7 +23,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
@@ -38,20 +38,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import(SecurityConfig.class)
 class SiteControllerTest {
 
-    @Autowired
-    private MockMvc mockMvc;
+    @Autowired private MockMvc mockMvc;
+    @Autowired private ObjectMapper objectMapper;
 
-    @Autowired
-    private ObjectMapper objectMapper;
-
-    @MockBean
-    private SiteService siteService;
-
-    @MockBean
-    private CustomUserDetailsService customUserDetailsService;
-
-    @MockBean
-    private JwtAuthenticationFilter jwtAuthenticationFilter;
+    @MockBean private SiteService siteService;
+    @MockBean private CustomUserDetailsService customUserDetailsService;
+    @MockBean private JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -75,6 +67,22 @@ class SiteControllerTest {
         mockMvc.perform(get("/api/sites"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].code").value("gov-main"));
+    }
+
+    @Test
+    @WithMockUser(authorities = "content:article:view")
+    void getSiteOptionsReturnsListForContentUsers() throws Exception {
+        when(siteService.getSiteOptions()).thenReturn(List.of(new SiteOptionDto(1L, "Gov Main", "enabled")));
+
+        mockMvc.perform(get("/api/sites/options"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].name").value("Gov Main"));
+    }
+
+    @Test
+    void getSiteOptionsReturnsUnauthorizedWithoutLogin() throws Exception {
+        mockMvc.perform(get("/api/sites/options"))
+                .andExpect(status().isForbidden());
     }
 
     @Test

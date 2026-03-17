@@ -19,7 +19,7 @@ import {
   CloudOutlined
 } from '@ant-design/icons-vue'
 import api from '../utils/api'
-import { clearSession, getUsername } from '../utils/session'
+import { clearSession, getRoles, getUsername } from '../utils/session'
 
 interface MenuItem {
   key: string
@@ -37,6 +37,7 @@ const selectedKeys = ref<string[]>([])
 const openKeys = ref<string[]>([])
 const menuItems = ref<MenuItem[]>([])
 const username = ref(getUsername() || 'Admin')
+const roleLabel = ref('\u7528\u6237')
 
 const iconMap: Record<string, any> = {
   DashboardOutlined,
@@ -143,8 +144,11 @@ watch(() => route.path, () => {
   updateSelectedKeys()
 })
 
+
 onMounted(async () => {
   username.value = getUsername() || 'Admin'
+  const roleCode = getRoles()[0] || ''
+  roleLabel.value = ({ admin: '\u7ba1\u7406\u5458', editor: '\u7f16\u8f91', reviewer: '\u5ba1\u6838\u5458', publisher: '\u53d1\u5e03\u5458' } as Record<string, string>)[roleCode] || '\u7528\u6237'
   await fetchMenus()
   updateSelectedKeys()
 })
@@ -152,9 +156,7 @@ onMounted(async () => {
 
 <template>
   <div class="app-layout">
-    <!-- 左侧侧边栏 -->
     <aside class="sidebar" :class="{ collapsed }">
-      <!-- Logo -->
       <div class="sidebar-header">
         <div class="logo">
           <div class="logo-icon">
@@ -168,7 +170,6 @@ onMounted(async () => {
         </div>
       </div>
 
-      <!-- 菜单 - 使用 Ant Design Menu 组件 -->
       <nav class="sidebar-nav">
         <a-menu
           v-if="!collapsed"
@@ -180,11 +181,10 @@ onMounted(async () => {
           @click="handleMenuClick"
           @openChange="handleOpenChange"
         />
-        
-        <!-- 折叠状态下的菜单 -->
+
         <div v-else class="collapsed-menu">
-          <div 
-            v-for="item in menuItems" 
+          <div
+            v-for="item in menuItems"
             :key="item.key"
             class="nav-item"
             :class="{ active: selectedKeys.includes(item.key) }"
@@ -195,22 +195,21 @@ onMounted(async () => {
         </div>
       </nav>
 
-      <!-- 底部用户 -->
       <div class="sidebar-footer">
         <div class="user-info" :class="{ collapsed }">
           <div class="user-avatar">A</div>
           <div v-if="!collapsed" class="user-detail">
             <span class="user-name">{{ username }}</span>
-            <span class="user-role">管理员</span>
+            <span class="user-role">{{ roleLabel }}</span>
           </div>
           <LogoutOutlined v-if="!collapsed" class="logout-icon" @click="handleLogout" />
         </div>
       </div>
     </aside>
 
-    <!-- 右侧主内容 -->
+    <!-- 闂佸憡鐟ラ崢鏍疾閼哥數鈻旈悹鍥ㄥ絻閺佸爼鎮?-->
     <div class="main-wrapper" :class="{ collapsed }">
-      <!-- 顶部导航 -->
+      <!-- 婵＄偑鍊曢悥濂稿磿鐎电硶鍋撴担鍐棈闁?-->
       <header class="top-header">
         <div class="header-left">
           <MenuFoldOutlined v-if="collapsed" class="trigger" @click="collapsed = !collapsed" />
@@ -230,7 +229,7 @@ onMounted(async () => {
         </div>
       </header>
 
-      <!-- 页面内容 -->
+      <!-- 婵＄偑鍊楅弫璇差焽娴兼潙绀冮柛娑卞弾閸?-->
       <main class="main-content">
         <router-view />
       </main>
@@ -295,7 +294,7 @@ onMounted(async () => {
   overflow-y: auto;
 }
 
-/* Ant Design Menu 样式覆盖 */
+/* Ant Design Menu 闂佸搫绉撮崲鑼閿涘嫭鍟洪柛鈩冪懄绾?*/
 .sidebar-nav :deep(.ant-menu) {
   border: none;
   background: transparent;
@@ -329,7 +328,7 @@ onMounted(async () => {
   display: none;
 }
 
-/* 折叠状态菜单 */
+/* 闂佺鍩栭敋鐟滅増妫冮幃鈺呮嚋绾版ê浜惧ù锝堟缂嶅懘鏌?*/
 .collapsed-menu {
   display: flex;
   flex-direction: column;

@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -29,93 +30,90 @@ public class MenuService {
         this.userRepository = userRepository;
     }
 
-    /**
-     * Get all menus (tree structure)
-     */
     public List<MenuTreeNode> getAllMenus() {
-        List<Menu> allMenus = menuRepository.findAllByOrderBySortAscIdAsc();
-        return buildMenuTree(allMenus);
+        return buildMenuTree(menuRepository.findAllByOrderBySortAscIdAsc());
     }
 
-    /**
-     * Get user-specific menus based on permissions
-     * Returns child menus with groupTitle from their parent
-     */
     @Transactional(readOnly = true)
     public List<MenuTreeNode> getUserMenus(String username) {
-        // Get user with roles and permissions (eager fetch)
         User user = userRepository.findByUsernameWithRoles(username)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "用户不存在"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found."));
 
-        // Collect permission IDs from user's roles
         Set<String> permissionIds = new HashSet<>();
         if (user.getRoles() != null) {
             for (var role : user.getRoles()) {
                 if (role.getPermissions() != null) {
-                    for (Permission perm : role.getPermissions()) {
-                        permissionIds.add(perm.getId());
+                    for (Permission permission : role.getPermissions()) {
+                        permissionIds.add(permission.getId());
                     }
                 }
             }
         }
 
-        // Get all menus
         List<Menu> allMenus = menuRepository.findAllByOrderBySortAscIdAsc();
-        
-        // Get all menus (including parents for tree structure)
-        // Filter: has path OR is a parent menu (parentId is null OR 0)
+        Map<Long, Menu> menuIndex = allMenus.stream().collect(Collectors.toMap(Menu::getId, menu -> menu));
+        Set<Long> includedIds = new HashSet<>();
+
+        for (Menu menu : allMenus) {
+            if (!Boolean.TRUE.equals(menu.getVisible()) || !"enabled".equalsIgnoreCase(menu.getStatus())) {
+                continue;
+            }
+            String permissionId = menu.getPermissionId();
+            if (permissionId != null && permissionIds.contains(permissionId)) {
+                includeWithAncestors(menu, menuIndex, includedIds);
+            }
+        }
+
         List<Menu> userMenus = allMenus.stream()
-                .filter(m -> (m.getPath() != null && !m.getPath().isEmpty()) 
-                          || m.getParentId() == null 
-                          || m.getParentId() == 0L)
-                .collect(Collectors.toList());
-        
-        // Set groupTitle for child menus from parent
-        // Also treat parentId=0 as null (top-level menu)
+                .filter(menu -> includedIds.contains(menu.getId()))
+                .toList();
+
         Map<Long, Menu> parentMap = userMenus.stream()
-                .filter(m -> m.getParentId() == null || m.getParentId() == 0L)
-                .collect(Collectors.toMap(Menu::getId, m -> m));
-        
+                .filter(menu -> menu.getParentId() == null || menu.getParentId() == 0L)
+                .collect(Collectors.toMap(Menu::getId, menu -> menu));
+
         userMenus.forEach(menu -> {
             if (menu.getParentId() != null && parentMap.containsKey(menu.getParentId())) {
-                Menu parent = parentMap.get(menu.getParentId());
-                menu.setGroupTitle(parent.getName());
+                menu.setGroupTitle(parentMap.get(menu.getParentId()).getName());
             }
         });
 
         return buildMenuTree(userMenus);
     }
 
-    /**
-     * Build menu tree from flat list
-     */
+    private void includeWithAncestors(Menu menu, Map<Long, Menu> menuIndex, Set<Long> includedIds) {
+        Menu cursor = menu;
+        while (cursor != null && includedIds.add(cursor.getId())) {
+            Long parentId = cursor.getParentId();
+            if (parentId == null || parentId == 0L) {
+                break;
+            }
+            cursor = menuIndex.get(parentId);
+        }
+    }
+
     private List<MenuTreeNode> buildMenuTree(List<Menu> menus) {
-        Map<Long, MenuTreeNode> nodeMap = menus.stream()
-                .collect(Collectors.toMap(Menu::getId, MenuTreeNode::from));
+        Map<Long, MenuTreeNode> nodeMap = new HashMap<>();
+        for (Menu menu : menus) {
+            nodeMap.put(menu.getId(), MenuTreeNode.from(menu));
+        }
 
         List<MenuTreeNode> roots = new ArrayList<>();
-
         for (Menu menu : menus) {
             MenuTreeNode node = nodeMap.get(menu.getId());
             Long parentId = menu.getParentId();
-            
-            // Treat parentId=0 as null (top-level menu)
-            if (parentId == null || parentId == 0L) {
+            if (parentId == null || parentId == 0L || !nodeMap.containsKey(parentId)) {
                 roots.add(node);
             } else {
-                MenuTreeNode parent = nodeMap.get(parentId);
-                if (parent != null) {
-                    parent.getChildren().add(node);
-                }
+                nodeMap.get(parentId).getChildren().add(node);
             }
         }
-
         return roots;
     }
 
     public Menu getMenuById(Long id) {
         return menuRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "菜单不存在"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Menu not found."));
     }
 
     @Transactional
@@ -150,7 +148,9 @@ public class MenuService {
 
     @Transactional
     public void deleteMenu(Long id) {
-        Menu menu = getMenuById(id);
-        menuRepository.delete(menu);
+        if (!menuRepository.existsById(id)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Menu not found.");
+        }
+        menuRepository.deleteById(id);
     }
 }
