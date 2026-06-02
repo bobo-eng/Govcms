@@ -2,6 +2,8 @@ package gov.cms.admin.service;
 
 import gov.cms.admin.entity.AuditLog;
 import gov.cms.admin.repository.AuditLogRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -40,9 +42,9 @@ public class AuditLogService {
         return auditLogRepository.save(log);
     }
 
-    public List<AuditLog> list(Long siteId, String actionType, String result, String operatorName) {
+    public Page<AuditLog> list(Long siteId, String actionType, String result, String operatorName, Pageable pageable) {
         Long accessibleSiteId = siteAccessService.isScopedSiteAdmin() ? siteAccessService.resolveAccessibleSiteId(siteId) : siteId;
-        return auditLogRepository.search(accessibleSiteId, actionType, result, operatorName);
+        return auditLogRepository.search(accessibleSiteId, actionType, result, operatorName, pageable);
     }
 
     public List<AuditLog> listByJobId(Long jobId) {
