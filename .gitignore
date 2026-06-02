@@ -33,3 +33,6 @@ storage/
 # Temp
 tmp/
 docs/*.docx
+
+# Worktrees
+.worktrees/
