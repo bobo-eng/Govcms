@@ -16,6 +16,7 @@ import NavigationManagement from '../views/NavigationManagement.vue'
 import Topics from '../views/Topics.vue'
 import Media from '../views/Media.vue'
 import SearchOps from '../views/SearchOps.vue'
+import AuditLogs from '../views/AuditLogs.vue'
 import { clearSession, getToken, hasStoredPermissions } from '../utils/session'
 
 const router = createRouter({
@@ -42,7 +43,8 @@ const router = createRouter({
         { path: 'navigation', name: 'NavigationManagement', component: NavigationManagement },
         { path: 'topics', name: 'Topics', component: Topics },
         { path: 'media', name: 'Media', component: Media },
-        { path: 'search-ops', name: 'SearchOps', component: SearchOps }
+        { path: 'search-ops', name: 'SearchOps', component: SearchOps },
+        { path: 'system/audit-logs', name: 'AuditLogs', component: AuditLogs }
       ]
     }
   ]

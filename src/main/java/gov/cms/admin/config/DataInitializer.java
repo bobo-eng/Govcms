@@ -226,6 +226,7 @@ public class DataInitializer {
         upsertMenu(menuRepository, createMenu("站点管理", "/sites", "GlobalOutlined", null, 7, "site:manage"), null);
         upsertMenu(menuRepository, createMenu("媒体管理", "/media", "CloudOutlined", null, 8, "media:manage"), null);
         upsertMenu(menuRepository, createMenu("搜索运营", "/search-ops", "SearchOutlined", null, 9, "search:ops"), null);
+        upsertMenu(menuRepository, createMenu("审计日志", "/system/audit-logs", "AuditOutlined", null, 10, "publish:center"), null);
     }
 
     private Menu upsertMenu(MenuRepository menuRepository, Menu desiredMenu, Long parentId) {
