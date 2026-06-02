@@ -105,10 +105,10 @@ public class TemplateService {
         Long accessibleSiteId = resolveAccessibleSiteId(siteId, false);
         if (accessibleSiteId != null) {
             return templateRepository.findByIdAndSiteId(id, accessibleSiteId)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Template not found."));
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "模板不存在"));
         }
         return templateRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Template not found."));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "模板不存在"));
     }
 
     @Transactional
@@ -172,7 +172,7 @@ public class TemplateService {
         Long accessibleSiteId = resolveAccessibleSiteId(request.getSiteId(), false);
         Template template = getTemplateById(id, accessibleSiteId);
         if (accessibleSiteId != null && !Objects.equals(template.getSiteId(), accessibleSiteId)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Template site mismatch.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "模板站点不匹配");
         }
 
         String name = request.getName() != null ? normalizeRequiredText(request.getName(), "模板名称不能为空", 100) : template.getName();
@@ -418,7 +418,7 @@ public class TemplateService {
     @Transactional(readOnly = true)
     public TemplatePreviewResponse previewTemplate(Long templateId, TemplatePreviewRequest request) {
         if (request == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "siteId is required for preview.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "预览需要提供站点ID");
         }
 
         Long accessibleSiteId = resolveAccessibleSiteId(request.getSiteId(), true);
@@ -825,7 +825,7 @@ public class TemplateService {
             return siteAccessService.resolveAccessibleSiteId(null);
         }
         if (required) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "siteId is required.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "站点ID不能为空");
         }
         return null;
     }
