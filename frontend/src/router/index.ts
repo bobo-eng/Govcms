@@ -12,7 +12,10 @@ import PublishCenter from '../views/PublishCenter.vue'
 import Categories from '../views/Categories.vue'
 import Templates from '../views/Templates.vue'
 import Sites from '../views/Sites.vue'
+import NavigationManagement from '../views/NavigationManagement.vue'
+import Topics from '../views/Topics.vue'
 import Media from '../views/Media.vue'
+import SearchOps from '../views/SearchOps.vue'
 import { clearSession, getToken, hasStoredPermissions } from '../utils/session'
 
 const router = createRouter({
@@ -36,7 +39,10 @@ const router = createRouter({
         { path: 'content/categories', name: 'Categories', component: Categories },
         { path: 'content/templates', name: 'Templates', component: Templates },
         { path: 'sites', name: 'Sites', component: Sites },
-        { path: 'media', name: 'Media', component: Media }
+        { path: 'navigation', name: 'NavigationManagement', component: NavigationManagement },
+        { path: 'topics', name: 'Topics', component: Topics },
+        { path: 'media', name: 'Media', component: Media },
+        { path: 'search-ops', name: 'SearchOps', component: SearchOps }
       ]
     }
   ]

@@ -1,4 +1,5 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
+import '../styles/admin-refresh.css'
 import { computed, onMounted, ref, watch } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import { DeleteOutlined, EditOutlined, PlusOutlined, SearchOutlined, SwapOutlined, PoweroffOutlined, EyeOutlined } from '@ant-design/icons-vue'
@@ -224,7 +225,7 @@ const fetchTemplateOptions = async (siteId?: number | null) => {
     }))
   } catch (error: any) {
     templateOptions.value = []
-    message.error(error.response?.data?.message || '????????')
+    message.error(error.response?.data?.message || '加载模板列表失败')
   }
 }
 
@@ -525,42 +526,44 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="categories-page">
-    <div class="page-header">
+  <div class="admin-page categories-page">
+    <div class="admin-page-header">
       <div class="header-left">
-        <h1>栏目管理</h1>
-        <p>维护站点栏目树、路径、排序和基础发布影响信息</p>
+        <h1 class="admin-page-title">栏目管理</h1>
+        <p class="admin-page-desc">维护站点栏目树、路径、排序、模板绑定和基础发布影响信息。</p>
       </div>
-      <button v-if="canCreateCategory" class="primary-btn" @click="openAddModal()">
+      <button v-if="canCreateCategory" class="admin-primary-btn" @click="openAddModal()">
         <PlusOutlined />
         <span>新建栏目</span>
       </button>
     </div>
 
-    <div class="toolbar">
-      <select v-model="selectedSiteId" class="filter-select">
-        <option :value="null">请选择站点</option>
-        <option v-for="site in sites" :key="site.id" :value="site.id">{{ site.name }}</option>
-      </select>
-      <div class="search-box">
-        <SearchOutlined class="search-icon" />
-        <input v-model="searchKeyword" type="text" class="search-input" placeholder="搜索栏目名称或编码" @keyup.enter="handleSearch" />
+    <div class="admin-toolbar-card">
+      <div class="admin-toolbar-row">
+        <select v-model="selectedSiteId" class="admin-filter-select">
+          <option :value="null">请选择站点</option>
+          <option v-for="site in sites" :key="site.id" :value="site.id">{{ site.name }}</option>
+        </select>
+        <div class="admin-search-box">
+          <SearchOutlined class="admin-search-icon" />
+          <input v-model="searchKeyword" type="text" class="admin-search-input" placeholder="搜索栏目名称或编码" @keyup.enter="handleSearch" />
+        </div>
+        <select v-model="filterStatus" class="admin-filter-select" @change="handleSearch">
+          <option value="">全部状态</option>
+          <option v-for="item in statusOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
+        </select>
+        <button class="admin-secondary-btn" @click="handleSearch">查询</button>
       </div>
-      <select v-model="filterStatus" class="filter-select" @change="handleSearch">
-        <option value="">全部状态</option>
-        <option v-for="item in statusOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
-      </select>
-      <button class="secondary-btn" @click="handleSearch">查询</button>
     </div>
 
-    <div class="content-grid">
-      <div class="tree-card">
-        <div class="card-header">
-          <h3>栏目树</h3>
-          <span class="card-subtitle">{{ loading ? '加载中...' : `${treeRows.length} 个节点` }}</span>
+    <div class="categories-grid">
+      <div class="admin-card tree-card">
+        <div class="admin-card-header">
+          <h3 class="admin-card-title">栏目树</h3>
+          <span class="admin-card-meta">{{ loading ? '加载中...' : `${treeRows.length} 个节点` }}</span>
         </div>
-        <div v-if="!selectedSiteId" class="empty-state">请先选择站点</div>
-        <div v-else-if="treeRows.length === 0" class="empty-state">当前站点暂无栏目</div>
+        <div v-if="!selectedSiteId" class="admin-empty-state">请先选择站点</div>
+        <div v-else-if="treeRows.length === 0" class="admin-empty-state">当前站点暂无栏目</div>
         <div v-else class="tree-list">
           <div
             v-for="row in treeRows"
@@ -574,17 +577,17 @@ onMounted(async () => {
               <span class="tree-code">{{ row.code }}</span>
             </div>
             <div class="tree-meta">
-              <span :class="['status-tag', row.status]">{{ row.status === 'enabled' ? '启用' : '禁用' }}</span>
+              <span :class="['admin-status-badge', row.status === 'enabled' ? 'admin-status-badge--success' : 'admin-status-badge--default']">{{ row.status === 'enabled' ? '启用' : '禁用' }}</span>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="detail-card">
-        <div class="card-header">
-          <h3>栏目详情</h3>
+      <div class="admin-card detail-card">
+        <div class="admin-card-header">
+          <h3 class="admin-card-title">栏目详情</h3>
         </div>
-        <div v-if="!selectedCategory" class="empty-state">请选择左侧栏目节点</div>
+        <div v-if="!selectedCategory" class="admin-empty-state">请选择左侧栏目节点</div>
         <div v-else class="detail-body">
           <div class="detail-grid">
             <div class="detail-item"><label>栏目名称</label><span>{{ selectedCategory.name }}</span></div>
@@ -600,28 +603,28 @@ onMounted(async () => {
             <label>栏目描述</label>
             <p>{{ selectedCategory.description || '暂无描述' }}</p>
           </div>
-          <div class="action-row">
-            <button v-if="canCreateCategory" class="secondary-btn" @click="openAddModal(selectedCategory)">
+          <div class="detail-actions">
+            <button v-if="canCreateCategory" class="admin-secondary-btn" @click="openAddModal(selectedCategory)">
               <PlusOutlined />
               <span>新增子栏目</span>
             </button>
-            <button v-if="canUpdateCategory" class="secondary-btn" @click="openEditModal(selectedCategory)">
+            <button v-if="canUpdateCategory" class="admin-secondary-btn" @click="openEditModal(selectedCategory)">
               <EditOutlined />
               <span>编辑</span>
             </button>
-            <button v-if="canUpdateCategory" class="secondary-btn" @click="openMoveModal(selectedCategory)">
+            <button v-if="canUpdateCategory" class="admin-secondary-btn" @click="openMoveModal(selectedCategory)">
               <SwapOutlined />
               <span>移动</span>
             </button>
-            <button class="secondary-btn" @click="openImpactModal(selectedCategory)">
+            <button class="admin-secondary-btn" @click="openImpactModal(selectedCategory)">
               <EyeOutlined />
               <span>影响范围</span>
             </button>
-            <button v-if="canUpdateCategory" class="secondary-btn" @click="handleToggleStatus(selectedCategory)">
+            <button v-if="canUpdateCategory" class="admin-secondary-btn" @click="handleToggleStatus(selectedCategory)">
               <PoweroffOutlined />
               <span>{{ selectedCategory.status === 'enabled' ? '禁用' : '启用' }}</span>
             </button>
-            <button v-if="canDeleteCategory" class="danger-btn" @click="handleDelete(selectedCategory)">
+            <button v-if="canDeleteCategory" class="admin-danger-btn" @click="handleDelete(selectedCategory)">
               <DeleteOutlined />
               <span>删除</span>
             </button>
@@ -630,8 +633,8 @@ onMounted(async () => {
       </div>
     </div>
 
-    <div class="table-card" v-if="treeRows.length > 0">
-      <table class="data-table">
+    <div class="admin-table-card" v-if="treeRows.length > 0">
+      <table class="admin-data-table">
         <thead>
           <tr>
             <th>栏目</th>
@@ -650,17 +653,17 @@ onMounted(async () => {
             <td>{{ row.fullPath }}</td>
             <td>{{ row.type }}</td>
             <td>
-              <input v-model.number="row.sortOrder" type="number" class="sort-input" @blur="handleUpdateSort(row)" />
+              <input v-model.number="row.sortOrder" type="number" class="admin-sort-input" @blur="handleUpdateSort(row)" />
             </td>
             <td>
-              <span :class="['status-tag', row.status]">{{ row.status === 'enabled' ? '启用' : '禁用' }}</span>
+              <span :class="['admin-status-badge', row.status === 'enabled' ? 'admin-status-badge--success' : 'admin-status-badge--default']">{{ row.status === 'enabled' ? '启用' : '禁用' }}</span>
             </td>
             <td>
-              <div class="action-btns">
-                <button class="action-btn" v-if="canUpdateCategory" @click="openEditModal(row)"><EditOutlined /></button>
-                <button class="action-btn" v-if="canUpdateCategory" @click="openMoveModal(row)"><SwapOutlined /></button>
-                <button class="action-btn" @click="openImpactModal(row)"><EyeOutlined /></button>
-                <button class="action-btn danger" v-if="canDeleteCategory" @click="handleDelete(row)"><DeleteOutlined /></button>
+              <div class="table-action-btns">
+                <button class="admin-icon-btn" v-if="canUpdateCategory" @click="openEditModal(row)"><EditOutlined /></button>
+                <button class="admin-icon-btn" v-if="canUpdateCategory" @click="openMoveModal(row)"><SwapOutlined /></button>
+                <button class="admin-icon-btn" @click="openImpactModal(row)"><EyeOutlined /></button>
+                <button class="admin-icon-btn admin-icon-btn--danger" v-if="canDeleteCategory" @click="handleDelete(row)"><DeleteOutlined /></button>
               </div>
             </td>
           </tr>
@@ -668,103 +671,182 @@ onMounted(async () => {
       </table>
     </div>
 
-    <div class="modal-overlay" v-if="modalVisible" @click.self="modalVisible = false">
-      <div class="modal-content large">
-        <div class="modal-header">
-          <h3>{{ isEdit ? '编辑栏目' : '新建栏目' }}</h3>
-          <button class="close-btn" @click="modalVisible = false">×</button>
+    <div class="admin-modal-overlay" v-if="modalVisible" @click.self="modalVisible = false">
+      <div class="admin-modal-content admin-modal-content--large">
+        <div class="admin-modal-header">
+          <h3 class="admin-modal-title">{{ isEdit ? '编辑栏目' : '新建栏目' }}</h3>
+          <button class="admin-close-btn" @click="modalVisible = false">×</button>
         </div>
-        <div class="modal-body">
-          <div class="form-row">
-            <div class="form-group">
-              <label>????</label>
-              <select v-model="editingCategory.aggregationMode" class="form-select">
-                <option v-for="item in aggregationOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
+        <div class="admin-modal-body">
+          <div class="admin-form-row">
+            <div class="admin-form-group">
+              <label class="admin-form-label">站点</label>
+              <select v-model="editingCategory.siteId" class="admin-form-select">
+                <option v-for="site in sites" :key="site.id" :value="site.id">{{ site.name }}</option>
               </select>
             </div>
-            <div class="form-group">
-              <label>????</label>
-              <select v-model="editingCategory.listTemplateId" class="form-select">
-                <option :value="null">???</option>
-                <option v-for="item in listTemplateOptions" :key="item.id" :value="item.id">
-                  {{ item.name }} ({{ item.code }})
+            <div class="admin-form-group">
+              <label class="admin-form-label">父栏目</label>
+              <select v-model="editingCategory.parentId" class="admin-form-select">
+                <option :value="null">作为顶级栏目</option>
+                <option v-for="item in parentOptions" :key="item.id" :value="item.id">
+                  {{ '—'.repeat(Math.max(item.level - 1, 0)) }} {{ item.fullPath }}
                 </option>
               </select>
             </div>
           </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>??????</label>
-              <select v-model="editingCategory.detailTemplateId" class="form-select">
-                <option :value="null">???</option>
-                <option v-for="item in detailTemplateOptions" :key="item.id" :value="item.id">
-                  {{ item.name }} ({{ item.code }})
+
+          <div class="admin-form-row">
+            <div class="admin-form-group">
+              <label class="admin-form-label">栏目名称</label>
+              <input v-model="editingCategory.name" type="text" class="admin-form-input" />
+            </div>
+            <div class="admin-form-group">
+              <label class="admin-form-label">栏目编码</label>
+              <input v-model="editingCategory.code" type="text" class="admin-form-input" />
+            </div>
+          </div>
+
+          <div class="admin-form-row">
+            <div class="admin-form-group">
+              <label class="admin-form-label">栏目类型</label>
+              <select v-model="editingCategory.type" class="admin-form-select">
+                <option v-for="item in categoryTypeOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
+              </select>
+            </div>
+            <div class="admin-form-group">
+              <label class="admin-form-label">路径标识</label>
+              <input v-model="editingCategory.slug" type="text" class="admin-form-input" />
+            </div>
+          </div>
+
+          <div class="admin-form-row">
+            <div class="admin-form-group">
+              <label class="admin-form-label">排序</label>
+              <input v-model.number="editingCategory.sortOrder" type="number" class="admin-form-input" />
+            </div>
+            <div class="admin-form-group">
+              <label class="admin-form-label">状态</label>
+              <select v-model="editingCategory.status" class="admin-form-select">
+                <option v-for="item in statusOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="admin-card modal-section">
+            <div class="admin-card-header">
+              <h4 class="admin-card-title">显示规则</h4>
+            </div>
+            <div class="checkbox-grid">
+              <label class="check-item"><input v-model="editingCategory.navVisible" type="checkbox" /> <span>在导航中显示</span></label>
+              <label class="check-item"><input v-model="editingCategory.breadcrumbVisible" type="checkbox" /> <span>启用面包屑</span></label>
+              <label class="check-item"><input v-model="editingCategory.publicVisible" type="checkbox" /> <span>前台公开可见</span></label>
+            </div>
+          </div>
+
+          <div class="admin-card modal-section">
+            <div class="admin-card-header">
+              <h4 class="admin-card-title">模板配置</h4>
+            </div>
+            <div class="admin-form-row">
+              <div class="admin-form-group">
+                <label class="admin-form-label">聚合方式</label>
+                <select v-model="editingCategory.aggregationMode" class="admin-form-select">
+                  <option v-for="item in aggregationOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
+                </select>
+              </div>
+              <div class="admin-form-group">
+                <label class="admin-form-label">列表模板</label>
+                <select v-model="editingCategory.listTemplateId" class="admin-form-select">
+                  <option :value="null">请选择</option>
+                  <option v-for="item in listTemplateOptions" :key="item.id" :value="item.id">{{ item.name }} ({{ item.code }})</option>
+                </select>
+              </div>
+            </div>
+            <div class="admin-form-row">
+              <div class="admin-form-group">
+                <label class="admin-form-label">详情模板</label>
+                <select v-model="editingCategory.detailTemplateId" class="admin-form-select">
+                  <option :value="null">请选择</option>
+                  <option v-for="item in detailTemplateOptions" :key="item.id" :value="item.id">{{ item.name }} ({{ item.code }})</option>
+                </select>
+              </div>
+              <div class="admin-form-group">
+                <label class="admin-form-label">模板说明</label>
+                <div class="admin-field-tip template-hint">列表模板建议使用 `column_list`，详情模板建议使用 `content_detail`。</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="admin-card modal-section">
+            <div class="admin-card-header">
+              <h4 class="admin-card-title">SEO 设置</h4>
+            </div>
+            <div class="admin-form-row admin-form-row--single">
+              <div class="admin-form-group">
+                <label class="admin-form-label">栏目描述</label>
+                <textarea v-model="editingCategory.description" class="admin-form-textarea" rows="3" placeholder="请输入栏目描述"></textarea>
+              </div>
+            </div>
+            <div class="admin-form-row">
+              <div class="admin-form-group">
+                <label class="admin-form-label">SEO 标题</label>
+                <input v-model="editingCategory.seoTitle" type="text" class="admin-form-input" />
+              </div>
+              <div class="admin-form-group">
+                <label class="admin-form-label">SEO 关键词</label>
+                <input v-model="editingCategory.seoKeywords" type="text" class="admin-form-input" />
+              </div>
+            </div>
+            <div class="admin-form-row admin-form-row--single">
+              <div class="admin-form-group">
+                <label class="admin-form-label">SEO 描述</label>
+                <textarea v-model="editingCategory.seoDescription" class="admin-form-textarea" rows="2"></textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="admin-modal-footer">
+          <button class="admin-secondary-btn" @click="modalVisible = false">取消</button>
+          <button class="admin-primary-btn" @click="handleSave">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-modal-overlay" v-if="moveModalVisible" @click.self="moveModalVisible = false">
+      <div class="admin-modal-content">
+        <div class="admin-modal-header">
+          <h3 class="admin-modal-title">移动栏目</h3>
+          <button class="admin-close-btn" @click="moveModalVisible = false">×</button>
+        </div>
+        <div class="admin-modal-body">
+          <div class="admin-form-row admin-form-row--single">
+            <div class="admin-form-group">
+              <label class="admin-form-label">目标父栏目</label>
+              <select v-model="moveTargetParentId" class="admin-form-select">
+                <option :value="null">作为顶级栏目</option>
+                <option v-for="item in parentOptions" :key="item.id" :value="item.id">
+                  {{ '—'.repeat(Math.max(item.level - 1, 0)) }} {{ item.fullPath }}
                 </option>
               </select>
             </div>
-            <div class="form-group">
-              <label>??????</label>
-              <div class="hint-text">??????????????????? column_list????????? content_detail?</div>
-            </div>
-          </div>
-          <div class="form-group">
-            <label>描述</label>
-            <textarea v-model="editingCategory.description" class="form-textarea" rows="3" placeholder="请输入栏目描述"></textarea>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>SEO 标题</label>
-              <input v-model="editingCategory.seoTitle" type="text" class="form-input" />
-            </div>
-            <div class="form-group">
-              <label>SEO 关键词</label>
-              <input v-model="editingCategory.seoKeywords" type="text" class="form-input" />
-            </div>
-          </div>
-          <div class="form-group">
-            <label>SEO 描述</label>
-            <textarea v-model="editingCategory.seoDescription" class="form-textarea" rows="2"></textarea>
           </div>
         </div>
-        <div class="modal-footer">
-          <button class="secondary-btn" @click="modalVisible = false">取消</button>
-          <button class="primary-btn" @click="handleSave">保存</button>
+        <div class="admin-modal-footer">
+          <button class="admin-secondary-btn" @click="moveModalVisible = false">取消</button>
+          <button class="admin-primary-btn" @click="handleMove">确认移动</button>
         </div>
       </div>
     </div>
 
-    <div class="modal-overlay" v-if="moveModalVisible" @click.self="moveModalVisible = false">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h3>移动栏目</h3>
-          <button class="close-btn" @click="moveModalVisible = false">×</button>
+    <div class="admin-modal-overlay" v-if="impactModalVisible" @click.self="impactModalVisible = false">
+      <div class="admin-modal-content admin-modal-content--large">
+        <div class="admin-modal-header">
+          <h3 class="admin-modal-title">影响范围</h3>
+          <button class="admin-close-btn" @click="impactModalVisible = false">×</button>
         </div>
-        <div class="modal-body">
-          <div class="form-group">
-            <label>目标父栏目</label>
-            <select v-model="moveTargetParentId" class="form-select">
-              <option :value="null">作为顶级栏目</option>
-              <option v-for="item in parentOptions" :key="item.id" :value="item.id">
-                {{ '—'.repeat(Math.max(item.level - 1, 0)) }} {{ item.fullPath }}
-              </option>
-            </select>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="secondary-btn" @click="moveModalVisible = false">取消</button>
-          <button class="primary-btn" @click="handleMove">确认移动</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="modal-overlay" v-if="impactModalVisible" @click.self="impactModalVisible = false">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h3>影响范围</h3>
-          <button class="close-btn" @click="impactModalVisible = false">×</button>
-        </div>
-        <div class="modal-body" v-if="impactData">
-          <div class="detail-grid single">
+        <div class="admin-modal-body" v-if="impactData">
+          <div class="detail-grid detail-grid--single">
             <div class="detail-item"><label>栏目</label><span>{{ impactData.categoryName }}</span></div>
             <div class="detail-item"><label>路径</label><span>{{ impactData.fullPath }}</span></div>
             <div class="detail-item"><label>子树节点数</label><span>{{ impactData.subtreeCount }}</span></div>
@@ -790,111 +872,13 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.categories-page {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.page-header,
-.toolbar,
-.content-grid,
-.table-card,
-.tree-card,
-.detail-card {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-}
-
-.page-header,
-.toolbar,
-.tree-card,
-.detail-card,
-.table-card {
-  padding: 20px;
-}
-
-.page-header,
-.toolbar,
-.card-header,
-.action-row,
-.form-row,
-.modal-header,
-.modal-footer {
-  display: flex;
-  align-items: center;
-}
-
-.page-header,
-.card-header,
-.modal-header,
-.modal-footer {
-  justify-content: space-between;
-}
-
-.header-left h1,
-.card-header h3 {
-  margin: 0;
-  color: #0f172a;
-}
-
-.header-left p,
-.card-subtitle {
-  margin: 6px 0 0;
-  color: #64748b;
-}
-
-.toolbar {
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.filter-select,
-.form-select,
-.form-input,
-.search-input,
-.form-textarea,
-.sort-input {
-  width: 100%;
-  border: 1px solid #cbd5e1;
-  border-radius: 10px;
-  padding: 10px 12px;
-  font-size: 14px;
-  box-sizing: border-box;
-}
-
-.filter-select {
-  width: 220px;
-}
-
-.search-box {
-  position: relative;
-  min-width: 260px;
-  flex: 1;
-}
-
-.search-icon {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: #94a3b8;
-}
-
-.search-input {
-  padding-left: 38px;
-}
-
-.content-grid {
+.categories-page .categories-grid {
   display: grid;
   grid-template-columns: 360px 1fr;
-  gap: 20px;
-  background: transparent;
-  border: none;
+  gap: 16px;
 }
 
-.tree-list {
+.categories-page .tree-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -902,7 +886,7 @@ onMounted(async () => {
   overflow-y: auto;
 }
 
-.tree-row {
+.categories-page .tree-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -913,247 +897,95 @@ onMounted(async () => {
   transition: all 0.2s ease;
 }
 
-.tree-row:hover,
-.tree-row.active {
+.categories-page .tree-row:hover,
+.categories-page .tree-row.active {
   background: #eff6ff;
 }
 
-.tree-main {
+.categories-page .tree-main {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.tree-name {
+.categories-page .tree-name {
   font-weight: 600;
   color: #0f172a;
 }
 
-.tree-code {
+.categories-page .tree-code,
+.categories-page .template-hint {
   color: #64748b;
   font-size: 12px;
+  line-height: 18px;
 }
 
-.detail-body {
+.categories-page .detail-body {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
 }
 
-.detail-grid {
+.categories-page .detail-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
 }
 
-.detail-grid.single {
-  grid-template-columns: 1fr 1fr;
+.categories-page .detail-grid--single {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.detail-item {
+.categories-page .detail-item,
+.categories-page .detail-description {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.detail-item label,
-.detail-description label,
-.form-group label {
+.categories-page .detail-item label,
+.categories-page .detail-description label,
+.categories-page .check-item {
   font-size: 13px;
-  color: #64748b;
+  line-height: 20px;
+  color: #475569;
 }
 
-.detail-item span,
-.detail-description p {
-  color: #0f172a;
-}
-
-.detail-description {
+.categories-page .detail-actions,
+.categories-page .table-action-btns {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.action-row {
-  gap: 12px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.data-table th,
-.data-table td {
-  padding: 14px 12px;
-  border-bottom: 1px solid #e2e8f0;
-  text-align: left;
-}
-
-.status-tag {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-}
-
-.status-tag.enabled {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.status-tag.disabled {
-  background: #fee2e2;
-  color: #991b1b;
-}
-
-.action-btns {
-  display: flex;
-  gap: 8px;
-}
-
-.action-btn,
-.primary-btn,
-.secondary-btn,
-.danger-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border-radius: 10px;
-  border: none;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.primary-btn,
-.secondary-btn,
-.danger-btn {
-  padding: 10px 16px;
-}
-
-.action-btn {
-  width: 34px;
-  height: 34px;
-  background: #f8fafc;
-  color: #1e293b;
-}
-
-.action-btn.danger,
-.danger-btn {
-  background: #fee2e2;
-  color: #b91c1c;
-}
-
-.primary-btn {
-  background: #2563eb;
-  color: #ffffff;
-}
-
-.secondary-btn {
-  background: #f1f5f9;
-  color: #0f172a;
-}
-
-.empty-state {
-  padding: 48px 16px;
-  text-align: center;
-  color: #94a3b8;
-}
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 999;
-}
-
-.modal-content {
-  width: min(720px, calc(100vw - 32px));
-  background: #ffffff;
-  border-radius: 16px;
-  overflow: hidden;
-}
-
-.modal-content.large {
-  width: min(920px, calc(100vw - 32px));
-}
-
-.modal-header,
-.modal-footer {
-  padding: 18px 20px;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.modal-footer {
-  border-top: 1px solid #e2e8f0;
-  border-bottom: none;
+.categories-page .checkbox-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
 
-.modal-body {
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  max-height: 70vh;
-  overflow-y: auto;
-}
-
-.close-btn {
-  border: none;
-  background: transparent;
-  font-size: 24px;
-  cursor: pointer;
-  color: #64748b;
-}
-
-.form-row {
-  gap: 16px;
-}
-
-.form-row > .form-group {
-  flex: 1;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.checkbox-row {
-  gap: 24px;
-  align-items: center;
-}
-
-.checkbox-row label {
+.categories-page .check-item {
   display: inline-flex;
   align-items: center;
   gap: 8px;
 }
 
-.impact-list {
+.categories-page .modal-section {
+  padding: 16px;
+}
+
+.categories-page .impact-list {
   margin: 0;
   padding-left: 18px;
   color: #334155;
 }
 
 @media (max-width: 1080px) {
-  .content-grid {
+  .categories-page .categories-grid,
+  .categories-page .detail-grid,
+  .categories-page .detail-grid--single,
+  .categories-page .checkbox-grid {
     grid-template-columns: 1fr;
-  }
-
-  .detail-grid,
-  .detail-grid.single,
-  .form-row {
-    grid-template-columns: 1fr;
-    flex-direction: column;
   }
 }
 </style>

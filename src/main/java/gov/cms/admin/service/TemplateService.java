@@ -65,6 +65,7 @@ public class TemplateService {
     private final ObjectMapper objectMapper;
     private final RenderContextAssembler renderContextAssembler;
     private final PortalRenderService portalRenderService;
+    private final SiteAccessService siteAccessService;
 
     public TemplateService(
             TemplateRepository templateRepository,
@@ -75,7 +76,8 @@ public class TemplateService {
             ArticleRepository articleRepository,
             ObjectMapper objectMapper,
             RenderContextAssembler renderContextAssembler,
-            PortalRenderService portalRenderService
+            PortalRenderService portalRenderService,
+            SiteAccessService siteAccessService
     ) {
         this.templateRepository = templateRepository;
         this.templateVersionRepository = templateVersionRepository;
@@ -86,39 +88,42 @@ public class TemplateService {
         this.objectMapper = objectMapper;
         this.renderContextAssembler = renderContextAssembler;
         this.portalRenderService = portalRenderService;
+        this.siteAccessService = siteAccessService;
     }
 
     @Transactional(readOnly = true)
     public List<Template> getTemplates(Long siteId, String type, String status, String keyword) {
-        if (siteId != null) {
-            ensureSiteExists(siteId);
+        Long accessibleSiteId = resolveAccessibleSiteId(siteId, false);
+        if (accessibleSiteId != null) {
+            ensureSiteExists(accessibleSiteId);
         }
-        return templateRepository.searchTemplates(siteId, normalizeType(type, true), normalizeStatus(status, true), normalizeText(keyword));
+        return templateRepository.searchTemplates(accessibleSiteId, normalizeType(type, true), normalizeStatus(status, true), normalizeText(keyword));
     }
 
     @Transactional(readOnly = true)
     public Template getTemplateById(Long id, Long siteId) {
-        if (siteId != null) {
-            return templateRepository.findByIdAndSiteId(id, siteId)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "?????"));
+        Long accessibleSiteId = resolveAccessibleSiteId(siteId, false);
+        if (accessibleSiteId != null) {
+            return templateRepository.findByIdAndSiteId(id, accessibleSiteId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Template not found."));
         }
         return templateRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "?????"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Template not found."));
     }
 
     @Transactional
     public Template createTemplate(TemplateRequest request) {
         if (request == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "妯℃澘鏁版嵁涓嶈兘涓虹┖");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "模板数据不能为空");
         }
         Long siteId = request.getSiteId();
         if (siteId == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "绔欑偣涓嶈兘涓虹┖");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "站点不能为空");
         }
         ensureSiteExists(siteId);
 
-        String name = normalizeRequiredText(request.getName(), "妯℃澘鍚嶇О涓嶈兘涓虹┖", 100);
-        String code = normalizeCode(request.getCode(), "妯℃澘缂栫爜涓嶈兘涓虹┖");
+        String name = normalizeRequiredText(request.getName(), "模板名称不能为空", 100);
+        String code = normalizeCode(request.getCode(), "模板编码不能为空");
         String type = normalizeType(request.getType(), false);
         String status = normalizeStatus(request.getStatus(), false);
         String description = normalizeText(request.getDescription());
@@ -127,14 +132,14 @@ public class TemplateService {
             defaultPreviewSource = "sample";
         }
 
-        String layoutSchema = validateSchema(request.getLayoutSchema(), "甯冨眬缁撴瀯", true);
-        String blockSchema = validateSchema(request.getBlockSchema(), "鍖哄潡閰嶇疆", true);
-        String seoSchema = validateSchema(request.getSeoSchema(), "SEO 閰嶇疆", false);
-        String styleSchema = validateSchema(request.getStyleSchema(), "鏍峰紡閰嶇疆", false);
+        String layoutSchema = validateSchema(request.getLayoutSchema(), "布局结构", true);
+        String blockSchema = validateSchema(request.getBlockSchema(), "区块配置", true);
+        String seoSchema = validateSchema(request.getSeoSchema(), "SEO 配置", false);
+        String styleSchema = validateSchema(request.getStyleSchema(), "样式配置", false);
         String changeLog = normalizeText(request.getChangeLog());
 
         if (templateRepository.existsBySiteIdAndCodeIgnoreCase(siteId, code)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "???????");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "模板编码已存在");
         }
 
         String username = resolveUsername();
@@ -162,31 +167,32 @@ public class TemplateService {
     @Transactional
     public Template updateTemplate(Long id, TemplateRequest request) {
         if (request == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "妯℃澘鏁版嵁涓嶈兘涓虹┖");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "模板数据不能为空");
         }
-        Template template = getTemplateById(id, request.getSiteId());
-        if (request.getSiteId() != null && !Objects.equals(template.getSiteId(), request.getSiteId())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "?????");
+        Long accessibleSiteId = resolveAccessibleSiteId(request.getSiteId(), false);
+        Template template = getTemplateById(id, accessibleSiteId);
+        if (accessibleSiteId != null && !Objects.equals(template.getSiteId(), accessibleSiteId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Template site mismatch.");
         }
 
-        String name = request.getName() != null ? normalizeRequiredText(request.getName(), "妯℃澘鍚嶇О涓嶈兘涓虹┖", 100) : template.getName();
-        String code = request.getCode() != null ? normalizeCode(request.getCode(), "妯℃澘缂栫爜涓嶈兘涓虹┖") : template.getCode();
+        String name = request.getName() != null ? normalizeRequiredText(request.getName(), "模板名称不能为空", 100) : template.getName();
+        String code = request.getCode() != null ? normalizeCode(request.getCode(), "模板编码不能为空") : template.getCode();
         if (!Objects.equals(code, template.getCode())
                 && templateRepository.existsBySiteIdAndCodeIgnoreCase(template.getSiteId(), code)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "???????");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "模板编码已存在");
         }
 
         if (request.getType() != null) {
             String requestedType = normalizeType(request.getType(), false);
             if (!Objects.equals(requestedType, template.getType())) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "?????????");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "模板类型不能修改");
             }
         }
 
         if (request.getStatus() != null) {
             String requestedStatus = normalizeStatus(request.getStatus(), false);
             if ("disabled".equals(requestedStatus) && templateBindingRepository.countByTemplateIdAndStatus(template.getId(), "active") > 0) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "妯℃澘宸茬粦瀹氱敓鏁堬紝鏃犳硶鍋滅敤");
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "模板已绑定生效，无法停用");
             }
             template.setStatus(requestedStatus);
         }
@@ -229,12 +235,12 @@ public class TemplateService {
     @Transactional
     public Template updateStatus(Long id, TemplateStatusUpdateRequest request) {
         if (request == null || request.getSiteId() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "绔欑偣涓嶈兘涓虹┖");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "站点不能为空");
         }
-        Template template = getTemplateById(id, request.getSiteId());
+        Template template = getTemplateById(id, resolveAccessibleSiteId(request.getSiteId(), true));
         String status = normalizeStatus(request.getStatus(), false);
         if ("disabled".equals(status) && templateBindingRepository.countByTemplateIdAndStatus(template.getId(), "active") > 0) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "妯℃澘宸茬粦瀹氱敓鏁堬紝鏃犳硶鍋滅敤");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "模板已绑定生效，无法停用");
         }
         template.setStatus(status);
         template.setUpdatedBy(resolveUsername());
@@ -243,14 +249,14 @@ public class TemplateService {
 
     @Transactional(readOnly = true)
     public List<TemplateVersion> getVersions(Long templateId, Long siteId) {
-        Template template = getTemplateById(templateId, siteId);
+        Template template = getTemplateById(templateId, resolveAccessibleSiteId(siteId, false));
         return templateVersionRepository.findByTemplateIdOrderByVersionNoDesc(template.getId());
     }
 
     @Transactional
     public TemplateVersion createVersion(Long templateId, TemplateVersionRequest request) {
         if (request == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "妯℃澘鐗堟湰鏁版嵁涓嶈兘涓虹┖");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "模板版本数据不能为空");
         }
         Template template = getTemplateById(templateId, null);
         TemplateVersionPayload payload = buildVersionPayload(request);
@@ -276,12 +282,12 @@ public class TemplateService {
     @Transactional
     public Template rollbackVersion(Long templateId, TemplateVersionRollbackRequest request) {
         if (request == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "鍥炴粴淇℃伅涓嶈兘涓虹┖");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "回滚信息不能为空");
         }
-        Template template = getTemplateById(templateId, request.getSiteId());
+        Template template = getTemplateById(templateId, resolveAccessibleSiteId(request.getSiteId(), true));
         TemplateVersion target = resolveRollbackTarget(templateId, request);
         int nextVersionNo = template.getLatestVersionNo() == null ? 1 : template.getLatestVersionNo() + 1;
-        String changeLog = "鍥炴粴鑷崇増鏈?" + target.getVersionNo();
+        String changeLog = "回滚至版本" + target.getVersionNo();
         TemplateVersion version = buildVersion(
                 template.getId(),
                 nextVersionNo,
@@ -302,38 +308,39 @@ public class TemplateService {
     @Transactional
     public TemplateBinding createBinding(Long templateId, TemplateBindingRequest request) {
         if (request == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "缁戝畾鏁版嵁涓嶈兘涓虹┖");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "绑定数据不能为空");
         }
         if (request.getSiteId() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "绔欑偣涓嶈兘涓虹┖");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "站点不能为空");
         }
+        Long accessibleSiteId = resolveAccessibleSiteId(request.getSiteId(), true);
 
-        Template template = getTemplateById(templateId, request.getSiteId());
+        Template template = getTemplateById(templateId, accessibleSiteId);
         if (!"active".equals(template.getStatus())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "妯℃澘鏈惎鐢紝鏃犳硶缁戝畾");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "模板未启用，无法绑定");
         }
 
         String targetType = normalizeTargetType(request.getTargetType(), false);
         String bindingSlot = normalizeBindingSlot(request.getBindingSlot(), false);
         Long targetId = request.getTargetId();
         if (targetId == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "缁戝畾鐩爣涓嶈兘涓虹┖");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "绑定目标不能为空");
         }
 
         validateBindingMapping(template.getType(), targetType, bindingSlot);
-        validateBindingTarget(request.getSiteId(), targetType, targetId);
+        validateBindingTarget(accessibleSiteId, targetType, targetId);
 
         if (request.getTemplateVersionId() != null) {
             TemplateVersion version = templateVersionRepository.findById(request.getTemplateVersionId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "???????"));
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "模板版本不存在"));
             if (!Objects.equals(version.getTemplateId(), template.getId())) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "???????????");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "模板版本与当前模板不匹配");
             }
         }
 
         List<TemplateBinding> existing = Optional.ofNullable(templateBindingRepository
                 .findBySiteIdAndTargetTypeAndTargetIdAndBindingSlotAndStatus(
-                        request.getSiteId(),
+                        accessibleSiteId,
                         targetType,
                         targetId,
                         bindingSlot,
@@ -342,7 +349,7 @@ public class TemplateService {
         boolean conflict = !existing.isEmpty();
         boolean replaceExisting = Boolean.TRUE.equals(request.getReplaceExisting());
         if (conflict && !replaceExisting) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "???????????");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "目标对象已存在生效的模板绑定");
         }
 
         Set<Long> affectedTemplateIds = new java.util.LinkedHashSet<>();
@@ -357,7 +364,7 @@ public class TemplateService {
         }
 
         TemplateBinding binding = new TemplateBinding();
-        binding.setSiteId(request.getSiteId());
+        binding.setSiteId(accessibleSiteId);
         binding.setTemplateId(template.getId());
         binding.setTemplateVersionId(request.getTemplateVersionId());
         binding.setTargetType(targetType);
@@ -379,7 +386,7 @@ public class TemplateService {
         Template template = getTemplateById(templateId, siteId);
         return templateBindingRepository.searchBindings(
                 template.getId(),
-                siteId,
+                template.getSiteId(),
                 normalizeTargetType(targetType, true),
                 normalizeBindingStatus(status, true)
         );
@@ -388,15 +395,16 @@ public class TemplateService {
     @Transactional
     public void deleteBinding(Long bindingId, Long siteId) {
         if (siteId == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "绔欑偣涓嶈兘涓虹┖");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "站点不能为空");
         }
-        TemplateBinding binding = templateBindingRepository.findByIdAndSiteId(bindingId, siteId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "???????"));
+        Long accessibleSiteId = resolveAccessibleSiteId(siteId, true);
+        TemplateBinding binding = templateBindingRepository.findByIdAndSiteId(bindingId, accessibleSiteId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "绑定记录不存在"));
         binding.setStatus("inactive");
         binding.setUpdatedBy(resolveUsername());
         TemplateBinding saved = templateBindingRepository.save(binding);
 
-        Long activeTemplateId = resolveActiveCategoryTemplateId(siteId, saved.getTargetType(), saved.getTargetId(), saved.getBindingSlot());
+        Long activeTemplateId = resolveActiveCategoryTemplateId(accessibleSiteId, saved.getTargetType(), saved.getTargetId(), saved.getBindingSlot());
         syncCategoryTemplateReference(saved, activeTemplateId);
 
         Set<Long> affectedTemplateIds = new java.util.LinkedHashSet<>();
@@ -409,12 +417,13 @@ public class TemplateService {
 
     @Transactional(readOnly = true)
     public TemplatePreviewResponse previewTemplate(Long templateId, TemplatePreviewRequest request) {
-        if (request == null || request.getSiteId() == null) {
+        if (request == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "siteId is required for preview.");
         }
 
+        Long accessibleSiteId = resolveAccessibleSiteId(request.getSiteId(), true);
         RenderRequest renderRequest = new RenderRequest();
-        renderRequest.setSiteId(request.getSiteId());
+        renderRequest.setSiteId(accessibleSiteId);
         renderRequest.setTemplateId(templateId);
         renderRequest.setSourceType(request.getSourceType());
         renderRequest.setSourceId(request.getSourceId());
@@ -479,53 +488,53 @@ public class TemplateService {
         if (template.getCurrentVersionId() != null) {
             return templateVersionRepository.findById(template.getCurrentVersionId())
                     .orElseGet(() -> templateVersionRepository.findTopByTemplateIdOrderByVersionNoDesc(template.getId())
-                            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "???????")));
+                            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "模板版本不存在")));
         }
         return templateVersionRepository.findTopByTemplateIdOrderByVersionNoDesc(template.getId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "???????"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "模板版本不存在"));
     }
 
     private TemplateVersion resolveRollbackTarget(Long templateId, TemplateVersionRollbackRequest request) {
         if (request.getVersionId() != null) {
             TemplateVersion version = templateVersionRepository.findById(request.getVersionId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "???????"));
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "模板版本不存在"));
             if (!Objects.equals(version.getTemplateId(), templateId)) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "???????????");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "模板版本与当前模板不匹配");
             }
             return version;
         }
         if (request.getVersionNo() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "鍥炴粴鐗堟湰涓嶈兘涓虹┖");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "回滚版本不能为空");
         }
         return templateVersionRepository.findByTemplateIdAndVersionNo(templateId, request.getVersionNo())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "???????"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "模板版本不存在"));
     }
 
     private TemplateVersionPayload buildVersionPayload(TemplateRequest request, TemplateVersion currentVersion) {
         String layoutSchema = request.getLayoutSchema() != null
-                ? validateSchema(request.getLayoutSchema(), "甯冨眬缁撴瀯", true)
+                ? validateSchema(request.getLayoutSchema(), "布局结构", true)
                 : currentVersion.getLayoutSchema();
         String blockSchema = request.getBlockSchema() != null
-                ? validateSchema(request.getBlockSchema(), "鍖哄潡閰嶇疆", true)
+                ? validateSchema(request.getBlockSchema(), "区块配置", true)
                 : currentVersion.getBlockSchema();
         if (layoutSchema == null || blockSchema == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "妯℃澘缁撴瀯涓嶈兘涓虹┖");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "模板结构不能为空");
         }
         String seoSchema = request.getSeoSchema() != null
-                ? validateSchema(request.getSeoSchema(), "SEO 閰嶇疆", false)
+                ? validateSchema(request.getSeoSchema(), "SEO 配置", false)
                 : currentVersion.getSeoSchema();
         String styleSchema = request.getStyleSchema() != null
-                ? validateSchema(request.getStyleSchema(), "鏍峰紡閰嶇疆", false)
+                ? validateSchema(request.getStyleSchema(), "样式配置", false)
                 : currentVersion.getStyleSchema();
         String changeLog = normalizeText(request.getChangeLog());
         return new TemplateVersionPayload(layoutSchema, blockSchema, seoSchema, styleSchema, changeLog);
     }
 
     private TemplateVersionPayload buildVersionPayload(TemplateVersionRequest request) {
-        String layoutSchema = validateSchema(request.getLayoutSchema(), "甯冨眬缁撴瀯", true);
-        String blockSchema = validateSchema(request.getBlockSchema(), "鍖哄潡閰嶇疆", true);
-        String seoSchema = validateSchema(request.getSeoSchema(), "SEO 閰嶇疆", false);
-        String styleSchema = validateSchema(request.getStyleSchema(), "鏍峰紡閰嶇疆", false);
+        String layoutSchema = validateSchema(request.getLayoutSchema(), "布局结构", true);
+        String blockSchema = validateSchema(request.getBlockSchema(), "区块配置", true);
+        String seoSchema = validateSchema(request.getSeoSchema(), "SEO 配置", false);
+        String styleSchema = validateSchema(request.getStyleSchema(), "样式配置", false);
         String changeLog = normalizeText(request.getChangeLog());
         return new TemplateVersionPayload(layoutSchema, blockSchema, seoSchema, styleSchema, changeLog);
     }
@@ -582,22 +591,22 @@ public class TemplateService {
                 return;
             }
         }
-        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "妯℃澘绫诲瀷涓庣粦瀹氭Ы浣嶄笉鍖归厤");
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "模板类型与绑定槽位不匹配");
     }
 
     private void validateBindingTarget(Long siteId, String targetType, Long targetId) {
         if ("site".equals(targetType)) {
             if (!Objects.equals(siteId, targetId)) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "绔欑偣妯℃澘鍙兘缁戝畾褰撳墠绔欑偣");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "站点模板只能绑定当前站点");
             }
             ensureSiteExists(siteId);
             return;
         }
         if ("column".equals(targetType)) {
             Category category = categoryRepository.findByIdAndSiteId(targetId, siteId)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "?????"));
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "栏目不存在"));
             if (!Objects.equals(category.getSiteId(), siteId)) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "????????");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "栏目不属于当前站点");
             }
         }
     }
@@ -703,7 +712,7 @@ public class TemplateService {
         columnContext.put("sourceType", sourceType);
         if (previewCategory == null) {
             columnContext.put("available", false);
-            columnContext.put("message", "褰撳墠棰勮鏈姞杞芥爮鐩笂涓嬫枃");
+            columnContext.put("message", "当前预览未加载栏目上下文");
             return columnContext;
         }
         columnContext.put("available", true);
@@ -722,7 +731,7 @@ public class TemplateService {
         contentContext.put("sourceType", sourceType);
         if (previewArticle == null) {
             contentContext.put("available", false);
-            contentContext.put("message", "褰撳墠棰勮鏈姞杞藉唴瀹逛笂涓嬫枃");
+            contentContext.put("message", "当前预览未加载内容上下文");
             return contentContext;
         }
         contentContext.put("available", true);
@@ -741,7 +750,7 @@ public class TemplateService {
         Map<String, Object> topicContext = new LinkedHashMap<>();
         topicContext.put("available", false);
         topicContext.put("supported", false);
-        topicContext.put("message", "??????????????????????");
+        topicContext.put("message", "暂无专题数据");
         return topicContext;
     }
 
@@ -781,7 +790,7 @@ public class TemplateService {
         Category category = new Category();
         category.setId(0L);
         category.setSiteId(siteId);
-        category.setName("绀轰緥鏍忕洰");
+        category.setName("示例栏目");
         category.setCode("sample-column");
         category.setSlug("sample-column");
         category.setFullPath("/sample-column");
@@ -799,18 +808,31 @@ public class TemplateService {
         article.setId(0L);
         article.setSiteId(siteId);
         article.setPrimaryCategoryId(categoryId);
-        article.setTitle("绀轰緥鍐呭鏍囬");
-        article.setSummary("???????????????");
-        article.setCategory("绀轰緥鏍忕洰");
+        article.setTitle("示例内容标题");
+        article.setSummary("示例内容摘要");
+        article.setCategory("示例栏目");
         article.setAuthor("system");
         article.setStatus("published");
         article.setViews(128);
         return article;
     }
 
+    private Long resolveAccessibleSiteId(Long siteId, boolean required) {
+        if (siteId != null) {
+            return siteAccessService.isScopedSiteAdmin() ? siteAccessService.resolveAccessibleSiteId(siteId) : siteId;
+        }
+        if (siteAccessService.isScopedSiteAdmin()) {
+            return siteAccessService.resolveAccessibleSiteId(null);
+        }
+        if (required) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "siteId is required.");
+        }
+        return null;
+    }
+
     private void ensureSiteExists(Long siteId) {
         if (!siteRepository.existsById(siteId)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "?????");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "站点不存在");
         }
     }
 
@@ -832,7 +854,7 @@ public class TemplateService {
         }
         normalized = normalized.toLowerCase(Locale.ROOT);
         if (!CODE_PATTERN.matcher(normalized).matches()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "?????????");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "模板编码格式无效");
         }
         return normalized;
     }
@@ -843,11 +865,11 @@ public class TemplateService {
             if (allowNull) {
                 return null;
             }
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "妯℃澘绫诲瀷涓嶈兘涓虹┖");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "模板类型不能为空");
         }
         normalized = normalized.toLowerCase(Locale.ROOT);
         if (!ALLOWED_TYPES.contains(normalized)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "???????");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "模板类型无效");
         }
         return normalized;
     }
@@ -862,7 +884,7 @@ public class TemplateService {
         }
         normalized = normalized.toLowerCase(Locale.ROOT);
         if (!ALLOWED_STATUS.contains(normalized)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "妯℃澘鐘舵€佷笉姝ｇ‘");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "模板状态不正确");
         }
         return normalized;
     }
@@ -874,7 +896,7 @@ public class TemplateService {
         }
         normalized = normalized.toLowerCase(Locale.ROOT);
         if (!ALLOWED_BINDING_STATUS.contains(normalized)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "缁戝畾鐘舵€佷笉姝ｇ‘");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "绑定状态不正确");
         }
         return normalized;
     }
@@ -885,11 +907,11 @@ public class TemplateService {
             if (allowNull) {
                 return null;
             }
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "缁戝畾鐩爣绫诲瀷涓嶈兘涓虹┖");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "绑定目标类型不能为空");
         }
         normalized = normalized.toLowerCase(Locale.ROOT);
         if (!ALLOWED_TARGET_TYPES.contains(normalized)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "?????????");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "绑定目标类型无效");
         }
         return normalized;
     }
@@ -900,11 +922,11 @@ public class TemplateService {
             if (allowNull) {
                 return null;
             }
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "缁戝畾妲戒綅涓嶈兘涓虹┖");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "绑定槽位不能为空");
         }
         normalized = normalized.toLowerCase(Locale.ROOT);
         if (!ALLOWED_BINDING_SLOTS.contains(normalized)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "???????");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "绑定槽位无效");
         }
         return normalized;
     }
@@ -916,7 +938,7 @@ public class TemplateService {
         }
         normalized = normalized.toLowerCase(Locale.ROOT);
         if (!ALLOWED_PREVIEW_SOURCES.contains(normalized)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "棰勮鏁版嵁婧愪笉姝ｇ‘");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "预览数据源不正确");
         }
         return normalized;
     }
@@ -932,30 +954,30 @@ public class TemplateService {
     private String validateSchema(String schema, String label, boolean required) {
         if (schema == null) {
             if (required) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, label + "涓嶈兘涓虹┖");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, label + "不能为空");
             }
             return null;
         }
         String normalized = schema.trim();
         if (normalized.isEmpty()) {
             if (required) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, label + "涓嶈兘涓虹┖");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, label + "不能为空");
             }
             return null;
         }
         if (normalized.length() > MAX_SCHEMA_LENGTH) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, label + "鍐呭杩囬暱");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, label + "内容过长");
         }
         String lower = normalized.toLowerCase(Locale.ROOT);
         for (String keyword : SCHEMA_BLACKLIST) {
             if (lower.contains(keyword)) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, label + "???????");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, label + "包含非法关键字");
             }
         }
         try {
             objectMapper.readTree(normalized);
         } catch (Exception ex) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, label + "涓嶆槸鍚堟硶 JSON");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, label + "不是合法 JSON");
         }
         return normalized;
     }

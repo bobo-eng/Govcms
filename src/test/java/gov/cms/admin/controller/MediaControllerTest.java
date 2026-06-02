@@ -2,6 +2,7 @@ package gov.cms.admin.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import gov.cms.admin.config.SecurityConfig;
+import gov.cms.admin.dto.MediaReferenceSummary;
 import gov.cms.admin.entity.MediaFile;
 import gov.cms.admin.security.JwtAuthenticationFilter;
 import gov.cms.admin.service.CustomUserDetailsService;
@@ -85,6 +86,19 @@ class MediaControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].originalName").value("cover.png"))
                 .andExpect(jsonPath("$.content[0].mediaType").value("image"));
+    }
+
+    @Test
+    @WithMockUser(authorities = "media:manage:view")
+    void getReferencesReturnsOk() throws Exception {
+        MediaReferenceSummary summary = new MediaReferenceSummary();
+        summary.setMediaId(1L);
+        summary.setContentReferenceCount(1);
+        when(mediaService.getReferenceSummary(1L)).thenReturn(summary);
+
+        mockMvc.perform(get("/api/media/{id}/references", 1L))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mediaId").value(1L));
     }
 
     @Test

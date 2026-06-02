@@ -1,4 +1,5 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
+import '../styles/admin-refresh.css'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import { PlusOutlined, SearchOutlined, SyncOutlined } from '@ant-design/icons-vue'
@@ -717,44 +718,44 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div v-if="!canView" class="templates-page">
-    <div class="empty-box">暂无模板查看权限</div>
-  </div>
-  <div v-else class="templates-page">
-    <div class="page-header">
+  <div class="templates-page">
+    <div v-if="!canView" class="admin-empty-state">暂无模板查看权限</div>
+    <div v-else>
+    <div class="admin-page-header">
       <div>
-        <h1>模板管理</h1>
-        <p>模板主流程、栏目联动、绑定管理与渲染准备态预览</p>
+        <h1 class="admin-page-title">模板管理</h1>
+        <p class="admin-page-desc">模板主流程、栏目联动、绑定管理与渲染准备态预览。</p>
       </div>
-      <button class="primary-btn" @click="handleCreateTemplate">
+      <button class="admin-primary-btn" @click="handleCreateTemplate">
         <PlusOutlined />
         新建模板
       </button>
     </div>
 
-    <div class="toolbar">
-      <select v-model="filters.siteId" class="filter-select">
+    <div class="admin-toolbar-card"><div class="admin-toolbar-row">
+      <select v-model="filters.siteId" class="admin-filter-select">
         <option :value="null">请选择站点</option>
         <option v-for="item in sites" :key="item.id" :value="item.id">{{ item.name }}</option>
       </select>
-      <select v-model="filters.type" class="filter-select">
+      <select v-model="filters.type" class="admin-filter-select">
         <option v-for="item in templateTypeOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
       </select>
-      <select v-model="filters.status" class="filter-select">
+      <select v-model="filters.status" class="admin-filter-select">
         <option v-for="item in statusOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
       </select>
-      <div class="search-box">
-        <SearchOutlined class="search-icon" />
-        <input v-model="filters.keyword" class="search-input" placeholder="搜索模板名称或编码" @keyup.enter="fetchList" />
+      <div class="admin-search-box">
+        <SearchOutlined class="admin-search-icon" />
+        <input v-model="filters.keyword" class="admin-search-input" placeholder="搜索模板名称或编码" @keyup.enter="fetchList" />
       </div>
-      <button class="secondary-btn" @click="fetchList">查询</button>
+      <button class="admin-secondary-btn" @click="fetchList">查询</button>
+    </div>
     </div>
 
-    <div class="workspace">
-      <aside class="left-panel">
-        <div class="panel-title">模板列表</div>
-        <div v-if="listLoading" class="empty-box">加载模板中...</div>
-        <div v-else-if="!templates.length" class="empty-box">当前没有模板数据</div>
+    <div class="workspace admin-workspace-shell">
+      <aside class="left-panel admin-card">
+        <div class="admin-card-title">模板列表</div>
+        <div v-if="listLoading" class="admin-empty-state">加载模板中...</div>
+        <div v-else-if="!templates.length" class="admin-empty-state">当前没有模板数据</div>
         <button
           v-for="item in templates"
           :key="item.id"
@@ -768,37 +769,37 @@ onMounted(async () => {
         </button>
       </aside>
 
-      <section class="middle-panel">
-        <div v-if="detailLoading" class="empty-box">加载模板详情中...</div>
-        <template v-else>
-          <div class="panel-title">基础信息</div>
+      <section class="middle-panel admin-card">
+        <div v-if="detailLoading" class="admin-empty-state">加载模板详情中...</div>
+        <div v-else>
+          <div class="admin-card-title">基础信息</div>
           <div class="form-grid">
-            <input v-model="form.name" class="form-input" placeholder="模板名称" />
-            <input v-model="form.code" class="form-input" placeholder="模板编码" />
-            <select v-model="form.type" class="form-select">
+            <input v-model="form.name" class="admin-form-input" placeholder="模板名称" />
+            <input v-model="form.code" class="admin-form-input" placeholder="模板编码" />
+            <select v-model="form.type" class="admin-form-select">
               <option v-for="item in formTypeOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
             </select>
-            <select v-model="form.status" class="form-select">
+            <select v-model="form.status" class="admin-form-select">
               <option v-for="item in statusOptions.filter(item => item.value)" :key="item.value" :value="item.value">{{ item.label }}</option>
             </select>
-            <select v-model="form.defaultPreviewSource" class="form-select">
+            <select v-model="form.defaultPreviewSource" class="admin-form-select">
               <option v-for="item in previewSourceOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
             </select>
             <div class="static-field">
               <label>当前版本</label>
               <span>{{ currentVersion ? `V${currentVersion.versionNo}` : '--' }}</span>
             </div>
-            <textarea v-model="form.description" class="form-textarea" rows="3" placeholder="模板说明"></textarea>
+            <textarea v-model="form.description" class="admin-form-textarea" rows="3" placeholder="模板说明"></textarea>
           </div>
 
-          <div class="action-row">
-            <button class="primary-btn" :disabled="saving" @click="saveMeta">保存信息</button>
-            <button class="secondary-btn" :disabled="savingVersion || !form.id" @click="saveVersion">保存新版本</button>
-            <input v-model="form.changeLog" class="form-input compact" placeholder="本次版本说明" />
+          <div class="admin-action-row">
+            <button class="admin-primary-btn" :disabled="saving" @click="saveMeta">保存信息</button>
+            <button class="admin-secondary-btn" :disabled="savingVersion || !form.id" @click="saveVersion">保存新版本</button>
+            <input v-model="form.changeLog" class="admin-form-input compact" placeholder="本次版本说明" />
           </div>
 
-          <div class="panel-title">Schema 编辑</div>
-          <div class="tab-row">
+          <div class="admin-card-title">Schema 编辑</div>
+          <div class="admin-section-tabs">
             <button
               v-for="item in ['layout', 'block', 'seo', 'style']"
               :key="item"
@@ -814,30 +815,30 @@ onMounted(async () => {
           <textarea v-else-if="editorSchemaTab === 'seo'" v-model="form.seoSchema" class="editor"></textarea>
           <textarea v-else v-model="form.styleSchema" class="editor"></textarea>
 
-          <div class="panel-title">绑定管理</div>
+          <div class="admin-card-title">绑定管理</div>
           <div class="form-grid binding-grid">
-            <select v-model="bindingForm.targetType" class="form-select" :disabled="form.type !== 'content_detail'">
+            <select v-model="bindingForm.targetType" class="admin-form-select" :disabled="form.type !== 'content_detail'">
               <option v-for="item in bindingTargetTypeOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
             </select>
             <div class="static-field">
               <label>绑定槽位</label>
               <span>{{ formatBindingSlot(bindingForm.bindingSlot) }}</span>
             </div>
-            <select v-model="bindingForm.targetId" class="form-select">
+            <select v-model="bindingForm.targetId" class="admin-form-select">
               <option :value="null">请选择绑定目标</option>
               <option v-for="item in bindingTargetOptions" :key="item.id" :value="item.id">{{ item.label }}</option>
             </select>
-            <select v-model="bindingForm.templateVersionId" class="form-select">
+            <select v-model="bindingForm.templateVersionId" class="admin-form-select">
               <option :value="null">使用当前版本</option>
               <option v-for="item in versions" :key="item.id" :value="item.id">V{{ item.versionNo }}</option>
             </select>
           </div>
-          <div class="action-row compact-row">
+          <div class="admin-action-row compact-row">
             <label class="check">
               <input v-model="bindingForm.replaceExisting" type="checkbox" />
               替换现有绑定
             </label>
-            <button class="secondary-btn" :disabled="bindingLoading || !form.id" @click="saveBinding">创建 / 替换绑定</button>
+            <button class="admin-secondary-btn" :disabled="bindingLoading || !form.id" @click="saveBinding">创建 / 替换绑定</button>
           </div>
           <div v-if="bindings.length" class="mini-list">
             <div v-for="item in bindings" :key="item.id" class="mini-item vertical">
@@ -847,38 +848,38 @@ onMounted(async () => {
               </div>
               <span>{{ formatBindingTarget(item) }}</span>
               <span>模板版本：{{ item.templateVersionId ? `#${item.templateVersionId}` : '当前版本' }}</span>
-              <button class="link-btn" @click="removeBinding(item)">解除绑定</button>
+              <button class="admin-link-action" @click="removeBinding(item)">解除绑定</button>
             </div>
           </div>
-          <div v-else class="empty-box small">当前模板还没有绑定记录</div>
-        </template>
+          <div v-else class="admin-empty-state small">当前模板还没有绑定记录</div>
+        </div>
       </section>
 
-      <aside class="right-panel">
-        <div class="tab-row top-tabs">
+      <aside class="right-panel admin-card">
+        <div class="admin-section-tabs top-tabs">
           <button class="tab-btn" :class="{ active: rightTab === 'preview' }" @click="rightTab = 'preview'">预览</button>
           <button class="tab-btn" :class="{ active: rightTab === 'impact' }" @click="rightTab = 'impact'">影响范围</button>
           <button class="tab-btn" :class="{ active: rightTab === 'versions' }" @click="rightTab = 'versions'">版本记录</button>
         </div>
 
-        <template v-if="rightTab === 'preview'">
-          <div class="preview-toolbar">
-            <select v-model="previewForm.sourceType" class="form-select compact-control">
+        <div v-if="rightTab === 'preview'">
+          <div class="admin-compact-toolbar">
+            <select v-model="previewForm.sourceType" class="admin-form-select compact-control">
               <option v-for="item in previewSourceOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
             </select>
-            <select v-if="previewForm.sourceType === 'column'" v-model="previewForm.sourceId" class="form-select grow-control">
+            <select v-if="previewForm.sourceType === 'column'" v-model="previewForm.sourceId" class="admin-form-select grow-control">
               <option :value="null">请选择栏目</option>
               <option v-for="item in categoryOptions" :key="item.id" :value="item.id">{{ item.fullPath }}</option>
             </select>
-            <select v-if="previewForm.sourceType === 'content'" v-model="previewForm.sourceId" class="form-select grow-control">
+            <select v-if="previewForm.sourceType === 'content'" v-model="previewForm.sourceId" class="admin-form-select grow-control">
               <option :value="null">请选择内容</option>
               <option v-for="item in articleOptions" :key="item.id" :value="item.id">{{ item.title }}（{{ item.status }}）</option>
             </select>
-            <button class="primary-btn" :disabled="previewing || !form.id" @click="runPreview">
+            <button class="admin-primary-btn" :disabled="previewing || !form.id" @click="runPreview">
               <SyncOutlined v-if="previewing" spin />
               <span>{{ previewing ? '预览中...' : '发起预览' }}</span>
             </button>
-            <button class="secondary-btn" :disabled="!previewHasHtml" @click="previewModalOpen = true">放大预览</button>
+            <button class="admin-secondary-btn" :disabled="!previewHasHtml" @click="previewModalOpen = true">放大预览</button>
           </div>
 
           <div :class="previewNoticeClass">{{ previewNoticeText }}</div>
@@ -895,14 +896,14 @@ onMounted(async () => {
               </div>
             </div>
 
-            <div class="tab-row sub-tabs">
+            <div class="admin-section-tabs sub-tabs">
               <button class="tab-btn" :class="{ active: previewPanelTab === 'page' }" @click="previewPanelTab = 'page'">页面预览</button>
               <button class="tab-btn" :class="{ active: previewPanelTab === 'contract' }" @click="previewPanelTab = 'contract'">渲染契约</button>
               <button class="tab-btn" :class="{ active: previewPanelTab === 'schema' }" @click="previewPanelTab = 'schema'">Schema</button>
               <button class="tab-btn" :class="{ active: previewPanelTab === 'html' }" @click="previewPanelTab = 'html'">HTML</button>
             </div>
 
-            <template v-if="previewPanelTab === 'page'">
+            <div v-if="previewPanelTab === 'page'">
               <div class="info-grid info-grid-compact">
                 <div v-for="item in previewInfoCards" :key="item.label" class="info-card">
                   <label>{{ item.label }}</label>
@@ -919,13 +920,13 @@ onMounted(async () => {
                   ></iframe>
                   <div v-if="previewing" class="preview-loading-mask">正在生成新的预览...</div>
                 </div>
-                <div v-else class="empty-box preview-empty">
+                <div v-else class="admin-empty-state preview-empty">
                   当前预览没有返回可渲染 HTML，请切换到“渲染契约”或“HTML”查看返回快照。
                 </div>
               </div>
-            </template>
+            </div>
 
-            <template v-else-if="previewPanelTab === 'contract'">
+            <div v-else-if="previewPanelTab === 'contract'">
               <div class="info-grid info-grid-compact">
                 <div v-for="item in previewSummaryCards" :key="item.label" class="info-card">
                   <label>{{ item.label }}</label>
@@ -938,10 +939,10 @@ onMounted(async () => {
                   <pre class="contract-box">{{ pretty(item.data) }}</pre>
                 </div>
               </div>
-            </template>
+            </div>
 
-            <template v-else-if="previewPanelTab === 'schema'">
-              <div class="tab-row sub-tabs nested-tabs">
+            <div v-else-if="previewPanelTab === 'schema'">
+              <div class="admin-section-tabs sub-tabs nested-tabs">
                 <button
                   v-for="item in ['layout', 'block', 'seo', 'style']"
                   :key="item"
@@ -961,21 +962,21 @@ onMounted(async () => {
                       ? (preview.seoSchema || '{}')
                       : (preview.styleSchema || '{}')
               }}</pre>
-            </template>
+            </div>
 
-            <template v-else>
+            <div v-else>
               <pre class="code-box html-box">{{ preview.renderedHtml || '<!-- 当前没有渲染 HTML -->' }}</pre>
-            </template>
+            </div>
           </div>
 
-          <div v-else class="empty-box preview-empty">
+          <div v-else class="admin-empty-state preview-empty">
             选择数据源后发起预览，右侧会先展示真实页面，再提供渲染契约、Schema 和 HTML 调试视图。
           </div>
-        </template>
+        </div>
 
-        <template v-else-if="rightTab === 'impact'">
-          <div class="action-row">
-            <button class="secondary-btn" :disabled="!form.id" @click="form.id && loadWorkspace(form.id)">
+        <div v-else-if="rightTab === 'impact'">
+          <div class="admin-action-row">
+            <button class="admin-secondary-btn" :disabled="!form.id" @click="form.id && loadWorkspace(form.id)">
               <SyncOutlined />
               刷新
             </button>
@@ -1002,10 +1003,10 @@ onMounted(async () => {
               <div v-for="item in impact.warnings" :key="item">{{ item }}</div>
             </div>
           </div>
-          <div v-else class="empty-box small">选择模板后查看影响范围</div>
-        </template>
+          <div v-else class="admin-empty-state small">选择模板后查看影响范围</div>
+        </div>
 
-        <template v-else>
+        <div v-else>
           <div v-if="versions.length" class="mini-list">
             <div v-for="item in versions" :key="item.id" class="mini-item vertical">
               <div class="binding-head">
@@ -1013,11 +1014,11 @@ onMounted(async () => {
                 <span>{{ item.createdAt || '--' }}</span>
               </div>
               <span>{{ item.changeLog || '无版本说明' }}</span>
-              <button class="link-btn" @click="rollbackVersion(item)">回滚到此版本</button>
+              <button class="admin-link-action" @click="rollbackVersion(item)">回滚到此版本</button>
             </div>
           </div>
-          <div v-else class="empty-box small">暂无版本记录</div>
-        </template>
+          <div v-else class="admin-empty-state small">暂无版本记录</div>
+        </div>
       </aside>
     </div>
 
@@ -1032,12 +1033,12 @@ onMounted(async () => {
         <div v-if="previewHasHtml" class="preview-frame-shell modal-frame-shell">
           <iframe class="preview-frame modal-frame" sandbox="" :srcdoc="preview?.renderedHtml" title="模板放大预览"></iframe>
         </div>
-        <div v-else class="empty-box preview-empty">当前预览没有可显示的 HTML。</div>
+        <div v-else class="admin-empty-state preview-empty">当前预览没有可显示的 HTML。</div>
       </div>
     </Modal>
+    </div>
   </div>
 </template>
-
 <style scoped>
 .templates-page {
   display: flex;
@@ -1476,4 +1477,8 @@ onMounted(async () => {
   }
 }
 </style>
+
+
+
+
 

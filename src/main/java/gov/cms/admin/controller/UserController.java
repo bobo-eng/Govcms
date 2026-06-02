@@ -20,6 +20,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.Set;
+
 @RestController
 @RequestMapping("/api/users")
 @CrossOrigin(origins = "*")
@@ -51,6 +53,12 @@ public class UserController {
         return ResponseEntity.ok(userService.getUserById(id));
     }
 
+    @GetMapping("/{id}/roles")
+    @PreAuthorize("hasAuthority('sys:user:view')")
+    public ResponseEntity<Set<Long>> getUserRoleIds(@PathVariable Long id) {
+        return ResponseEntity.ok(userService.getRoleIds(id));
+    }
+
     @PostMapping
     @PreAuthorize("hasAuthority('sys:user:create')")
     public ResponseEntity<User> createUser(@RequestBody User user) {
@@ -61,6 +69,12 @@ public class UserController {
     @PreAuthorize("hasAuthority('sys:user:update')")
     public ResponseEntity<User> updateUser(@PathVariable Long id, @RequestBody User user) {
         return ResponseEntity.ok(userService.updateUser(id, user));
+    }
+
+    @PutMapping("/{id}/roles")
+    @PreAuthorize("hasAuthority('sys:user:update')")
+    public ResponseEntity<User> assignRoles(@PathVariable Long id, @RequestBody Set<Long> roleIds) {
+        return ResponseEntity.ok(userService.assignRoles(id, roleIds));
     }
 
     @DeleteMapping("/{id}")

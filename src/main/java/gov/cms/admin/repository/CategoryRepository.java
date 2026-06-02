@@ -31,6 +31,8 @@ public interface CategoryRepository extends JpaRepository<Category, Long> {
 
     List<Category> findBySiteIdOrderBySortOrderAscIdAsc(Long siteId);
 
+    List<Category> findBySiteIdAndStatusOrderBySortOrderAscIdAsc(Long siteId, String status);
+
     Optional<Category> findByIdAndSiteId(Long id, Long siteId);
 
     boolean existsBySiteIdAndCodeIgnoreCase(Long siteId, String code);
@@ -71,3 +73,5 @@ public interface CategoryRepository extends JpaRepository<Category, Long> {
 
     long countByParentId(Long parentId);
 }
+
+

@@ -1,9 +1,12 @@
 package gov.cms.admin.service;
 
+import gov.cms.admin.dto.CurrentSiteResponse;
 import gov.cms.admin.dto.SiteOptionDto;
 import gov.cms.admin.entity.Site;
 import gov.cms.admin.repository.SiteRepository;
+import gov.cms.admin.repository.UserRepository;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -22,23 +25,51 @@ public class SiteService {
     private static final String STATUS_DISABLED = "disabled";
 
     private final SiteRepository siteRepository;
+    private final SiteAccessService siteAccessService;
+    private final UserRepository userRepository;
 
-    public SiteService(SiteRepository siteRepository) {
+    public SiteService(SiteRepository siteRepository, SiteAccessService siteAccessService, UserRepository userRepository) {
         this.siteRepository = siteRepository;
+        this.siteAccessService = siteAccessService;
+        this.userRepository = userRepository;
     }
 
     public Page<Site> getSites(String keyword, String status, Long organizationId, Pageable pageable) {
-        return siteRepository.searchSites(keyword, normalizeStatus(status, true), organizationId, pageable);
+        if (!siteAccessService.isScopedSiteAdmin()) {
+            return siteRepository.searchSites(keyword, normalizeStatus(status, true), organizationId, pageable);
+        }
+        Site site = resolveCurrentManagedSite();
+        return new PageImpl<>(List.of(site), pageable, 1);
     }
 
     public List<SiteOptionDto> getSiteOptions() {
+        if (siteAccessService.isScopedSiteAdmin()) {
+            Site site = resolveCurrentManagedSite();
+            return List.of(new SiteOptionDto(site.getId(), site.getName(), site.getStatus()));
+        }
         return siteRepository.findAll().stream()
                 .sorted((left, right) -> left.getName().compareToIgnoreCase(right.getName()))
                 .map(site -> new SiteOptionDto(site.getId(), site.getName(), site.getStatus()))
                 .toList();
     }
 
+    public CurrentSiteResponse getCurrentManagedSite() {
+        Site site = resolveCurrentManagedSite();
+        CurrentSiteResponse response = new CurrentSiteResponse();
+        response.setId(site.getId());
+        response.setName(site.getName());
+        response.setCode(site.getCode());
+        response.setDomain(site.getDomain());
+        response.setOrganizationId(site.getOrganizationId());
+        response.setDescription(site.getDescription());
+        response.setStatus(site.getStatus());
+        return response;
+    }
+
     public Site getSiteById(Long id) {
+        if (siteAccessService.isScopedSiteAdmin()) {
+            siteAccessService.assertAccessibleSite(id);
+        }
         return siteRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Site not found."));
     }
@@ -59,6 +90,9 @@ public class SiteService {
 
     @Transactional
     public Site updateSite(Long id, Site siteData) {
+        if (siteAccessService.isScopedSiteAdmin()) {
+            siteAccessService.assertAccessibleSite(id);
+        }
         Site site = getSiteById(id);
         prepareForSave(siteData);
 
@@ -67,6 +101,9 @@ public class SiteService {
         }
         if (siteData.getDomain() != null && siteRepository.existsByDomainIgnoreCaseAndIdNot(siteData.getDomain(), id)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Site domain already exists.");
+        }
+        if (STATUS_DISABLED.equals(siteData.getStatus()) && userRepository.existsByManagedSiteId(id)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "当前站点仍绑定了站点管理员，无法禁用");
         }
 
         site.setName(siteData.getName());
@@ -80,8 +117,20 @@ public class SiteService {
 
     @Transactional
     public void deleteSite(Long id) {
+        if (siteAccessService.isScopedSiteAdmin()) {
+            siteAccessService.assertAccessibleSite(id);
+        }
+        if (userRepository.existsByManagedSiteId(id)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "当前站点仍绑定了站点管理员，无法删除");
+        }
         Site site = getSiteById(id);
         siteRepository.delete(site);
+    }
+
+    private Site resolveCurrentManagedSite() {
+        Long siteId = siteAccessService.getCurrentManagedSiteId();
+        return siteRepository.findById(siteId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Site not found."));
     }
 
     private void prepareForSave(Site site) {
@@ -98,41 +147,38 @@ public class SiteService {
         if (code == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Site code is required.");
         }
-        if (!CODE_PATTERN.matcher(code).matches()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Site code format is invalid.");
-        }
+
+        String domain = normalizeText(site.getDomain());
+        String status = normalizeStatus(site.getStatus(), false);
 
         site.setName(name);
         site.setCode(code);
-        site.setDomain(normalizeDomain(site.getDomain()));
+        site.setDomain(domain);
+        site.setStatus(status);
         site.setDescription(normalizeText(site.getDescription()));
-        site.setStatus(normalizeStatus(site.getStatus(), false));
     }
 
-    private String normalizeCode(String code) {
-        String normalized = normalizeText(code);
-        return normalized == null ? null : normalized.toLowerCase(Locale.ROOT);
-    }
-
-    private String normalizeDomain(String domain) {
-        String normalized = normalizeText(domain);
+    private String normalizeCode(String value) {
+        String normalized = normalizeText(value);
         if (normalized == null) {
             return null;
         }
-        if (normalized.contains("://") || normalized.contains("/")) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Site domain cannot include protocol or path.");
+        normalized = normalized.toLowerCase(Locale.ROOT);
+        if (!CODE_PATTERN.matcher(normalized).matches()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Site code format is invalid.");
         }
-        return normalized.toLowerCase(Locale.ROOT);
+        return normalized;
     }
 
-    private String normalizeStatus(String status, boolean allowNull) {
-        String normalized = normalizeText(status);
+    private String normalizeStatus(String value, boolean allowNull) {
+        String normalized = normalizeText(value);
         if (normalized == null) {
             if (allowNull) {
                 return null;
             }
             return STATUS_ENABLED;
         }
+        normalized = normalized.toLowerCase(Locale.ROOT);
         if (!STATUS_ENABLED.equals(normalized) && !STATUS_DISABLED.equals(normalized)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Site status is invalid.");
         }

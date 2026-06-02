@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import '../styles/admin-refresh.css'
+
 import { computed, onMounted, ref } from 'vue'
 import { message, Modal, Tree } from 'ant-design-vue'
-import { CopyOutlined, DeleteOutlined, EditOutlined, KeyOutlined, PlusOutlined } from '@ant-design/icons-vue'
+import { CopyOutlined, DeleteOutlined, KeyOutlined, PlusOutlined } from '@ant-design/icons-vue'
 import { usePermission } from '../composables/usePermission'
 import api from '../utils/api'
 
@@ -131,6 +133,7 @@ const handleDelete = (id: number) => {
     content: '删除后将无法恢复该角色，是否继续？',
     okText: '确认删除',
     okType: 'danger',
+    cancelText: '取消',
     onOk: async () => {
       try {
         await api.delete(`/roles/${id}`)
@@ -166,75 +169,61 @@ const copyRole = async (role: Role) => {
   }
 }
 
-const handleCopy = (record: Role) => {
+const handleCopy = async (record: Role) => {
   if (!ensurePermission('sys:role:create', '复制角色')) {
     return
   }
-
-  Modal.confirm({
-    title: '复制角色',
-    content: `确认复制角色“${record.name}”吗？`,
-    okText: '确认复制',
-    onOk: async () => {
-      try {
-        await copyRole(record)
-        message.success(canUpdateRole ? '复制成功' : '复制成功，但当前账号没有分配权限能力')
-        fetchRoles()
-      } catch (error: any) {
-        message.error(error.response?.data?.message || '复制失败')
-      }
-    }
-  })
+  try {
+    await copyRole(record)
+    message.success('复制成功')
+    fetchRoles()
+  } catch (error: any) {
+    message.error(error.response?.data?.message || '复制失败')
+  }
 }
 
 const handleBatchCopy = () => {
   if (!ensurePermission('sys:role:create', '批量复制')) {
     return
   }
-
   if (selectedRoleIds.value.length !== 1) {
     message.warning('请选择 1 个角色进行复制')
     return
   }
-
   const targetRole = roles.value.find(role => role.id === selectedRoleIds.value[0])
   if (!targetRole) {
-    message.error('未找到选中的角色')
+    message.warning('未找到目标角色')
     return
   }
-
   handleCopy(targetRole)
 }
 
 const handleBatchDelete = () => {
-  if (!ensurePermission('sys:role:delete', '批量删除')) {
+  if (!ensurePermission('sys:role:delete', '批量删除角色')) {
     return
   }
-
   if (!selectedRoleIds.value.length) {
     message.warning('请选择角色')
     return
   }
-
   Modal.confirm({
     title: '批量删除角色',
     content: `确认删除选中的 ${selectedRoleIds.value.length} 个角色？`,
     okText: '确认删除',
     okType: 'danger',
+    cancelText: '取消',
     onOk: async () => {
       batchLoading.value = true
       try {
         const result = await Promise.allSettled(selectedRoleIds.value.map(id => api.delete(`/roles/${id}`)))
         const successCount = result.filter(item => item.status === 'fulfilled').length
         const failCount = result.length - successCount
-
         if (successCount > 0) {
           message.success(`已删除 ${successCount} 个角色`)
         }
         if (failCount > 0) {
           message.error(`${failCount} 个角色删除失败`)
         }
-
         selectedRoleIds.value = []
         fetchRoles()
       } finally {
@@ -312,13 +301,8 @@ const onCheck = (checkedKeys: TreeCheckedKeys) => {
   selectedPermissions.value = values.map(String)
 }
 
-const getStatusClass = (status: string) => {
-  return status === 'enabled' ? 'success' : 'default'
-}
-
-const getStatusText = (status: string) => {
-  return status === 'enabled' ? '启用' : '禁用'
-}
+const getStatusClass = (status: string) => status === 'enabled' ? 'admin-status-badge--success' : 'admin-status-badge--default'
+const getStatusText = (status: string) => status === 'enabled' ? '启用' : '禁用'
 
 onMounted(() => {
   fetchRoles()
@@ -326,42 +310,38 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="roles-page">
-    <!-- 页面头部 -->
-    <div class="page-header">
-      <div class="header-left">
-        <h1>角色管理</h1>
-        <p>管理系统角色和权限分配</p>
+  <div class="admin-page roles-page">
+    <div class="admin-page-header">
+      <div>
+        <h1 class="admin-page-title">角色管理</h1>
+        <p class="admin-page-desc">管理系统角色、权限分配和角色复制能力。</p>
       </div>
-      <button v-if="canOpenCreateRole" class="primary-btn" @click="handleAdd">
+      <button v-if="canOpenCreateRole" class="admin-primary-btn" @click="handleAdd">
         <PlusOutlined />
         <span>新增角色</span>
       </button>
     </div>
 
-    <div class="toolbar">
-      <button v-if="canCreateRole" class="secondary-btn" :disabled="selectedRoleIds.length !== 1 || batchLoading" @click="handleBatchCopy">
-        <CopyOutlined />
-        复制所选角色
-      </button>
-      <button v-if="canDeleteRole" class="secondary-btn danger-btn" :disabled="!selectedRoleIds.length || batchLoading" @click="handleBatchDelete">
-        <DeleteOutlined />
-        批量删除
-      </button>
-      <span class="selected-count" v-if="selectedRoleIds.length">已选择 {{ selectedRoleIds.length }} 项</span>
+    <div class="admin-toolbar-card">
+      <div class="admin-toolbar-row">
+        <button v-if="canCreateRole" class="admin-secondary-btn" :disabled="selectedRoleIds.length !== 1 || batchLoading" @click="handleBatchCopy">
+          <CopyOutlined />
+          <span>复制所选角色</span>
+        </button>
+        <button v-if="canDeleteRole" class="admin-danger-btn" :disabled="!selectedRoleIds.length || batchLoading" @click="handleBatchDelete">
+          <DeleteOutlined />
+          <span>批量删除</span>
+        </button>
+        <span class="admin-sub-text" v-if="selectedRoleIds.length">已选择 {{ selectedRoleIds.length }} 项</span>
+      </div>
     </div>
 
-    <!-- 数据表格 -->
-    <div class="table-card">
-      <table class="data-table">
+    <div class="admin-table-card">
+      <table class="admin-data-table">
         <thead>
           <tr>
             <th class="checkbox-col">
-              <input
-                type="checkbox"
-                :checked="allSelected"
-                @change="toggleSelectAll"
-              />
+              <input type="checkbox" :checked="allSelected" @change="toggleSelectAll" />
             </th>
             <th>角色名称</th>
             <th>角色编码</th>
@@ -372,13 +352,15 @@ onMounted(() => {
           </tr>
         </thead>
         <tbody>
+          <tr v-if="loading">
+            <td colspan="7" class="admin-empty-cell">加载中...</td>
+          </tr>
+          <tr v-else-if="!roles.length">
+            <td colspan="7" class="admin-empty-cell">暂无角色数据</td>
+          </tr>
           <tr v-for="role in roles" :key="role.id">
             <td class="checkbox-col">
-              <input
-                type="checkbox"
-                :checked="selectedRoleIds.includes(role.id)"
-                @change="toggleSelectRole(role.id, $event)"
-              />
+              <input type="checkbox" :checked="selectedRoleIds.includes(role.id)" @change="toggleSelectRole(role.id, $event)" />
             </td>
             <td>
               <div class="role-cell">
@@ -388,27 +370,15 @@ onMounted(() => {
                 <span class="role-name">{{ role.name }}</span>
               </div>
             </td>
-            <td>
-              <code class="role-code">{{ role.code }}</code>
-            </td>
-            <td class="desc-cell">{{ role.description || '-' }}</td>
+            <td><code class="role-code">{{ role.code }}</code></td>
+            <td class="admin-muted-cell">{{ role.description || '-' }}</td>
             <td>{{ role.permissions?.length || 0 }} 个权限</td>
+            <td><span :class="['admin-status-badge', getStatusClass(role.status)]">{{ getStatusText(role.status) }}</span></td>
             <td>
-              <span class="status-badge" :class="getStatusClass(role.status)">
-                {{ getStatusText(role.status) }}
-              </span>
-            </td>
-            <td>
-              <div class="action-btns">
-                <button class="action-btn" v-if="canCreateRole" @click="handleCopy(role)" title="复制">
-                  <CopyOutlined />
-                </button>
-                <button class="action-btn" v-if="canOpenEditRole" @click="handleEdit(role)" title="编辑">
-                  <EditOutlined />
-                </button>
-                <button class="action-btn danger" v-if="canDeleteRole" @click="handleDelete(role.id)" title="删除">
-                  <DeleteOutlined />
-                </button>
+              <div class="admin-tree-actions">
+                <button class="admin-link-action" v-if="canCreateRole" @click="handleCopy(role)">复制</button>
+                <button class="admin-link-action" v-if="canOpenEditRole" @click="handleEdit(role)">编辑</button>
+                <button class="admin-link-action" v-if="canDeleteRole" @click="handleDelete(role.id)">删除</button>
               </div>
             </td>
           </tr>
@@ -416,71 +386,54 @@ onMounted(() => {
       </table>
     </div>
 
-    <!-- 编辑弹窗 -->
-    <div class="modal-overlay" v-if="modalVisible" @click.self="modalVisible = false">
-      <div class="modal-content modal-large">
-        <div class="modal-header">
-          <h3>{{ isEdit ? '编辑角色' : '新增角色' }}</h3>
-          <button class="close-btn" @click="modalVisible = false">×</button>
+    <div v-if="modalVisible" class="admin-modal-overlay" @click.self="modalVisible = false">
+      <div class="admin-modal-content admin-modal-content--large">
+        <div class="admin-modal-header">
+          <h3 class="admin-modal-title">{{ isEdit ? '编辑角色' : '新增角色' }}</h3>
+          <button class="admin-close-btn" @click="modalVisible = false">×</button>
         </div>
-        <div class="modal-body">
-          <div class="form-row">
-            <div class="form-group">
-              <label>角色名称</label>
-              <input 
-                v-model="editingRole.name"
-                type="text" 
-                placeholder="请输入角色名称"
-                class="form-input"
-              />
+        <div class="admin-modal-body">
+          <div class="admin-card modal-section">
+            <div class="admin-card-header"><h4 class="admin-card-title">基础信息</h4></div>
+            <div class="admin-form-row">
+              <div class="admin-form-group">
+                <label class="admin-form-label">角色名称</label>
+                <input v-model="editingRole.name" type="text" placeholder="请输入角色名称" class="admin-form-input" />
+              </div>
+              <div class="admin-form-group">
+                <label class="admin-form-label">角色编码</label>
+                <input v-model="editingRole.code" type="text" placeholder="如：admin, editor" class="admin-form-input" :disabled="isEdit" />
+              </div>
             </div>
-            <div class="form-group">
-              <label>角色编码</label>
-              <input 
-                v-model="editingRole.code"
-                type="text" 
-                placeholder="如：admin, editor"
-                class="form-input"
-                :disabled="isEdit"
-              />
+            <div class="admin-form-row">
+              <div class="admin-form-group">
+                <label class="admin-form-label">角色描述</label>
+                <input v-model="editingRole.description" type="text" placeholder="请输入角色描述" class="admin-form-input" />
+              </div>
+              <div class="admin-form-group">
+                <label class="admin-form-label">排序</label>
+                <input v-model.number="editingRole.sort" type="number" class="admin-form-input" />
+              </div>
             </div>
           </div>
-          <div class="form-group">
-            <label>描述</label>
-            <input 
-              v-model="editingRole.description"
-              type="text" 
-              placeholder="请输入角色描述"
-              class="form-input"
-            />
-          </div>
-          <div class="form-group">
-            <label>状态</label>
-            <select v-model="editingRole.status" class="form-select">
-              <option value="enabled">启用</option>
-              <option value="disabled">禁用</option>
-            </select>
-          </div>
-          
-          <!-- 权限选择 -->
-          <div class="form-group">
-            <label>分配权限</label>
-            <div class="permission-tree">
+
+          <div class="admin-card modal-section">
+            <div class="admin-card-header"><h4 class="admin-card-title">权限分配</h4></div>
+            <div v-if="canViewPermissionTree" class="role-tree-box">
               <Tree
-                v-if="treeData.length"
-                v-model:checkedKeys="selectedPermissions"
-                :treeData="treeData"
                 checkable
-                :default-expand-all="true"
+                block-node
+                :tree-data="treeData"
+                :checked-keys="selectedPermissions"
                 @check="onCheck"
               />
-              <p v-else class="tree-loading">加载中...</p>
             </div>
+            <div v-else class="admin-empty-state">当前账号无权限查看权限树。</div>
           </div>
         </div>
-        <div class="modal-footer">
-          <button class="secondary-btn" @click="modalVisible = false">取消</button>
-          <button v-if="isEdit ? canUpdateRole : canCreateRole" class="primary-btn" @click="handleSave">保存</button>
+        <div class="admin-modal-footer">
+          <button class="admin-secondary-btn" @click="modalVisible = false">取消</button>
+          <button v-if="isEdit ? canUpdateRole : canCreateRole" class="admin-primary-btn" @click="handleSave">保存</button>
         </div>
       </div>
     </div>
@@ -488,151 +441,24 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.roles-page {
-  max-width: 1400px;
-}
-
-/* 页面头部 */
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-}
-
-.header-left h1 {
-  font-size: 24px;
-  font-weight: 600;
-  color: #1e293b;
-  margin: 0 0 4px;
-}
-
-.header-left p {
-  font-size: 14px;
-  color: #64748b;
-  margin: 0;
-}
-
-.primary-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 18px;
-  background: #2563eb;
-  border: none;
-  border-radius: 8px;
-  color: #fff;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.primary-btn:hover {
-  background: #1d4ed8;
-}
-
-.secondary-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 18px;
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  color: #1e293b;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.secondary-btn:hover {
-  background: #f1f5f9;
-}
-
-.secondary-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.selected-count {
-  color: #64748b;
-  font-size: 13px;
-}
-
-.danger-btn {
-  color: #ef4444;
-  border-color: #fecaca;
-}
-
-.danger-btn:hover:not(:disabled) {
-  background: #fef2f2;
-}
-
-/* 表格 */
-.table-card {
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.data-table th {
-  text-align: left;
-  padding: 14px 16px;
-  font-size: 13px;
-  font-weight: 500;
-  color: #64748b;
-  background: #f8fafc;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.checkbox-col {
+.roles-page .checkbox-col {
   width: 44px;
   text-align: center !important;
 }
 
-.checkbox-col input {
+.roles-page .checkbox-col input {
   width: 16px;
   height: 16px;
   cursor: pointer;
 }
 
-.data-table td {
-  padding: 16px;
-  font-size: 14px;
-  color: #1e293b;
-  border-bottom: 1px solid #f1f5f9;
-}
-
-.data-table tr:last-child td {
-  border-bottom: none;
-}
-
-.data-table tr:hover td {
-  background: #f8fafc;
-}
-
-.role-cell {
+.roles-page .role-cell {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.role-avatar {
+.roles-page .role-avatar {
   width: 36px;
   height: 36px;
   border-radius: 10px;
@@ -641,196 +467,30 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-size: 16px;
 }
 
-.role-name {
-  font-weight: 500;
+.roles-page .role-name {
+  font-weight: 600;
 }
 
-.role-code {
+.roles-page .role-code {
+  font-family: Consolas, Monaco, monospace;
+  font-size: 13px;
+  color: #475569;
   background: #f1f5f9;
   padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 13px;
-  color: #64748b;
-}
-
-.desc-cell {
-  color: #64748b;
-}
-
-.status-badge {
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.status-badge.success {
-  background: #ecfdf5;
-  color: #059669;
-}
-
-.status-badge.default {
-  background: #f1f5f9;
-  color: #64748b;
-}
-
-.action-btns {
-  display: flex;
-  gap: 8px;
-}
-
-.action-btn {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #f1f5f9;
-  border: none;
-  border-radius: 6px;
-  color: #64748b;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.action-btn:hover {
-  background: #e2e8f0;
-  color: #1e293b;
-}
-
-.action-btn.danger:hover {
-  background: #fef2f2;
-  color: #ef4444;
-}
-
-/* 弹窗 */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal-content {
-  background: #fff;
-  border-radius: 16px;
-  width: 100%;
-  max-width: 480px;
-  max-height: 90vh;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.modal-large {
-  max-width: 640px;
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px 24px;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.modal-header h3 {
-  font-size: 18px;
-  font-weight: 600;
-  margin: 0;
-}
-
-.close-btn {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: none;
-  border: none;
-  font-size: 24px;
-  color: #64748b;
-  cursor: pointer;
   border-radius: 6px;
 }
 
-.close-btn:hover {
-  background: #f1f5f9;
+.roles-page .modal-section {
+  padding: 16px;
 }
 
-.modal-body {
-  padding: 24px;
-  overflow-y: auto;
-}
-
-.form-group {
-  margin-bottom: 20px;
-}
-
-.form-group label {
-  display: block;
-  font-size: 14px;
-  font-weight: 500;
-  color: #374151;
-  margin-bottom: 8px;
-}
-
-.form-input,
-.form-select {
-  width: 100%;
-  height: 42px;
-  padding: 0 14px;
+.roles-page .role-tree-box {
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  font-size: 14px;
-  outline: none;
-  transition: all 0.2s;
-}
-
-.form-input:focus,
-.form-select:focus {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-}
-
-.form-input:disabled {
-  background: #f8fafc;
-  color: #94a3b8;
-}
-
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
-
-/* 权限树 */
-.permission-tree {
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  border-radius: 12px;
   padding: 12px;
-  max-height: 280px;
-  overflow-y: auto;
-}
-
-.tree-loading {
-  text-align: center;
-  color: #94a3b8;
-  padding: 20px;
-}
-
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 16px 24px;
-  border-top: 1px solid #e2e8f0;
+  background: #f8fafc;
 }
 </style>
+

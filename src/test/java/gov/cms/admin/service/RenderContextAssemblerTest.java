@@ -7,10 +7,14 @@ import gov.cms.admin.entity.Article;
 import gov.cms.admin.entity.ArticleStatus;
 import gov.cms.admin.entity.Category;
 import gov.cms.admin.entity.Site;
+import gov.cms.admin.entity.Topic;
 import gov.cms.admin.entity.Template;
 import gov.cms.admin.entity.TemplateVersion;
 import gov.cms.admin.repository.ArticleRepository;
 import gov.cms.admin.repository.CategoryRepository;
+import gov.cms.admin.repository.NavigationItemRepository;
+import gov.cms.admin.repository.TopicRepository;
+import gov.cms.admin.repository.TopicContentItemRepository;
 import gov.cms.admin.repository.SiteRepository;
 import gov.cms.admin.repository.TemplateRepository;
 import gov.cms.admin.repository.TemplateVersionRepository;
@@ -42,6 +46,9 @@ class RenderContextAssemblerTest {
     @Mock private TemplateVersionRepository templateVersionRepository;
     @Mock private SiteRepository siteRepository;
     @Mock private CategoryRepository categoryRepository;
+    @Mock private NavigationItemRepository navigationItemRepository;
+    @Mock private TopicRepository topicRepository;
+    @Mock private TopicContentItemRepository topicContentItemRepository;
     @Mock private ArticleRepository articleRepository;
     @Spy private ObjectMapper objectMapper = new ObjectMapper();
     @InjectMocks private RenderContextAssembler assembler;
@@ -152,6 +159,36 @@ class RenderContextAssemblerTest {
         assertEquals(HttpStatus.CONFLICT, exception.getStatusCode());
     }
 
+    @Test
+    void assembleTopicPreviewBuildsTopicContext() {
+        Template template = buildTemplate("topic_page", "active");
+        TemplateVersion version = buildVersion(template.getId(), "{\"layout\":[{\"slot\":\"main\"}]}", "{\"blocks\":[]}");
+        Topic topic = buildTopic(5L, "manual");
+        Article article = buildArticle(88L, ArticleStatus.published);
+
+        when(templateRepository.findByIdAndSiteId(10L, 1L)).thenReturn(Optional.of(template));
+        when(templateVersionRepository.findById(101L)).thenReturn(Optional.of(version));
+        when(siteRepository.findById(1L)).thenReturn(Optional.of(buildSite()));
+        when(topicRepository.findByIdAndSiteId(5L, 1L)).thenReturn(Optional.of(topic));
+        when(topicContentItemRepository.findByTopicIdOrderBySortOrderAscIdAsc(5L)).thenReturn(List.of(buildTopicContentItem(5L, 88L, 0)));
+        when(articleRepository.findAllById(List.of(88L))).thenReturn(List.of(article));
+        when(categoryRepository.findBySiteIdOrderBySortOrderAscIdAsc(1L)).thenReturn(List.of(buildCategory(7L, "/news")));
+
+        RenderRequest request = new RenderRequest();
+        request.setSiteId(1L);
+        request.setTemplateId(10L);
+        request.setSourceType("topic");
+        request.setSourceId(5L);
+        request.setMode("preview");
+
+        RenderContextSnapshot snapshot = assembler.assemble(request);
+
+        assertEquals("topic-page", snapshot.getPageType());
+        assertEquals("manual", String.valueOf(snapshot.getContext().get("topicContext") instanceof java.util.Map<?,?> map ? map.get("aggregationMode") : null));
+        assertEquals("/topics/topic-1/index.html", snapshot.getPathHint());
+        assertTrue(snapshot.isPublishReady());
+    }
+
     private Template buildTemplate(String type, String status) {
         Template template = new Template();
         template.setId(10L);
@@ -200,6 +237,28 @@ class RenderContextAssemblerTest {
         category.setBreadcrumbVisible(true);
         category.setPublicVisible(true);
         return category;
+    }
+
+    private Topic buildTopic(Long id, String aggregationMode) {
+        Topic topic = new Topic();
+        topic.setId(id);
+        topic.setSiteId(1L);
+        topic.setName("???");
+        topic.setCode("topic-1");
+        topic.setSlug("topic-1");
+        topic.setStatus("active");
+        topic.setTemplateId(10L);
+        topic.setAggregationMode(aggregationMode);
+        topic.setRuleLimit(10);
+        return topic;
+    }
+
+    private gov.cms.admin.entity.TopicContentItem buildTopicContentItem(Long topicId, Long articleId, int sortOrder) {
+        gov.cms.admin.entity.TopicContentItem item = new gov.cms.admin.entity.TopicContentItem();
+        item.setTopicId(topicId);
+        item.setArticleId(articleId);
+        item.setSortOrder(sortOrder);
+        return item;
     }
 
     private Article buildArticle(Long id, ArticleStatus status) {

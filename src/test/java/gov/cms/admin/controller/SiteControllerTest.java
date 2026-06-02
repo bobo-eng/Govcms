@@ -80,6 +80,29 @@ class SiteControllerTest {
     }
 
     @Test
+    @WithMockUser(authorities = "site:manage:self")
+    void getSiteOptionsReturnsListForScopedSiteAdmin() throws Exception {
+        when(siteService.getSiteOptions()).thenReturn(List.of(new SiteOptionDto(2L, "??A", "enabled")));
+
+        mockMvc.perform(get("/api/sites/options"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(2L));
+    }
+
+    @Test
+    @WithMockUser(authorities = "site:manage:self")
+    void getCurrentSiteReturnsManagedSiteForScopedAdmin() throws Exception {
+        var response = new gov.cms.admin.dto.CurrentSiteResponse();
+        response.setId(2L);
+        response.setName("??A");
+        when(siteService.getCurrentManagedSite()).thenReturn(response);
+
+        mockMvc.perform(get("/api/sites/current"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(2L));
+    }
+
+    @Test
     void getSiteOptionsReturnsUnauthorizedWithoutLogin() throws Exception {
         mockMvc.perform(get("/api/sites/options"))
                 .andExpect(status().isForbidden());

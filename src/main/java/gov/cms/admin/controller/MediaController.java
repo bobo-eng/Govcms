@@ -1,5 +1,6 @@
 package gov.cms.admin.controller;
 
+import gov.cms.admin.dto.MediaReferenceSummary;
 import gov.cms.admin.entity.MediaFile;
 import gov.cms.admin.service.MediaPreviewResource;
 import gov.cms.admin.service.MediaService;
@@ -45,6 +46,12 @@ public class MediaController {
             @RequestParam(required = false, name = "type") String type,
             @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         return ResponseEntity.ok(mediaService.getMediaFiles(keyword, type, pageable));
+    }
+
+    @GetMapping("/{id}/references")
+    @PreAuthorize("hasAuthority('media:manage:view')")
+    public ResponseEntity<MediaReferenceSummary> getReferences(@PathVariable Long id) {
+        return ResponseEntity.ok(mediaService.getReferenceSummary(id));
     }
 
     @PostMapping("/upload")

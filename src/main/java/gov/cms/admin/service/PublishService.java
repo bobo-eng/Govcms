@@ -10,6 +10,7 @@ import gov.cms.admin.dto.PublishRollbackRequest;
 import gov.cms.admin.dto.RenderContextSnapshot;
 import gov.cms.admin.dto.RenderRequest;
 import gov.cms.admin.entity.Article;
+import gov.cms.admin.entity.AuditLog;
 import gov.cms.admin.entity.ArticleStatus;
 import gov.cms.admin.entity.Category;
 import gov.cms.admin.entity.PublishArtifact;
@@ -18,13 +19,17 @@ import gov.cms.admin.entity.PublishJob;
 import gov.cms.admin.entity.PublishRollbackRecord;
 import gov.cms.admin.entity.Site;
 import gov.cms.admin.entity.TemplateBinding;
+import gov.cms.admin.entity.Topic;
 import gov.cms.admin.repository.ArticleRepository;
 import gov.cms.admin.repository.CategoryRepository;
 import gov.cms.admin.repository.PublishArtifactRepository;
 import gov.cms.admin.repository.PublishImpactItemRepository;
 import gov.cms.admin.repository.PublishJobRepository;
 import gov.cms.admin.repository.PublishRollbackRecordRepository;
+import gov.cms.admin.repository.NavigationItemRepository;
 import gov.cms.admin.repository.SiteRepository;
+import gov.cms.admin.repository.TopicContentItemRepository;
+import gov.cms.admin.repository.TopicRepository;
 import gov.cms.admin.repository.TemplateBindingRepository;
 import gov.cms.admin.repository.TemplateRepository;
 import org.springframework.http.HttpStatus;
@@ -62,12 +67,19 @@ public class PublishService {
     private final ArticleRepository articleRepository;
     private final CategoryRepository categoryRepository;
     private final SiteRepository siteRepository;
+    private final NavigationItemRepository navigationItemRepository;
+    private final TopicContentItemRepository topicContentItemRepository;
+    private final TopicRepository topicRepository;
     private final TemplateRepository templateRepository;
     private final TemplateBindingRepository templateBindingRepository;
     private final ArticleService articleService;
+    private final MediaReferenceService mediaReferenceService;
     private final RenderContextAssembler renderContextAssembler;
     private final PortalRenderService portalRenderService;
     private final ObjectMapper objectMapper;
+    private final SiteAccessService siteAccessService;
+    private final AuditLogService auditLogService;
+    private final SearchIndexService searchIndexService;
     private String publishStoragePath = "./storage/publish";
 
     public PublishService(PublishJobRepository publishJobRepository,
@@ -78,12 +90,19 @@ public class PublishService {
                           ArticleRepository articleRepository,
                           CategoryRepository categoryRepository,
                           SiteRepository siteRepository,
+                          NavigationItemRepository navigationItemRepository,
+                          TopicContentItemRepository topicContentItemRepository,
+                          TopicRepository topicRepository,
                           TemplateRepository templateRepository,
                           TemplateBindingRepository templateBindingRepository,
                           ArticleService articleService,
+                          MediaReferenceService mediaReferenceService,
                           RenderContextAssembler renderContextAssembler,
                           PortalRenderService portalRenderService,
-                          ObjectMapper objectMapper) {
+                          ObjectMapper objectMapper,
+                          SiteAccessService siteAccessService,
+                          AuditLogService auditLogService,
+                          SearchIndexService searchIndexService) {
         this.publishJobRepository = publishJobRepository;
         this.publishImpactItemRepository = publishImpactItemRepository;
         this.publishArtifactRepository = publishArtifactRepository;
@@ -92,12 +111,19 @@ public class PublishService {
         this.articleRepository = articleRepository;
         this.categoryRepository = categoryRepository;
         this.siteRepository = siteRepository;
+        this.navigationItemRepository = navigationItemRepository;
+        this.topicContentItemRepository = topicContentItemRepository;
+        this.topicRepository = topicRepository;
         this.templateRepository = templateRepository;
         this.templateBindingRepository = templateBindingRepository;
         this.articleService = articleService;
         this.renderContextAssembler = renderContextAssembler;
+        this.mediaReferenceService = mediaReferenceService;
         this.portalRenderService = portalRenderService;
         this.objectMapper = objectMapper;
+        this.siteAccessService = siteAccessService;
+        this.auditLogService = auditLogService;
+        this.searchIndexService = searchIndexService;
     }
 
     public PublishCheckResponse check(PublishRequest request) {
@@ -108,7 +134,9 @@ public class PublishService {
         response.setMode(normalized.getMode());
         List<String> reasons = validate(normalized);
         PublishImpactCalculator.ImpactPlan plan = publishImpactCalculator.calculate(normalized);
-        response.setWarnings(plan.getWarnings());
+        List<String> mediaWarnings = collectMediaWarnings(normalized);
+        response.setWarnings(new ArrayList<>(plan.getWarnings()));
+        response.getWarnings().addAll(mediaWarnings);
         response.setImpactCount(plan.getItems().size());
         response.setReasons(reasons);
         response.setPublishable(reasons.isEmpty() && !plan.getItems().isEmpty());
@@ -116,19 +144,41 @@ public class PublishService {
             response.getReasons().add("no publish impacts generated");
             response.setPublishable(false);
         }
+        auditLogService.record(
+                "publish_check",
+                normalized.getUnitType(),
+                normalized.getUnitIds().isEmpty() ? null : normalized.getUnitIds().get(0),
+                normalized.getSiteId(),
+                response.isPublishable() ? "success" : "blocked",
+                "Publish precheck executed",
+                response.isPublishable() ? null : String.join("; ", response.getReasons()),
+                null
+        );
         return response;
     }
 
     public PublishImpactResponse impact(PublishRequest request) {
         PublishRequest normalized = normalizeRequest(request);
         PublishImpactCalculator.ImpactPlan plan = publishImpactCalculator.calculate(normalized);
+        List<String> mediaWarnings = collectMediaWarnings(normalized);
         PublishImpactResponse response = new PublishImpactResponse();
         response.setSiteId(normalized.getSiteId());
         response.setUnitType(normalized.getUnitType());
         response.setMode(normalized.getMode());
-        response.setWarnings(plan.getWarnings());
+        response.setWarnings(new ArrayList<>(plan.getWarnings()));
+        response.getWarnings().addAll(mediaWarnings);
         response.setTotalItems(plan.getItems().size());
         response.setItems(plan.getItems().stream().map(this::toImpactView).collect(Collectors.toList()));
+        auditLogService.record(
+                "publish_impact",
+                normalized.getUnitType(),
+                normalized.getUnitIds().isEmpty() ? null : normalized.getUnitIds().get(0),
+                normalized.getSiteId(),
+                "success",
+                "Publish impact calculated",
+                null,
+                null
+        );
         return response;
     }
 
@@ -137,6 +187,7 @@ public class PublishService {
         PublishRequest normalized = normalizeRequest(request);
         PublishCheckResponse check = check(normalized);
         if (!check.isPublishable()) {
+            auditLogService.record("publish_execute", normalized.getUnitType(), normalized.getUnitIds().isEmpty() ? null : normalized.getUnitIds().get(0), normalized.getSiteId(), "blocked", "Publish execution blocked", String.join("; ", check.getReasons()), null);
             throw new ResponseStatusException(HttpStatus.CONFLICT, String.join("; ", check.getReasons()));
         }
 
@@ -175,7 +226,9 @@ public class PublishService {
             job.setLogContent(String.join("\n", logs));
             job.setResultSummary("Generated " + publishArtifactRepository.findByJobIdOrderByIdAsc(job.getId()).size() + " artifact records.");
             job.setFailureReason(null);
-            return publishJobRepository.save(job);
+            PublishJob saved = publishJobRepository.save(job);
+            auditLogService.record("publish_execute", saved.getUnitType(), normalized.getUnitIds().isEmpty() ? null : normalized.getUnitIds().get(0), saved.getSiteId(), "success", saved.getResultSummary(), null, saved.getId());
+            return saved;
         } catch (Exception exception) {
             job.setStatus("failed");
             job.setFinishedAt(LocalDateTime.now());
@@ -183,6 +236,7 @@ public class PublishService {
             logs.add("Job failed: " + exception.getMessage());
             job.setLogContent(String.join("\n", logs));
             publishJobRepository.save(job);
+            auditLogService.record("publish_execute", job.getUnitType(), normalized.getUnitIds().isEmpty() ? null : normalized.getUnitIds().get(0), job.getSiteId(), exception instanceof ResponseStatusException ? "blocked" : "failed", "Publish execution failed", exception.getMessage(), job.getId());
             if (exception instanceof ResponseStatusException responseStatusException) {
                 throw responseStatusException;
             }
@@ -190,19 +244,25 @@ public class PublishService {
         }
     }
 
-    public List<PublishJob> listJobs(Long siteId, String status, String mode) {
+    public List<PublishJob> listJobs(Long siteId, String status, String mode, String unitType) {
+        Long accessibleSiteId = siteAccessService.isScopedSiteAdmin() ? siteAccessService.getCurrentManagedSiteId() : siteId;
         return publishJobRepository.findAll().stream()
-                .filter(job -> siteId == null || Objects.equals(job.getSiteId(), siteId))
+                .filter(job -> accessibleSiteId == null || Objects.equals(job.getSiteId(), accessibleSiteId))
                 .filter(job -> status == null || status.isBlank() || status.equalsIgnoreCase(job.getStatus()))
                 .filter(job -> mode == null || mode.isBlank() || mode.equalsIgnoreCase(job.getMode()))
+                .filter(job -> unitType == null || unitType.isBlank() || unitType.equalsIgnoreCase(job.getUnitType()))
                 .sorted((left, right) -> Optional.ofNullable(right.getCreatedAt()).orElse(LocalDateTime.MIN)
                         .compareTo(Optional.ofNullable(left.getCreatedAt()).orElse(LocalDateTime.MIN)))
                 .toList();
     }
 
     public PublishJob getJob(Long id) {
-        return publishJobRepository.findById(id)
+        PublishJob job = publishJobRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Publish job not found."));
+        if (siteAccessService.isScopedSiteAdmin()) {
+            siteAccessService.assertAccessibleSite(job.getSiteId());
+        }
+        return job;
     }
 
     public List<PublishImpactItem> getImpacts(Long jobId) {
@@ -227,15 +287,19 @@ public class PublishService {
     public PublishJob retry(Long jobId) {
         PublishJob job = getJob(jobId);
         if (!"failed".equalsIgnoreCase(job.getStatus())) {
+            auditLogService.record("publish_retry", "publish_job", jobId, job.getSiteId(), "blocked", "Retry blocked", "Only failed jobs can be retried.", jobId);
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only failed jobs can be retried.");
         }
-        return createAndExecute(readRequestFromSnapshot(job.getSourceSnapshot()));
+        PublishJob retried = createAndExecute(readRequestFromSnapshot(job.getSourceSnapshot()));
+        auditLogService.record("publish_retry", "publish_job", jobId, job.getSiteId(), "success", "Retry created new job #" + retried.getId(), null, retried.getId());
+        return retried;
     }
 
     @Transactional
     public PublishJob rollback(Long jobId, PublishRollbackRequest request) {
         PublishJob targetJob = getJob(jobId);
         if (!("success".equalsIgnoreCase(targetJob.getStatus()) || "rollback_success".equalsIgnoreCase(targetJob.getStatus()))) {
+            auditLogService.record("publish_rollback", "publish_job", jobId, targetJob.getSiteId(), "blocked", "Rollback blocked", "Only successful jobs can be rolled back.", jobId);
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only successful jobs can be rolled back.");
         }
         String reason = request == null || request.getReason() == null || request.getReason().isBlank()
@@ -303,6 +367,7 @@ public class PublishService {
             }
 
             applyContentStatusAfterRollback(targetJob, rollbackJob, reason);
+            syncSearchIndexAfterRollback(targetJob, rollbackJob, logs);
 
             PublishRollbackRecord rollbackRecord = new PublishRollbackRecord();
             rollbackRecord.setRollbackJobId(rollbackJob.getId());
@@ -316,7 +381,9 @@ public class PublishService {
             rollbackJob.setFailureReason(null);
             rollbackJob.setResultSummary("Rollback completed for job #" + targetJob.getId());
             rollbackJob.setLogContent(String.join("\n", logs));
-            return publishJobRepository.save(rollbackJob);
+            PublishJob saved = publishJobRepository.save(rollbackJob);
+            auditLogService.record("publish_rollback", "publish_job", targetJob.getId(), targetJob.getSiteId(), "success", saved.getResultSummary(), null, saved.getId());
+            return saved;
         } catch (Exception exception) {
             rollbackJob.setStatus("rollback_failed");
             rollbackJob.setFinishedAt(LocalDateTime.now());
@@ -324,6 +391,7 @@ public class PublishService {
             logs.add("Rollback failed: " + exception.getMessage());
             rollbackJob.setLogContent(String.join("\n", logs));
             publishJobRepository.save(rollbackJob);
+            auditLogService.record("publish_rollback", "publish_job", targetJob.getId(), targetJob.getSiteId(), exception instanceof ResponseStatusException ? "blocked" : "failed", "Rollback failed", exception.getMessage(), rollbackJob.getId());
             if (exception instanceof ResponseStatusException responseStatusException) {
                 throw responseStatusException;
             }
@@ -336,7 +404,13 @@ public class PublishService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Publish request is required.");
         }
         if (request.getSiteId() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "siteId is required.");
+            if (siteAccessService.isScopedSiteAdmin()) {
+                request.setSiteId(siteAccessService.resolveAccessibleSiteId(null));
+            } else {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "siteId is required.");
+            }
+        } else if (siteAccessService.isScopedSiteAdmin()) {
+            request.setSiteId(siteAccessService.resolveAccessibleSiteId(request.getSiteId()));
         }
         request.setUnitType(publishImpactCalculator.normalizeUnitType(request.getUnitType()));
         request.setMode(publishImpactCalculator.normalizeMode(request.getMode(), request.getUnitType()));
@@ -364,6 +438,8 @@ public class PublishService {
             case "content" -> validateContentRequest(request, reasons);
             case "category" -> validateCategoryRequest(request, reasons);
             case "template" -> validateTemplateRequest(request, reasons);
+            case "navigation" -> validateNavigationRequest(request, reasons);
+            case "topic" -> validateTopicRequest(request, reasons);
             case "site" -> {
             }
             default -> reasons.add("unsupported unit type");
@@ -404,6 +480,50 @@ public class PublishService {
         }
     }
 
+    private void validateNavigationRequest(PublishRequest request, List<String> reasons) {
+        for (Long navigationId : request.getUnitIds()) {
+            var navigation = navigationItemRepository.findByIdAndSiteId(navigationId, request.getSiteId()).orElse(null);
+            if (navigation == null) {
+                reasons.add("navigation " + navigationId + " does not exist");
+                continue;
+            }
+            if (!"enabled".equalsIgnoreCase(navigation.getStatus())) {
+                reasons.add("navigation " + navigationId + " is not enabled");
+            }
+        }
+    }
+
+    private void validateTopicRequest(PublishRequest request, List<String> reasons) {
+        for (Long topicId : request.getUnitIds()) {
+            Topic topic = topicRepository.findByIdAndSiteId(topicId, request.getSiteId()).orElse(null);
+            if (topic == null) {
+                reasons.add("topic " + topicId + " does not exist");
+                continue;
+            }
+            if (!"active".equalsIgnoreCase(topic.getStatus())) {
+                reasons.add("topic " + topicId + " is not active");
+            }
+            if (topic.getTemplateId() == null) {
+                reasons.add("topic " + topicId + " has no template bound");
+                continue;
+            }
+            var template = templateRepository.findByIdAndSiteId(topic.getTemplateId(), request.getSiteId()).orElse(null);
+            if (template == null) {
+                reasons.add("topic " + topicId + " template does not exist");
+                continue;
+            }
+            if (!"active".equalsIgnoreCase(template.getStatus())) {
+                reasons.add("topic " + topicId + " template is not active");
+            }
+            if (!"topic_page".equalsIgnoreCase(template.getType())) {
+                reasons.add("topic " + topicId + " template is not topic_page");
+            }
+            if (countPublishableTopicArticles(topic) < 1) {
+                reasons.add("topic " + topicId + " has no publishable content");
+            }
+        }
+    }
+
     private void validateTemplateRequest(PublishRequest request, List<String> reasons) {
         for (Long templateId : request.getUnitIds()) {
             var template = templateRepository.findByIdAndSiteId(templateId, request.getSiteId()).orElse(null);
@@ -423,13 +543,20 @@ public class PublishService {
     private void executeJob(PublishJob job, List<PublishImpactItem> impacts, List<String> logs) throws IOException {
         PublishSnapshot snapshot = readSnapshot(job.getSourceSnapshot());
         for (PublishImpactItem impact : impacts) {
+            if ("search-index".equals(impact.getPageType())) {
+                logs.add("Search index sync queued in service for " + impact.getSummary());
+                continue;
+            }
             if ("delete".equalsIgnoreCase(impact.getAction())) {
                 handleDeleteArtifact(job, impact, logs);
                 continue;
             }
+            if ("topic-page".equals(impact.getPageType())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Current version does not support topic-page formal publishing.");
+            }
             Long templateId = resolveTemplateId(job.getSiteId(), impact);
             if (templateId == null) {
-                if ("content-detail".equals(impact.getPageType())) {
+                if ("content-detail".equals(impact.getPageType()) || "topic-page".equals(impact.getPageType())) {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, "No active template for impact path: " + impact.getPath());
                 }
                 logs.add("Skipped impact due to missing template: " + impact.getPath());
@@ -485,6 +612,61 @@ public class PublishService {
         }
     }
 
+    private void syncSearchIndexAfterSuccess(PublishJob job, PublishRequest request, List<String> logs) {
+        switch (request.getUnitType()) {
+            case "content" -> {
+                for (Long articleId : request.getUnitIds()) {
+                    if ("offline".equals(request.getMode())) {
+                        searchIndexService.removeContentEntry(job.getSiteId(), articleId);
+                        logs.add("Removed content search index: " + articleId);
+                    } else {
+                        searchIndexService.syncContentEntry(articleId);
+                        logs.add("Synced content search index: " + articleId);
+                    }
+                }
+            }
+            case "category" -> {
+                for (Long categoryId : request.getUnitIds()) {
+                    searchIndexService.syncCategoryEntry(categoryId);
+                    for (Article article : articleRepository.findBySiteIdAndPrimaryCategoryIdAndStatusOrderByCreatedAtDescIdDesc(job.getSiteId(), categoryId, ArticleStatus.published)) {
+                        searchIndexService.syncContentEntry(article.getId());
+                    }
+                    logs.add("Synced category search index: " + categoryId);
+                }
+            }
+            case "topic" -> {
+                for (Long topicId : request.getUnitIds()) {
+                    searchIndexService.syncTopicEntry(topicId);
+                    logs.add("Synced topic search index: " + topicId);
+                }
+            }
+            case "site", "template" -> {
+                searchIndexService.rebuildSiteIndex(job.getSiteId());
+                logs.add("Rebuilt site search index: site-" + job.getSiteId());
+            }
+            default -> {
+            }
+        }
+    }
+
+    private void syncSearchIndexAfterRollback(PublishJob targetJob, PublishJob rollbackJob, List<String> logs) {
+        PublishSnapshot snapshot = readSnapshot(targetJob.getSourceSnapshot());
+        if ("content".equals(snapshot.unitType)) {
+            for (Long articleId : snapshot.unitIds) {
+                String previousStatus = snapshot.articleStatuses.get(String.valueOf(articleId));
+                if ("published".equals(previousStatus)) {
+                    searchIndexService.syncContentEntry(articleId);
+                    logs.add("Restored content search index: " + articleId);
+                } else {
+                    searchIndexService.removeContentEntry(targetJob.getSiteId(), articleId);
+                    logs.add("Removed content search index after rollback: " + articleId);
+                }
+            }
+        } else if (snapshot.siteId != null) {
+            searchIndexService.rebuildSiteIndex(snapshot.siteId);
+            logs.add("Rebuilt site search index after rollback: site-" + snapshot.siteId);
+        }
+    }
     private void applyContentStatusAfterRollback(PublishJob targetJob, PublishJob rollbackJob, String reason) {
         PublishSnapshot snapshot = readSnapshot(targetJob.getSourceSnapshot());
         if (!"content".equals(snapshot.unitType)) {
@@ -531,6 +713,32 @@ public class PublishService {
                 .orElse(null);
     }
 
+    private Long resolveTopicPageTemplate(Long siteId, Long topicId) {
+        Topic topic = topicRepository.findByIdAndSiteId(topicId, siteId).orElse(null);
+        if (topic == null || topic.getTemplateId() == null) {
+            return null;
+        }
+        var template = templateRepository.findByIdAndSiteId(topic.getTemplateId(), siteId).orElse(null);
+        if (template == null || !"active".equalsIgnoreCase(template.getStatus()) || !"topic_page".equalsIgnoreCase(template.getType())) {
+            return null;
+        }
+        return template.getId();
+    }
+
+    private int countPublishableTopicArticles(Topic topic) {
+        if (topic == null) {
+            return 0;
+        }
+        int limit = topic.getRuleLimit() == null ? 10 : Math.max(1, Math.min(50, topic.getRuleLimit()));
+        if ("rule_based".equalsIgnoreCase(topic.getAggregationMode())) {
+            if (topic.getRuleCategoryId() != null) {
+                return articleRepository.findBySiteIdAndPrimaryCategoryIdAndStatusOrderByCreatedAtDescIdDesc(topic.getSiteId(), topic.getRuleCategoryId(), ArticleStatus.published, org.springframework.data.domain.PageRequest.of(0, limit)).size();
+            }
+            return articleRepository.searchArticles(null, null, ArticleStatus.published, topic.getSiteId(), null, org.springframework.data.domain.PageRequest.of(0, limit)).getContent().size();
+        }
+        List<Long> articleIds = topicContentItemRepository.findByTopicIdOrderBySortOrderAscIdAsc(topic.getId()).stream().map(item -> item.getArticleId()).toList();
+        return (int) articleRepository.findAllById(articleIds).stream().filter(article -> Objects.equals(article.getSiteId(), topic.getSiteId())).filter(article -> article.getStatus() == ArticleStatus.published).count();
+    }
     private Long resolveContentDetailTemplate(Long siteId, Long articleId) {
         Article article = articleRepository.findById(articleId).orElse(null);
         if (article == null) {
@@ -660,6 +868,41 @@ public class PublishService {
         }
     }
 
+
+    public List<AuditLog> getAuditLogs(Long jobId) {
+        getJob(jobId);
+        return auditLogService.listByJobId(jobId);
+    }
+
+    public List<PublishRollbackRecord> getRollbackRecords(Long jobId) {
+        getJob(jobId);
+        return publishRollbackRecordRepository.findByTargetJobIdOrRollbackJobIdOrderByCreatedAtDesc(jobId, jobId);
+    }
+
+    private List<String> collectMediaWarnings(PublishRequest request) {
+        List<String> warnings = new ArrayList<>();
+        switch (request.getUnitType()) {
+            case "content" -> {
+                for (Long articleId : request.getUnitIds()) {
+                    Article article = articleRepository.findById(articleId).orElse(null);
+                    if (article != null) {
+                        warnings.addAll(mediaReferenceService.collectMissingMediaWarningsForArticle(article));
+                    }
+                }
+            }
+            case "topic" -> {
+                for (Long topicId : request.getUnitIds()) {
+                    Topic topic = topicRepository.findByIdAndSiteId(topicId, request.getSiteId()).orElse(null);
+                    if (topic != null) {
+                        warnings.addAll(mediaReferenceService.collectMissingMediaWarningsForTopic(topic));
+                    }
+                }
+            }
+            default -> {
+            }
+        }
+        return warnings;
+    }
     private String joinIds(List<Long> ids) {
         return ids.stream().map(String::valueOf).collect(Collectors.joining(","));
     }
@@ -694,3 +937,18 @@ public class PublishService {
         private Map<String, String> articleStatuses;
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

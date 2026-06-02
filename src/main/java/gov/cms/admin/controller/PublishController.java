@@ -4,9 +4,11 @@ import gov.cms.admin.dto.PublishCheckResponse;
 import gov.cms.admin.dto.PublishImpactResponse;
 import gov.cms.admin.dto.PublishRequest;
 import gov.cms.admin.dto.PublishRollbackRequest;
+import gov.cms.admin.entity.AuditLog;
 import gov.cms.admin.entity.PublishArtifact;
 import gov.cms.admin.entity.PublishImpactItem;
 import gov.cms.admin.entity.PublishJob;
+import gov.cms.admin.entity.PublishRollbackRecord;
 import gov.cms.admin.service.PublishService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -55,8 +57,9 @@ public class PublishController {
     @PreAuthorize("hasAuthority('publish:center:view')")
     public ResponseEntity<List<PublishJob>> getJobs(@RequestParam(required = false) Long siteId,
                                                     @RequestParam(required = false) String status,
-                                                    @RequestParam(required = false) String mode) {
-        return ResponseEntity.ok(publishService.listJobs(siteId, status, mode));
+                                                    @RequestParam(required = false) String mode,
+                                                    @RequestParam(required = false) String unitType) {
+        return ResponseEntity.ok(publishService.listJobs(siteId, status, mode, unitType));
     }
 
     @GetMapping("/jobs/{id}")
@@ -81,6 +84,18 @@ public class PublishController {
     @PreAuthorize("hasAuthority('publish:center:log:view')")
     public ResponseEntity<List<String>> getLogs(@PathVariable Long id) {
         return ResponseEntity.ok(publishService.getLogs(id));
+    }
+
+    @GetMapping("/jobs/{id}/audits")
+    @PreAuthorize("hasAuthority('publish:center:view')")
+    public ResponseEntity<List<AuditLog>> getAudits(@PathVariable Long id) {
+        return ResponseEntity.ok(publishService.getAuditLogs(id));
+    }
+
+    @GetMapping("/jobs/{id}/rollback-records")
+    @PreAuthorize("hasAuthority('publish:center:view')")
+    public ResponseEntity<List<PublishRollbackRecord>> getRollbackRecords(@PathVariable Long id) {
+        return ResponseEntity.ok(publishService.getRollbackRecords(id));
     }
 
     @PostMapping("/jobs/{id}/retry")

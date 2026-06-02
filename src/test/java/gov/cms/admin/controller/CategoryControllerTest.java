@@ -73,7 +73,7 @@ class CategoryControllerTest {
     void getCategoryTreeReturnsDataForAuthorizedUser() throws Exception {
         CategoryTreeNode node = new CategoryTreeNode();
         node.setId(1L);
-        node.setName("????");
+        node.setName("新闻栏目");
         node.setCode("news");
         when(categoryService.getCategoryTree(1L, null, null)).thenReturn(List.of(node));
 
@@ -87,7 +87,7 @@ class CategoryControllerTest {
     void createCategoryReturnsForbiddenWithoutCreatePermission() throws Exception {
         CategoryRequest request = new CategoryRequest();
         request.setSiteId(1L);
-        request.setName("????");
+        request.setName("新闻栏目");
         request.setCode("news");
         request.setSlug("news");
         request.setType("channel");
@@ -105,7 +105,7 @@ class CategoryControllerTest {
     void createCategoryReturnsCreatedForAuthorizedUser() throws Exception {
         CategoryRequest request = new CategoryRequest();
         request.setSiteId(1L);
-        request.setName("????");
+        request.setName("新闻栏目");
         request.setCode("news");
         request.setSlug("news");
         request.setType("channel");
@@ -113,7 +113,7 @@ class CategoryControllerTest {
         Category category = new Category();
         category.setId(1L);
         category.setSiteId(1L);
-        category.setName("????");
+        category.setName("新闻栏目");
         category.setCode("news");
         category.setSlug("news");
         category.setFullPath("/news");
@@ -134,7 +134,7 @@ class CategoryControllerTest {
         request.setTargetParentId(2L);
 
         when(categoryService.moveCategory(eq(1L), any(CategoryMoveRequest.class)))
-                .thenThrow(new ResponseStatusException(HttpStatus.CONFLICT, "??????????????"));
+                .thenThrow(new ResponseStatusException(HttpStatus.CONFLICT, "目标栏目不存在或已被删除"));
 
         mockMvc.perform(put("/api/categories/{id}/move", 1L)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -164,7 +164,7 @@ class CategoryControllerTest {
     @Test
     @WithMockUser(authorities = "content:category:delete")
     void deleteCategoryReturnsConflictWhenBlocked() throws Exception {
-        doThrow(new ResponseStatusException(HttpStatus.CONFLICT, "??????????????"))
+        doThrow(new ResponseStatusException(HttpStatus.CONFLICT, "栏目下存在文章，无法删除"))
                 .when(categoryService).deleteCategory(anyLong(), anyLong());
 
         mockMvc.perform(delete("/api/categories/{id}", 1L).param("siteId", "1"))

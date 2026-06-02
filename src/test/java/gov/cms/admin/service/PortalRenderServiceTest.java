@@ -75,14 +75,22 @@ class PortalRenderServiceTest {
     }
 
     @Test
-    void renderRejectsTopicPageForNow() {
+    void renderTopicPageProducesHtml() {
         RenderContextSnapshot snapshot = new RenderContextSnapshot();
         snapshot.setPageType("topic-page");
+        snapshot.setPathHint("/topics/topic-1/index.html");
         snapshot.setLayoutSlots(List.of());
         snapshot.setRenderBlocks(List.of());
+        snapshot.setContext(new LinkedHashMap<>(Map.of(
+                "siteContext", Map.of("name", "Gov Main"),
+                "topicContext", Map.of("name", "示例专题", "summary", "专题摘要", "aggregationMode", "manual", "itemCount", 1, "items", List.of(Map.of("title", "文章A", "summary", "摘要", "author", "editor", "createdAt", "2026-03-20", "path", "/news/1.html"))),
+                "renderMeta", Map.of("publishReady", true)
+        )));
 
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> portalRenderService.render(snapshot));
+        PortalRenderResult result = portalRenderService.render(snapshot);
 
-        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatusCode());
+        assertEquals("portal/page/topic-page", result.getRenderTemplateName());
+        assertTrue(result.getRenderedHtml().contains("???"));
+        assertTrue(result.getRenderedHtml().contains("??A"));
     }
 }

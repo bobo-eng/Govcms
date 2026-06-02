@@ -67,6 +67,11 @@ public class LocalMediaStorageService implements MediaStorageService {
     }
 
     @Override
+    public boolean exists(String storagePath) {
+        return Files.exists(resolveStoredPath(storagePath));
+    }
+
+    @Override
     public void delete(String storagePath) {
         Path target = resolveStoredPath(storagePath);
         try {

@@ -46,17 +46,20 @@ public class CategoryService {
     private final ArticleRepository articleRepository;
     private final TemplateRepository templateRepository;
     private final TemplateBindingRepository templateBindingRepository;
+    private final SiteAccessService siteAccessService;
 
     public CategoryService(CategoryRepository categoryRepository,
                            SiteRepository siteRepository,
                            ArticleRepository articleRepository,
                            TemplateRepository templateRepository,
-                           TemplateBindingRepository templateBindingRepository) {
+                           TemplateBindingRepository templateBindingRepository,
+                           SiteAccessService siteAccessService) {
         this.categoryRepository = categoryRepository;
         this.siteRepository = siteRepository;
         this.articleRepository = articleRepository;
         this.templateRepository = templateRepository;
         this.templateBindingRepository = templateBindingRepository;
+        this.siteAccessService = siteAccessService;
     }
 
     @Transactional(readOnly = true)
@@ -111,7 +114,7 @@ public class CategoryService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "站点不能为空");
         }
         List<Category> siteCategories = categoryRepository.findBySiteIdOrderBySortOrderAscIdAsc(request.getSiteId());
-        Category existing = getCategoryById(id, request.getSiteId());
+        Category existing = getCategoryById(id, resolveAccessibleSiteId(request.getSiteId(), true));
         Category normalized = normalizeRequest(request, existing, siteCategories);
         if (categoryRepository.existsBySiteIdAndCodeIgnoreCaseAndIdNot(normalized.getSiteId(), normalized.getCode(), id)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "栏目编码已存在");
@@ -142,7 +145,8 @@ public class CategoryService {
         if (request == null || request.getSiteId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "站点不能为空");
         }
-        Category category = getCategoryById(id, request.getSiteId());
+        Long accessibleSiteId = resolveAccessibleSiteId(request.getSiteId(), true);
+        Category category = getCategoryById(id, accessibleSiteId);
         category.setSortOrder(normalizeSortOrder(request.getSortOrder()));
         return categoryRepository.save(category);
     }
@@ -152,7 +156,8 @@ public class CategoryService {
         if (request == null || request.getSiteId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "站点不能为空");
         }
-        Category category = getCategoryById(id, request.getSiteId());
+        Long accessibleSiteId = resolveAccessibleSiteId(request.getSiteId(), true);
+        Category category = getCategoryById(id, accessibleSiteId);
         List<Category> siteCategories = categoryRepository.findBySiteIdOrderBySortOrderAscIdAsc(category.getSiteId());
         Map<Long, Category> categoryMap = siteCategories.stream().collect(Collectors.toMap(Category::getId, item -> item));
         Long targetParentId = request.getTargetParentId();
@@ -201,14 +206,14 @@ public class CategoryService {
         if (request == null || request.getSiteId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "站点不能为空");
         }
-        Category category = getCategoryById(id, request.getSiteId());
+        Category category = getCategoryById(id, resolveAccessibleSiteId(request.getSiteId(), true));
         category.setStatus(normalizeStatus(request.getStatus(), false));
         return categoryRepository.save(category);
     }
 
     @Transactional(readOnly = true)
     public CategoryImpactResponse getImpact(Long id, Long siteId) {
-        Category category = getCategoryById(id, siteId);
+        Category category = getCategoryById(id, resolveAccessibleSiteId(siteId, false));
         List<Category> siteCategories = categoryRepository.findBySiteIdOrderBySortOrderAscIdAsc(category.getSiteId());
         List<Category> subtree = collectSubtree(category.getId(), siteCategories);
         Set<Long> subtreeIds = subtree.stream().map(Category::getId).collect(Collectors.toCollection(LinkedHashSet::new));
@@ -240,7 +245,7 @@ public class CategoryService {
         if (siteId == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "站点不能为空");
         }
-        Category category = getCategoryById(id, siteId);
+        Category category = getCategoryById(id, resolveAccessibleSiteId(siteId, true));
         if (categoryRepository.countByParentId(category.getId()) > 0) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "当前栏目存在子栏目，无法删除");
         }
@@ -546,6 +551,19 @@ public class CategoryService {
             }
         }
         return roots;
+    }
+
+    private Long resolveAccessibleSiteId(Long siteId, boolean required) {
+        if (siteId != null) {
+            return siteAccessService.isScopedSiteAdmin() ? siteAccessService.resolveAccessibleSiteId(siteId) : siteId;
+        }
+        if (siteAccessService.isScopedSiteAdmin()) {
+            return siteAccessService.resolveAccessibleSiteId(null);
+        }
+        if (required) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "站点不能为空");
+        }
+        return null;
     }
 
     private void ensureSiteExists(Long siteId) {

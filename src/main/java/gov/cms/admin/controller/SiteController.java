@@ -1,5 +1,6 @@
 package gov.cms.admin.controller;
 
+import gov.cms.admin.dto.CurrentSiteResponse;
 import gov.cms.admin.dto.SiteOptionDto;
 import gov.cms.admin.entity.Site;
 import gov.cms.admin.service.SiteService;
@@ -45,13 +46,19 @@ public class SiteController {
     }
 
     @GetMapping("/options")
-    @PreAuthorize("hasAnyAuthority('content:article:view','publish:center:view','site:manage:view')")
+    @PreAuthorize("hasAnyAuthority('content:article:view','publish:center:view','site:manage:view','site:manage:self')")
     public ResponseEntity<List<SiteOptionDto>> getSiteOptions() {
         return ResponseEntity.ok(siteService.getSiteOptions());
     }
 
+    @GetMapping("/current")
+    @PreAuthorize("hasAnyAuthority('site:manage:self','site:manage:view')")
+    public ResponseEntity<CurrentSiteResponse> getCurrentSite() {
+        return ResponseEntity.ok(siteService.getCurrentManagedSite());
+    }
+
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('site:manage:view')")
+    @PreAuthorize("hasAnyAuthority('site:manage:self','site:manage:view')")
     public ResponseEntity<Site> getSite(@PathVariable Long id) {
         return ResponseEntity.ok(siteService.getSiteById(id));
     }

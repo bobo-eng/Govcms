@@ -1,4 +1,4 @@
-﻿<th:block xmlns:th="http://www.thymeleaf.org">
+<th:block xmlns:th="http://www.thymeleaf.org">
   <th:block th:switch="${block.type}">
     <header th:case="'site_header'" class="block site-header">
       <div class="brand" th:text="${data['siteName']}">GovCMS</div>
@@ -79,3 +79,4 @@
     </section>
   </th:block>
 </th:block>
+

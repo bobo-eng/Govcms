@@ -1,6 +1,9 @@
 package gov.cms.admin.service;
 
+import gov.cms.admin.entity.Role;
 import gov.cms.admin.entity.User;
+import gov.cms.admin.repository.RoleRepository;
+import gov.cms.admin.repository.SiteRepository;
 import gov.cms.admin.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -11,16 +14,30 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.LinkedHashSet;
+import java.util.Set;
+import java.util.stream.Collectors;
+
 @Service
 public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final SiteRepository siteRepository;
+    private final RoleRepository roleRepository;
+    private final AuditLogService auditLogService;
 
     @Autowired
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public UserService(UserRepository userRepository,
+                       PasswordEncoder passwordEncoder,
+                       SiteRepository siteRepository,
+                       RoleRepository roleRepository,
+                       AuditLogService auditLogService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.siteRepository = siteRepository;
+        this.roleRepository = roleRepository;
+        this.auditLogService = auditLogService;
     }
 
     public Page<User> getUsers(Pageable pageable) {
@@ -39,6 +56,7 @@ public class UserService {
     @Transactional
     public User createUser(User user) {
         validateCreateUser(user);
+        validateManagedSiteId(user.getManagedSiteId());
 
         if (userRepository.existsByUsername(user.getUsername())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "用户名已存在");
@@ -49,6 +67,7 @@ public class UserService {
 
         user.setId(null);
         user.setPassword(passwordEncoder.encode(user.getPassword()));
+        user.setRoles(new LinkedHashSet<>());
         return userRepository.save(user);
     }
 
@@ -63,7 +82,7 @@ public class UserService {
             if (userRepository.existsByUsernameAndIdNot(updateRequest.getUsername(), id)) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "用户名已存在");
             }
-            existingUser.setUsername(updateRequest.getUsername());
+            existingUser.setUsername(updateRequest.getUsername().trim());
         }
 
         if (updateRequest.getEmail() != null) {
@@ -73,7 +92,7 @@ public class UserService {
             if (userRepository.existsByEmailAndIdNot(updateRequest.getEmail(), id)) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "邮箱已存在");
             }
-            existingUser.setEmail(updateRequest.getEmail());
+            existingUser.setEmail(updateRequest.getEmail().trim());
         }
 
         if (updateRequest.getPassword() != null) {
@@ -84,14 +103,51 @@ public class UserService {
         }
 
         if (updateRequest.getFullName() != null) {
-            existingUser.setFullName(updateRequest.getFullName());
+            existingUser.setFullName(updateRequest.getFullName().trim());
         }
 
         if (updateRequest.getEnabled() != null) {
             existingUser.setEnabled(updateRequest.getEnabled());
         }
 
+        if (updateRequest.getManagedSiteId() != null || existingUser.getManagedSiteId() != null) {
+            validateManagedSiteId(updateRequest.getManagedSiteId());
+            existingUser.setManagedSiteId(updateRequest.getManagedSiteId());
+        }
+
         return userRepository.save(existingUser);
+    }
+
+    @Transactional
+    public User assignRoles(Long id, Set<Long> roleIds) {
+        User user = getUserById(id);
+        Set<Long> normalizedRoleIds = roleIds == null ? Set.of() : roleIds;
+        Set<Role> roles = new LinkedHashSet<>(roleRepository.findAllById(normalizedRoleIds));
+        if (roles.size() != normalizedRoleIds.size()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "角色不存在");
+        }
+
+        boolean hadSiteAdmin = user.getRoles().stream().anyMatch(role -> "site_admin".equals(role.getCode()));
+        boolean hasSiteAdmin = roles.stream().anyMatch(role -> "site_admin".equals(role.getCode()));
+        if (hasSiteAdmin && user.getManagedSiteId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "站点管理员必须绑定一个管理站点");
+        }
+        if (!hasSiteAdmin) {
+            user.setManagedSiteId(null);
+        }
+
+        user.setRoles(roles);
+        User saved = userRepository.save(user);
+        if (hasSiteAdmin) {
+            auditLogService.record("site_admin_assignment", "user", saved.getId(), saved.getManagedSiteId(), "success", "Assigned site_admin to user", null, null);
+        } else if (hadSiteAdmin) {
+            auditLogService.record("site_admin_unbind", "user", saved.getId(), null, "success", "Removed site_admin from user", null, null);
+        }
+        return saved;
+    }
+
+    public Set<Long> getRoleIds(Long id) {
+        return getUserById(id).getRoles().stream().map(Role::getId).collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     @Transactional
@@ -114,9 +170,15 @@ public class UserService {
         }
     }
 
-    /**
-     * 修改用户密码
-     */
+    private void validateManagedSiteId(Long managedSiteId) {
+        if (managedSiteId == null) {
+            return;
+        }
+        if (!siteRepository.existsById(managedSiteId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "管理站点不存在");
+        }
+    }
+
     @Transactional
     public void changePassword(Long id, String newPassword) {
         User user = getUserById(id);
@@ -127,9 +189,6 @@ public class UserService {
         userRepository.save(user);
     }
 
-    /**
-     * 重置用户密码（默认密码：GovCMS@2026）
-     */
     @Transactional
     public void resetPassword(Long id) {
         User user = getUserById(id);

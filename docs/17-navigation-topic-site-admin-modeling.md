@@ -5,7 +5,7 @@
 - 文档名称：导航 / 专题 / 站点管理员建模稿
 - 版本：V1.0
 - 当前状态：待评审
-- 最近更新：2026-03-17
+- 最近更新：2026-03-18
 - 适用范围：GovCMS CMS 平台共享层、后台标准版、门户标准版前置建模
 - 关联文档：`docs/03-backoffice-prd.md`、`docs/04-portal-prd.md`、`docs/10-publish-render-contract-prd.md`、`docs/15-publish-center-mvp-prd.md`、`docs/16-role-system-definition.md`
 
@@ -218,13 +218,17 @@
 - `Category`
 - `Template`
 - `TemplateBinding`
-- `PublishCenter MVP`
+- `NavigationItem`
+- `Topic`
+- `TopicContentItem`
+- `site_admin` 角色与站点绑定实现
+- `PublishCenter` 首批增强能力
 
-当前代码尚无：
+当前代码仍待增强：
 
-- 独立导航对象
-- 独立专题对象
-- 站点管理员角色实现
+- 搜索体验增强
+- 独立审计中心 / 运维工作台 UI
+- 异步发布编排与正式交付能力
 
 ### 7.2 与当前文档映射
 

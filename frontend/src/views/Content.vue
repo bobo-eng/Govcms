@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import '../styles/admin-refresh.css'
+
 import { computed, onMounted, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
@@ -79,6 +81,18 @@ const statusLabel = (status?: string) => {
   return status ? (map[status] || status) : '-'
 }
 
+const statusClass = (status?: string) => {
+  const map: Record<string, string> = {
+    draft: 'admin-status-chip--draft',
+    pending_review: 'admin-status-chip--pending-review',
+    rejected: 'admin-status-chip--rejected',
+    approved: 'admin-status-chip--approved',
+    published: 'admin-status-chip--published',
+    offline: 'admin-status-chip--offline'
+  }
+  return map[status || 'draft'] || 'admin-status-chip--draft'
+}
+
 const loadSites = async () => {
   const response = await fetchSiteOptions()
   sites.value = response.data || []
@@ -155,8 +169,8 @@ const openEdit = async (record: ArticleItem) => {
     }
     historyItems.value = historyResponse.data || []
     publishCheck.value = null
-    if (detail.siteId) {
-      await loadCategories(detail.siteId)
+    if (form.value.siteId) {
+      await loadCategories(form.value.siteId || undefined)
     }
     modalOpen.value = true
   } catch (error: any) {
@@ -165,26 +179,18 @@ const openEdit = async (record: ArticleItem) => {
 }
 
 const save = async () => {
-  if (!form.value.title.trim()) {
-    message.warning('请输入标题')
-    return
-  }
-  if (!form.value.siteId) {
-    message.warning('请选择站点')
-    return
-  }
-  if (!form.value.primaryCategoryId) {
-    message.warning('请选择栏目')
+  if (!form.value.siteId || !form.value.primaryCategoryId || !form.value.title.trim()) {
+    message.warning('请填写完整的内容基础信息')
     return
   }
   saving.value = true
   const payload: ArticlePayload = {
-    title: form.value.title.trim(),
-    summary: form.value.summary?.trim() || null,
-    author: form.value.author?.trim() || null,
-    content: form.value.content || '',
     siteId: form.value.siteId,
-    primaryCategoryId: form.value.primaryCategoryId
+    primaryCategoryId: form.value.primaryCategoryId,
+    title: form.value.title,
+    summary: form.value.summary,
+    author: form.value.author,
+    content: form.value.content
   }
   try {
     if (isEdit.value && form.value.id) {
@@ -205,12 +211,10 @@ const save = async () => {
 
 const removeArticle = async (record: ArticleItem) => {
   if (!canDelete.value) {
-    message.warning('没有删除权限')
+    message.warning('没有删除内容权限')
     return
   }
-  if (!window.confirm(`确认删除《${record.title}》吗？`)) {
-    return
-  }
+  if (!window.confirm(`确认删除《${record.title}》吗？`)) return
   try {
     await deleteArticle(record.id)
     message.success('删除成功')
@@ -221,10 +225,6 @@ const removeArticle = async (record: ArticleItem) => {
 }
 
 const submitReviewAction = async (record: ArticleItem) => {
-  if (!canSubmit.value) {
-    message.warning('没有提交审核权限')
-    return
-  }
   try {
     await submitArticleReview(record.id)
     message.success('提交审核成功')
@@ -240,7 +240,6 @@ const viewPublishCheck = async (record: ArticleItem) => {
     publishCheck.value = response.data
     if (!modalOpen.value) {
       await openEdit(record)
-      publishCheck.value = response.data
     }
   } catch (error: any) {
     message.error(error.response?.data?.message || '获取发布检查失败')
@@ -251,7 +250,7 @@ const gotoPublish = (record: ArticleItem, mode: 'incremental' | 'offline') => {
   router.push({
     path: '/content/publish',
     query: {
-      siteId: String(record.siteId || ''),
+      siteId: String(record.siteId || filters.value.siteId || ''),
       unitType: 'content',
       unitId: String(record.id),
       mode
@@ -259,55 +258,52 @@ const gotoPublish = (record: ArticleItem, mode: 'incremental' | 'offline') => {
   })
 }
 
-watch(() => form.value.siteId, async siteId => {
-  await loadCategories(siteId || undefined)
-  if (!categoryOptions.value.some(item => item.id === form.value.primaryCategoryId)) {
-    form.value.primaryCategoryId = undefined
-  }
-})
-
 watch(() => filters.value.siteId, async siteId => {
-  await loadCategories(siteId || undefined)
-  if (!categoryOptions.value.some(item => item.id === filters.value.primaryCategoryId)) {
-    filters.value.primaryCategoryId = undefined
-  }
+  filters.value.primaryCategoryId = undefined
+  await loadCategories(siteId)
+  await loadArticles()
 })
 
 onMounted(async () => {
   await loadSites()
-  await loadCategories(filters.value.siteId)
   await loadArticles()
 })
 </script>
 
 <template>
-  <div class="page-shell">
-    <div class="page-header">
+  <div class="admin-page content-page">
+    <div class="admin-page-header">
       <div>
-        <h2>内容中心</h2>
-        <p>按六态生命周期管理内容，提交审核后进入审核工作区，正式发布统一收口到发布中心。</p>
+        <h1 class="admin-page-title">内容管理</h1>
+        <p class="admin-page-desc">管理内容稿件、提交审核、查看发布检查与生命周期流转记录。</p>
       </div>
-      <button class="primary-btn" :disabled="!canCreate" @click="openCreate">新建内容</button>
+      <button v-if="canCreate" class="admin-primary-btn" @click="openCreate">
+        <span>新建内容</span>
+      </button>
     </div>
 
-    <div class="toolbar">
-      <input v-model="filters.keyword" class="input" placeholder="关键词搜索" @keyup.enter="loadArticles" />
-      <select v-model="filters.siteId" class="input small-select">
-        <option :value="undefined">全部站点</option>
-        <option v-for="site in sites" :key="site.id" :value="site.id">{{ site.name }}</option>
-      </select>
-      <select v-model="filters.primaryCategoryId" class="input small-select">
-        <option :value="undefined">全部栏目</option>
-        <option v-for="item in categoryOptions" :key="item.id" :value="item.id">{{ item.name }}</option>
-      </select>
-      <select v-model="filters.status" class="input small-select">
-        <option v-for="item in statusOptions" :key="item.value || 'all'" :value="item.value">{{ item.label }}</option>
-      </select>
-      <button class="secondary-btn" @click="loadArticles">查询</button>
+    <div class="admin-toolbar-card">
+      <div class="admin-toolbar-row">
+        <div class="admin-search-box">
+          <input v-model="filters.keyword" class="admin-search-input" placeholder="搜索标题、摘要或作者" @keyup.enter="loadArticles" />
+        </div>
+        <select v-model="filters.siteId" class="admin-filter-select">
+          <option :value="undefined">全部站点</option>
+          <option v-for="site in sites" :key="site.id" :value="site.id">{{ site.name }}</option>
+        </select>
+        <select v-model="filters.primaryCategoryId" class="admin-filter-select" @change="loadArticles">
+          <option :value="undefined">全部栏目</option>
+          <option v-for="item in categoryOptions" :key="item.id" :value="item.id">{{ item.name }}</option>
+        </select>
+        <select v-model="filters.status" class="admin-filter-select" @change="loadArticles">
+          <option v-for="item in statusOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
+        </select>
+        <button class="admin-secondary-btn" @click="loadArticles">查询</button>
+      </div>
     </div>
 
-    <div class="table-card">
-      <table class="data-table">
+    <div class="admin-table-card">
+      <table class="admin-data-table">
         <thead>
           <tr>
             <th>标题</th>
@@ -320,111 +316,127 @@ onMounted(async () => {
         </thead>
         <tbody>
           <tr v-if="loading">
-            <td colspan="6" class="empty-row">加载中...</td>
+            <td colspan="6" class="admin-empty-cell">加载中...</td>
           </tr>
           <tr v-else-if="!articles.length">
-            <td colspan="6" class="empty-row">暂无数据</td>
+            <td colspan="6" class="admin-empty-cell">暂无数据</td>
           </tr>
           <tr v-for="item in articles" :key="item.id">
             <td>
-              <div class="title-cell">{{ item.title }}</div>
-              <div class="sub-text">{{ item.author || '未填写作者' }}</div>
+              <div class="article-title-cell">
+                <strong>{{ item.title }}</strong>
+                <span class="admin-sub-text">{{ item.author || '未填写作者' }}</span>
+              </div>
             </td>
             <td>{{ item.category || '-' }}</td>
-            <td><span :class="['status-chip', item.status]">{{ statusLabel(item.status) }}</span></td>
+            <td><span :class="['admin-status-chip', statusClass(item.status)]">{{ statusLabel(item.status) }}</span></td>
             <td>r{{ item.currentRevision || 1 }}</td>
-            <td>{{ item.updatedAt ? item.updatedAt.replace('T', ' ').slice(0, 16) : '-' }}</td>
+            <td class="admin-muted-cell">{{ item.updatedAt ? item.updatedAt.replace('T', ' ').slice(0, 16) : '-' }}</td>
             <td>
-              <div class="actions">
-                <button class="link-btn" @click="openEdit(item)">详情</button>
-                <button v-if="canUpdate && (item.status === 'draft' || item.status === 'rejected')" class="link-btn" @click="openEdit(item)">编辑</button>
-                <button v-if="canDelete && (item.status === 'draft' || item.status === 'rejected')" class="link-btn danger" @click="removeArticle(item)">删除</button>
-                <button v-if="canSubmit && (item.status === 'draft' || item.status === 'rejected')" class="link-btn" @click="submitReviewAction(item)">提交审核</button>
-                <button v-if="item.status === 'approved'" class="link-btn" @click="gotoPublish(item, 'incremental')">去发布中心</button>
-                <button v-if="item.status === 'published'" class="link-btn warning" @click="gotoPublish(item, 'offline')">下线</button>
-                <button class="link-btn" @click="viewPublishCheck(item)">发布检查</button>
+              <div class="article-actions">
+                <button class="admin-link-action" @click="openEdit(item)">详情</button>
+                <button v-if="canUpdate && (item.status === 'draft' || item.status === 'rejected')" class="admin-link-action" @click="openEdit(item)">编辑</button>
+                <button v-if="canDelete && (item.status === 'draft' || item.status === 'rejected')" class="admin-link-action" @click="removeArticle(item)">删除</button>
+                <button v-if="canSubmit && (item.status === 'draft' || item.status === 'rejected')" class="admin-link-action" @click="submitReviewAction(item)">提交审核</button>
+                <button v-if="item.status === 'approved'" class="admin-link-action" @click="gotoPublish(item, 'incremental')">去发布中心</button>
+                <button v-if="item.status === 'published'" class="admin-link-action" @click="gotoPublish(item, 'offline')">下线</button>
+                <button class="admin-link-action" @click="viewPublishCheck(item)">发布检查</button>
               </div>
             </td>
           </tr>
         </tbody>
       </table>
-    </div>
 
-    <div class="pagination-row">
-      <span>共 {{ pagination.total }} 条</span>
-      <div class="actions">
-        <button class="secondary-btn" :disabled="pagination.current <= 1" @click="pagination.current -= 1; loadArticles()">上一页</button>
-        <span>第 {{ pagination.current }} 页</span>
-        <button class="secondary-btn" :disabled="pagination.current * pagination.pageSize >= pagination.total" @click="pagination.current += 1; loadArticles()">下一页</button>
+      <div class="admin-pagination">
+        <span class="admin-pagination-total">共 {{ pagination.total }} 条</span>
+        <div class="admin-pagination-controls">
+          <button class="admin-page-btn" :disabled="pagination.current <= 1" @click="pagination.current -= 1; loadArticles()">上一页</button>
+          <span class="admin-page-info">第 {{ pagination.current }} 页</span>
+          <button class="admin-page-btn" :disabled="pagination.current * pagination.pageSize >= pagination.total" @click="pagination.current += 1; loadArticles()">下一页</button>
+        </div>
       </div>
     </div>
 
-    <a-modal v-model:open="modalOpen" :title="isEdit ? '内容详情 / 编辑' : '新建内容'" width="980px" :footer="null" destroy-on-close>
-      <div class="modal-grid">
-        <div class="form-panel">
-          <div class="form-grid">
-            <label>
-              <span>站点</span>
-              <select v-model="form.siteId" class="input">
+    <a-modal v-model:open="modalOpen" :title="isEdit ? '内容详情 / 编辑' : '新建内容'" width="1100px" :footer="null" destroy-on-close>
+      <div class="content-detail-shell">
+        <div class="admin-card modal-section">
+          <div class="admin-card-header"><h3 class="admin-card-title">基础信息</h3></div>
+          <div class="admin-form-row">
+            <div class="admin-form-group">
+              <label class="admin-form-label">站点</label>
+              <select v-model="form.siteId" class="admin-form-select">
                 <option :value="undefined">请选择站点</option>
                 <option v-for="site in sites" :key="site.id" :value="site.id">{{ site.name }}</option>
               </select>
-            </label>
-            <label>
-              <span>栏目</span>
-              <select v-model="form.primaryCategoryId" class="input">
+            </div>
+            <div class="admin-form-group">
+              <label class="admin-form-label">栏目</label>
+              <select v-model="form.primaryCategoryId" class="admin-form-select">
                 <option :value="undefined">请选择栏目</option>
                 <option v-for="item in categoryOptions" :key="item.id" :value="item.id">{{ item.name }}</option>
               </select>
-            </label>
-            <label class="full-row">
-              <span>标题</span>
-              <input v-model="form.title" class="input" placeholder="请输入标题" />
-            </label>
-            <label>
-              <span>作者</span>
-              <input v-model="form.author" class="input" placeholder="作者" />
-            </label>
-            <label>
-              <span>摘要</span>
-              <input v-model="form.summary" class="input" placeholder="摘要" />
-            </label>
-            <label class="full-row">
-              <span>正文</span>
-              <textarea v-model="form.content" class="textarea" rows="10" placeholder="请输入正文"></textarea>
-            </label>
+            </div>
           </div>
-          <div class="footer-actions">
-            <button class="secondary-btn" @click="modalOpen = false">关闭</button>
-            <button v-if="isEdit && form.id" class="secondary-btn" @click="viewPublishCheck({ id: form.id, siteId: form.siteId, title: form.title, status: 'draft' } as ArticleItem)">发布检查</button>
-            <button v-if="!isEdit || canUpdate" class="primary-btn" :disabled="saving" @click="save">{{ saving ? '保存中...' : '保存' }}</button>
+          <div class="admin-form-row admin-form-row--single">
+            <div class="admin-form-group">
+              <label class="admin-form-label">标题</label>
+              <input v-model="form.title" class="admin-form-input" placeholder="请输入标题" />
+            </div>
+          </div>
+          <div class="admin-form-row">
+            <div class="admin-form-group">
+              <label class="admin-form-label">作者</label>
+              <input v-model="form.author" class="admin-form-input" placeholder="作者" />
+            </div>
+            <div class="admin-form-group">
+              <label class="admin-form-label">摘要</label>
+              <input v-model="form.summary" class="admin-form-input" placeholder="摘要" />
+            </div>
           </div>
         </div>
-        <div class="side-panel">
-          <div class="side-card">
-            <div class="side-title">发布检查</div>
-            <div v-if="publishCheck" class="check-box">
-              <div :class="['status-chip', publishCheck.publishable ? 'published' : 'rejected']">{{ publishCheck.publishable ? '可发布' : '不可发布' }}</div>
-              <div class="sub-text">模板：{{ publishCheck.templateName || '未解析' }}</div>
-              <ul>
+
+        <div class="admin-card modal-section">
+          <div class="admin-card-header"><h3 class="admin-card-title">正文编辑</h3></div>
+          <div class="admin-form-row admin-form-row--single">
+            <div class="admin-form-group">
+              <label class="admin-form-label">正文</label>
+              <textarea v-model="form.content" class="admin-form-textarea" rows="12" placeholder="请输入正文"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="admin-detail-grid">
+          <div class="admin-detail-card">
+            <div class="admin-card-header"><h3 class="admin-card-title">发布检查</h3></div>
+            <div v-if="publishCheck" class="publish-check-box">
+              <div class="admin-sub-text">模板：{{ publishCheck.templateName || '-' }}</div>
+              <ul class="detail-list">
                 <li v-for="item in publishCheck.reasons" :key="`reason-${item}`">{{ item }}</li>
                 <li v-for="item in publishCheck.warnings" :key="`warn-${item}`">{{ item }}</li>
+                <li v-if="!publishCheck.reasons.length && !publishCheck.warnings.length">当前无额外提示</li>
               </ul>
             </div>
-            <div v-else class="empty-side">点击“发布检查”查看当前内容是否满足正式发布条件。</div>
+            <div v-else class="admin-empty-state">点击“发布检查”后查看结果。</div>
           </div>
-          <div class="side-card">
-            <div class="side-title">流转历史</div>
-            <div v-if="historyItems.length" class="history-list">
-              <div v-for="item in historyItems.slice(0, 6)" :key="item.id" class="history-item">
+
+          <div class="admin-detail-card">
+            <div class="admin-card-header"><h3 class="admin-card-title">生命周期历史</h3></div>
+            <div v-if="historyItems.length" class="admin-history-list">
+              <div v-for="item in historyItems" :key="item.id" class="admin-history-item">
                 <div>{{ item.action }} · {{ item.operatorName }}</div>
-                <div class="sub-text">{{ item.fromStatus || '-' }} → {{ item.toStatus || '-' }}</div>
-                <div class="sub-text">{{ item.createdAt?.replace('T', ' ').slice(0, 16) }}</div>
-                <div v-if="item.reason" class="sub-text">{{ item.reason }}</div>
+                <div class="admin-sub-text">{{ item.fromStatus || '-' }} → {{ item.toStatus || '-' }}</div>
+                <div class="admin-sub-text">{{ item.createdAt?.replace('T', ' ').slice(0, 16) }}</div>
+                <div v-if="item.reason" class="admin-sub-text">{{ item.reason }}</div>
               </div>
             </div>
-            <div v-else class="empty-side">暂无流转记录</div>
+            <div v-else class="admin-empty-state">暂无历史记录</div>
           </div>
+        </div>
+
+        <div class="admin-toolbar-row content-footer-actions">
+          <button class="admin-secondary-btn" @click="modalOpen = false">关闭</button>
+          <button v-if="isEdit && form.id" class="admin-secondary-btn" @click="viewPublishCheck({ id: form.id, siteId: form.siteId, title: form.title, status: 'draft' } as ArticleItem)">发布检查</button>
+          <button v-if="!isEdit || canUpdate" class="admin-primary-btn" :disabled="saving" @click="save">{{ saving ? '保存中...' : '保存内容' }}</button>
         </div>
       </div>
     </a-modal>
@@ -432,40 +444,38 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.page-shell { display: flex; flex-direction: column; gap: 16px; }
-.page-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
-.page-header h2 { margin: 0; }
-.page-header p { margin: 6px 0 0; color: #64748b; }
-.toolbar, .actions, .pagination-row, .footer-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-.table-card, .side-card, .form-panel { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px; }
-.data-table { width: 100%; border-collapse: collapse; }
-.data-table th, .data-table td { padding: 12px; border-bottom: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
-.empty-row { text-align: center; color: #94a3b8; padding: 40px 0; }
-.title-cell { font-weight: 600; }
-.sub-text { color: #64748b; font-size: 12px; }
-.input, .textarea { width: 100%; border: 1px solid #cbd5e1; border-radius: 10px; padding: 10px 12px; box-sizing: border-box; }
-.small-select { min-width: 160px; }
-.primary-btn, .secondary-btn, .link-btn { border: none; border-radius: 10px; padding: 10px 14px; cursor: pointer; }
-.primary-btn { background: #2563eb; color: #fff; }
-.secondary-btn { background: #e2e8f0; color: #0f172a; }
-.link-btn { background: transparent; color: #2563eb; padding: 0; }
-.link-btn.danger { color: #dc2626; }
-.link-btn.warning { color: #b45309; }
-.status-chip { display: inline-flex; padding: 4px 10px; border-radius: 999px; font-size: 12px; }
-.status-chip.draft { background: #e2e8f0; color: #334155; }
-.status-chip.pending_review { background: #fef3c7; color: #92400e; }
-.status-chip.rejected { background: #fee2e2; color: #991b1b; }
-.status-chip.approved { background: #dbeafe; color: #1d4ed8; }
-.status-chip.published { background: #dcfce7; color: #166534; }
-.status-chip.offline { background: #f3e8ff; color: #6b21a8; }
-.modal-grid { display: grid; grid-template-columns: 1.3fr 0.9fr; gap: 16px; }
-.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.form-grid label { display: flex; flex-direction: column; gap: 8px; }
-.full-row { grid-column: 1 / -1; }
-.side-panel { display: flex; flex-direction: column; gap: 16px; }
-.side-title { font-weight: 600; margin-bottom: 10px; }
-.history-list { display: flex; flex-direction: column; gap: 10px; }
-.history-item, .check-box, .empty-side { background: #f8fafc; border-radius: 12px; padding: 12px; }
-.pagination-row { justify-content: space-between; }
-@media (max-width: 1100px) { .modal-grid { grid-template-columns: 1fr; } .form-grid { grid-template-columns: 1fr; } }
+.content-page .article-title-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.content-page .article-actions,
+.content-page .content-footer-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.content-page .content-detail-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.content-page .modal-section {
+  padding: 16px;
+}
+
+.content-page .publish-check-box {
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.content-page .detail-list {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  color: #334155;
+}
 </style>

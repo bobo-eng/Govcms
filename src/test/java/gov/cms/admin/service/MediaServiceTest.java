@@ -1,5 +1,6 @@
 package gov.cms.admin.service;
 
+import gov.cms.admin.dto.MediaReferenceSummary;
 import gov.cms.admin.entity.MediaFile;
 import gov.cms.admin.repository.MediaFileRepository;
 import org.junit.jupiter.api.Test;
@@ -32,7 +33,9 @@ class MediaServiceTest {
         MediaFileRepository mediaFileRepository = mock(MediaFileRepository.class);
         LocalMediaStorageService storageService = new LocalMediaStorageService(tempDir.toString());
         storageService.initializeStorageDirectory();
-        MediaService mediaService = new MediaService(mediaFileRepository, storageService);
+        MediaReferenceService mediaReferenceService = mock(MediaReferenceService.class);
+        AuditLogService auditLogService = mock(AuditLogService.class);
+        MediaService mediaService = new MediaService(mediaFileRepository, storageService, mediaReferenceService, auditLogService);
 
         doAnswer(invocation -> {
             MediaFile mediaFile = invocation.getArgument(0);
@@ -40,12 +43,7 @@ class MediaServiceTest {
             return mediaFile;
         }).when(mediaFileRepository).save(any(MediaFile.class));
 
-        MockMultipartFile file = new MockMultipartFile(
-                "file",
-                "cover.png",
-                "image/png",
-                "png-data".getBytes()
-        );
+        MockMultipartFile file = new MockMultipartFile("file", "cover.png", "image/png", "png-data".getBytes());
 
         MediaFile saved = mediaService.upload(file, "admin");
 
@@ -61,14 +59,11 @@ class MediaServiceTest {
         MediaFileRepository mediaFileRepository = mock(MediaFileRepository.class);
         LocalMediaStorageService storageService = new LocalMediaStorageService(tempDir.toString());
         storageService.initializeStorageDirectory();
-        MediaService mediaService = new MediaService(mediaFileRepository, storageService);
+        MediaReferenceService mediaReferenceService = mock(MediaReferenceService.class);
+        AuditLogService auditLogService = mock(AuditLogService.class);
+        MediaService mediaService = new MediaService(mediaFileRepository, storageService, mediaReferenceService, auditLogService);
 
-        MockMultipartFile file = new MockMultipartFile(
-                "file",
-                "script.exe",
-                "application/octet-stream",
-                "bad".getBytes()
-        );
+        MockMultipartFile file = new MockMultipartFile("file", "script.exe", "application/octet-stream", "bad".getBytes());
 
         ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> mediaService.upload(file, "admin"));
 
@@ -80,7 +75,9 @@ class MediaServiceTest {
         MediaFileRepository mediaFileRepository = mock(MediaFileRepository.class);
         LocalMediaStorageService storageService = new LocalMediaStorageService(tempDir.toString());
         storageService.initializeStorageDirectory();
-        MediaService mediaService = new MediaService(mediaFileRepository, storageService);
+        MediaReferenceService mediaReferenceService = mock(MediaReferenceService.class);
+        AuditLogService auditLogService = mock(AuditLogService.class);
+        MediaService mediaService = new MediaService(mediaFileRepository, storageService, mediaReferenceService, auditLogService);
 
         Path storedFile = tempDir.resolve("stored-file.pdf");
         Files.writeString(storedFile, "pdf-data");
@@ -96,7 +93,13 @@ class MediaServiceTest {
         mediaFile.setMediaType("document");
         mediaFile.setUploadedBy("admin");
 
+        MediaReferenceSummary summary = new MediaReferenceSummary();
+        summary.setMediaId(3L);
+        summary.setContentReferenceCount(0);
+        summary.setTopicReferenceCount(0);
+
         when(mediaFileRepository.findById(3L)).thenReturn(Optional.of(mediaFile));
+        when(mediaReferenceService.summarize(3L)).thenReturn(summary);
 
         mediaService.deleteMediaFile(3L);
 
@@ -109,12 +112,40 @@ class MediaServiceTest {
         MediaFileRepository mediaFileRepository = mock(MediaFileRepository.class);
         LocalMediaStorageService storageService = new LocalMediaStorageService(tempDir.toString());
         storageService.initializeStorageDirectory();
-        MediaService mediaService = new MediaService(mediaFileRepository, storageService);
+        MediaReferenceService mediaReferenceService = mock(MediaReferenceService.class);
+        AuditLogService auditLogService = mock(AuditLogService.class);
+        MediaService mediaService = new MediaService(mediaFileRepository, storageService, mediaReferenceService, auditLogService);
 
         when(mediaFileRepository.findById(99L)).thenReturn(Optional.empty());
 
         ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> mediaService.deleteMediaFile(99L));
 
         assertEquals(HttpStatus.NOT_FOUND, exception.getStatusCode());
+    }
+
+    @Test
+    void deleteMediaRejectsReferencedRecord() {
+        MediaFileRepository mediaFileRepository = mock(MediaFileRepository.class);
+        LocalMediaStorageService storageService = new LocalMediaStorageService(tempDir.toString());
+        storageService.initializeStorageDirectory();
+        MediaReferenceService mediaReferenceService = mock(MediaReferenceService.class);
+        AuditLogService auditLogService = mock(AuditLogService.class);
+        MediaService mediaService = new MediaService(mediaFileRepository, storageService, mediaReferenceService, auditLogService);
+
+        MediaFile mediaFile = new MediaFile();
+        mediaFile.setId(3L);
+        mediaFile.setOriginalName("manual.pdf");
+        mediaFile.setStoredName("stored-file.pdf");
+        mediaFile.setStoragePath("stored-file.pdf");
+        when(mediaFileRepository.findById(3L)).thenReturn(Optional.of(mediaFile));
+
+        MediaReferenceSummary summary = new MediaReferenceSummary();
+        summary.setMediaId(3L);
+        summary.setContentReferenceCount(1);
+        when(mediaReferenceService.summarize(3L)).thenReturn(summary);
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> mediaService.deleteMediaFile(3L));
+
+        assertEquals(HttpStatus.CONFLICT, exception.getStatusCode());
     }
 }

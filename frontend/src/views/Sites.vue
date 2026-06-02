@@ -1,8 +1,11 @@
-﻿<script setup lang="ts">
-import { onMounted, ref } from 'vue'
+<script setup lang="ts">
+import '../styles/admin-refresh.css'
+
+import { computed, onMounted, ref } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import { DeleteOutlined, EditOutlined, PlusOutlined, PoweroffOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import { usePermission } from '../composables/usePermission'
+import { getRoles } from '../utils/session'
 import api from '../utils/api'
 
 interface Site {
@@ -14,7 +17,7 @@ interface Site {
   description?: string | null
   status: string
   createdAt: string
-  updatedAt?: string
+  updatedAt?: string | null
 }
 
 interface SiteForm {
@@ -31,6 +34,7 @@ const { hasPermission } = usePermission()
 const canCreateSite = hasPermission('site:manage:create')
 const canUpdateSite = hasPermission('site:manage:update')
 const canDeleteSite = hasPermission('site:manage:delete')
+const isSiteAdmin = computed(() => getRoles().includes('site_admin'))
 
 const loading = ref(false)
 const sites = ref<Site[]>([])
@@ -50,6 +54,8 @@ const statusOptions = [
   { value: 'enabled', label: '启用' },
   { value: 'disabled', label: '禁用' }
 ]
+
+const currentSite = computed(() => sites.value[0] || null)
 
 const ensurePermission = (permissionCode: string, actionName: string) => {
   if (hasPermission(permissionCode)) {
@@ -92,6 +98,13 @@ const buildSitePayload = () => {
 const fetchSites = async () => {
   loading.value = true
   try {
+    if (isSiteAdmin.value && !hasPermission('site:manage:view')) {
+      const res = await api.get('/sites/current')
+      sites.value = [res.data]
+      pagination.value.total = 1
+      return
+    }
+
     const params: Record<string, any> = {
       page: pagination.value.current - 1,
       size: pagination.value.pageSize
@@ -222,6 +235,7 @@ const handleDelete = (record: Site) => {
     content: `确认删除站点“${record.name}”吗？此操作不可恢复。`,
     okText: '确认删除',
     okType: 'danger',
+    cancelText: '取消',
     onOk: async () => {
       try {
         await api.delete(`/sites/${record.id}`)
@@ -237,13 +251,8 @@ const handleDelete = (record: Site) => {
   })
 }
 
-const getStatusClass = (status: string) => {
-  return status === 'enabled' ? 'success' : 'default'
-}
-
-const getStatusText = (status: string) => {
-  return status === 'enabled' ? '启用' : '禁用'
-}
+const getStatusText = (status: string) => status === 'enabled' ? '启用' : '禁用'
+const formatDate = (value?: string | null) => value ? value.replace('T', ' ').slice(0, 16) : '-'
 
 onMounted(() => {
   fetchSites()
@@ -251,153 +260,183 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="sites-page">
-    <div class="page-header">
-      <div class="header-left">
-        <h1>站点管理</h1>
-        <p>管理站点基础信息、所属组织和启停状态</p>
+  <div class="admin-page sites-page">
+    <div class="admin-page-header">
+      <div>
+        <h1 class="admin-page-title">站点管理</h1>
+        <p class="admin-page-desc">平台管理员管理站点列表，站点管理员在同页查看并维护本站点配置。</p>
       </div>
-      <button v-if="canCreateSite" class="primary-btn" @click="handleAdd">
+      <button v-if="canCreateSite && !isSiteAdmin" class="admin-primary-btn" @click="handleAdd">
         <PlusOutlined />
         <span>新增站点</span>
       </button>
     </div>
 
-    <div class="toolbar">
-      <div class="search-box">
-        <SearchOutlined class="search-icon" />
-        <input
-          v-model="searchKeyword"
-          type="text"
-          placeholder="搜索名称、编码或域名"
-          class="search-input"
-          @keyup.enter="handleSearch"
-        />
-      </div>
-      <select v-model="filterStatus" class="filter-select" @change="handleSearch">
-        <option value="">全部状态</option>
-        <option v-for="item in statusOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
-      </select>
-      <input
-        v-model="filterOrganizationId"
-        type="number"
-        min="1"
-        placeholder="组织 ID"
-        class="filter-input"
-        @keyup.enter="handleSearch"
-      />
-      <button class="secondary-btn" @click="handleSearch">搜索</button>
-    </div>
+    <div v-if="isSiteAdmin && currentSite">
+      <div class="sites-admin-grid">
+        <div class="admin-card">
+          <div class="admin-card-header">
+            <h3 class="admin-card-title">站点摘要</h3>
+          </div>
+          <div class="site-summary-grid">
+            <div class="site-summary-item"><label>站点名称</label><strong>{{ currentSite.name }}</strong></div>
+            <div class="site-summary-item"><label>站点编码</label><strong>{{ currentSite.code }}</strong></div>
+            <div class="site-summary-item"><label>域名</label><span>{{ currentSite.domain || '—' }}</span></div>
+            <div class="site-summary-item"><label>组织 ID</label><span>{{ currentSite.organizationId ?? '—' }}</span></div>
+            <div class="site-summary-item"><label>状态</label><span :class="['admin-status-badge', currentSite.status === 'enabled' ? 'admin-status-badge--success' : 'admin-status-badge--default']">{{ getStatusText(currentSite.status) }}</span></div>
+            <div class="site-summary-item"><label>最近更新</label><span>{{ formatDate(currentSite.updatedAt || currentSite.createdAt) }}</span></div>
+          </div>
+        </div>
 
-    <div class="table-card">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>站点名称</th>
-            <th>站点编码</th>
-            <th>域名</th>
-            <th>组织 ID</th>
-            <th>状态</th>
-            <th>创建时间</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="!loading && !sites.length">
-            <td colspan="7" class="empty-state">暂无站点数据</td>
-          </tr>
-          <tr v-for="site in sites" :key="site.id">
-            <td>
-              <div class="site-name-cell">
-                <strong>{{ site.name }}</strong>
-                <span class="site-desc">{{ site.description || '—' }}</span>
-              </div>
-            </td>
-            <td class="code-cell">{{ site.code }}</td>
-            <td>{{ site.domain || '—' }}</td>
-            <td>{{ site.organizationId ?? '—' }}</td>
-            <td>
-              <span class="status-badge" :class="getStatusClass(site.status)">
-                {{ getStatusText(site.status) }}
-              </span>
-            </td>
-            <td class="date-cell">{{ site.createdAt?.split('T')[0] || '—' }}</td>
-            <td>
-              <div class="action-btns">
-                <button v-if="canUpdateSite" class="action-btn" @click="handleEdit(site)" title="编辑站点">
-                  <EditOutlined />
-                </button>
-                <button v-if="canUpdateSite" class="action-btn" @click="handleToggleStatus(site)" :title="site.status === 'enabled' ? '禁用站点' : '启用站点'">
-                  <PoweroffOutlined />
-                </button>
-                <button v-if="canDeleteSite" class="action-btn danger" @click="handleDelete(site)" title="删除站点">
-                  <DeleteOutlined />
-                </button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-
-      <div class="pagination">
-        <span class="pagination-total">共 {{ pagination.total }} 条</span>
-        <div class="pagination-controls">
-          <button
-            class="page-btn"
-            :disabled="pagination.current === 1"
-            @click="handlePageChange(pagination.current - 1, pagination.pageSize)"
-          >上一页</button>
-          <span class="page-info">{{ pagination.current }} / {{ Math.ceil(pagination.total / pagination.pageSize) || 1 }}</span>
-          <button
-            class="page-btn"
-            :disabled="pagination.current >= Math.ceil(pagination.total / pagination.pageSize)"
-            @click="handlePageChange(pagination.current + 1, pagination.pageSize)"
-          >下一页</button>
+        <div class="admin-card">
+          <div class="admin-card-header">
+            <h3 class="admin-card-title">站点配置</h3>
+            <button v-if="canUpdateSite" class="admin-secondary-btn" @click="handleEdit(currentSite)">
+              <EditOutlined />
+              <span>编辑配置</span>
+            </button>
+          </div>
+          <div class="site-config-body">
+            <div class="site-config-item">
+              <label>站点描述</label>
+              <p>{{ currentSite.description || '暂无站点描述' }}</p>
+            </div>
+            <div class="site-config-actions">
+              <button v-if="canUpdateSite" class="admin-secondary-btn" @click="handleToggleStatus(currentSite)">
+                <PoweroffOutlined />
+                <span>{{ currentSite.status === 'enabled' ? '禁用站点' : '启用站点' }}</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
-    <div v-if="modalVisible" class="modal-overlay" @click.self="modalVisible = false">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h3>{{ isEdit ? '编辑站点' : '新增站点' }}</h3>
-          <button class="close-btn" @click="modalVisible = false">×</button>
+    <div v-else>
+      <div class="admin-toolbar-card">
+        <div class="admin-toolbar-row">
+          <div class="admin-search-box">
+            <SearchOutlined class="admin-search-icon" />
+            <input v-model="searchKeyword" type="text" placeholder="搜索名称、编码或域名" class="admin-search-input" @keyup.enter="handleSearch" />
+          </div>
+          <select v-model="filterStatus" class="admin-filter-select" @change="handleSearch">
+            <option value="">全部状态</option>
+            <option v-for="item in statusOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
+          </select>
+          <input v-model="filterOrganizationId" type="number" min="1" placeholder="组织 ID" class="admin-form-input org-filter-input" @keyup.enter="handleSearch" />
+          <button class="admin-secondary-btn" @click="handleSearch">查询</button>
         </div>
-        <div class="modal-body">
-          <div class="form-row two-columns">
-            <div class="form-group">
-              <label>站点名称</label>
-              <input v-model="editingSite.name" type="text" placeholder="请输入站点名称" class="form-input" />
-            </div>
-            <div class="form-group">
-              <label>站点编码</label>
-              <input v-model="editingSite.code" type="text" placeholder="例如 gov-main" class="form-input" />
-            </div>
-          </div>
-          <div class="form-row two-columns">
-            <div class="form-group">
-              <label>域名</label>
-              <input v-model="editingSite.domain" type="text" placeholder="例如 www.example.gov.cn" class="form-input" />
-            </div>
-            <div class="form-group">
-              <label>组织 ID</label>
-              <input v-model="editingSite.organizationId" type="number" min="1" placeholder="可选" class="form-input" />
-            </div>
-          </div>
-          <div class="form-group">
-            <label>状态</label>
-            <select v-model="editingSite.status" class="form-select">
-              <option v-for="item in statusOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>描述</label>
-            <textarea v-model="editingSite.description" rows="4" placeholder="请输入站点说明" class="form-textarea"></textarea>
+      </div>
+
+      <div class="admin-table-card">
+        <table class="admin-data-table">
+          <thead>
+            <tr>
+              <th>站点名称</th>
+              <th>站点编码</th>
+              <th>域名</th>
+              <th>组织 ID</th>
+              <th>状态</th>
+              <th>创建时间</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="loading">
+              <td colspan="7" class="admin-empty-cell">加载中...</td>
+            </tr>
+            <tr v-else-if="!sites.length">
+              <td colspan="7" class="admin-empty-cell">暂无站点数据</td>
+            </tr>
+            <tr v-for="site in sites" :key="site.id">
+              <td>
+                <div class="site-name-cell">
+                  <strong>{{ site.name }}</strong>
+                  <span class="admin-sub-text">{{ site.description || '暂无描述' }}</span>
+                </div>
+              </td>
+              <td class="code-cell">{{ site.code }}</td>
+              <td>{{ site.domain || '—' }}</td>
+              <td>{{ site.organizationId ?? '—' }}</td>
+              <td>
+                <span :class="['admin-status-badge', site.status === 'enabled' ? 'admin-status-badge--success' : 'admin-status-badge--default']">
+                  {{ getStatusText(site.status) }}
+                </span>
+              </td>
+              <td class="admin-muted-cell">{{ formatDate(site.createdAt) }}</td>
+              <td>
+                <div class="table-action-btns">
+                  <button v-if="canUpdateSite" class="admin-icon-btn" @click="handleEdit(site)" title="编辑站点">
+                    <EditOutlined />
+                  </button>
+                  <button v-if="canUpdateSite" class="admin-icon-btn" @click="handleToggleStatus(site)" :title="site.status === 'enabled' ? '禁用站点' : '启用站点'">
+                    <PoweroffOutlined />
+                  </button>
+                  <button v-if="canDeleteSite" class="admin-icon-btn admin-icon-btn--danger" @click="handleDelete(site)" title="删除站点">
+                    <DeleteOutlined />
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="admin-pagination">
+          <span class="admin-pagination-total">共 {{ pagination.total }} 条</span>
+          <div class="admin-pagination-controls">
+            <button class="admin-page-btn" :disabled="pagination.current === 1" @click="handlePageChange(pagination.current - 1, pagination.pageSize)">上一页</button>
+            <span class="admin-page-info">{{ pagination.current }} / {{ Math.ceil(pagination.total / pagination.pageSize) || 1 }}</span>
+            <button class="admin-page-btn" :disabled="pagination.current >= Math.ceil(pagination.total / pagination.pageSize)" @click="handlePageChange(pagination.current + 1, pagination.pageSize)">下一页</button>
           </div>
         </div>
-        <div class="modal-footer">
-          <button class="secondary-btn" @click="modalVisible = false">取消</button>
-          <button v-if="isEdit ? canUpdateSite : canCreateSite" class="primary-btn" @click="handleSave">保存</button>
+      </div>
+    </div>
+
+    <div v-if="modalVisible" class="admin-modal-overlay" @click.self="modalVisible = false">
+      <div class="admin-modal-content">
+        <div class="admin-modal-header">
+          <h3 class="admin-modal-title">{{ isEdit ? '编辑站点' : '新增站点' }}</h3>
+          <button class="admin-close-btn" @click="modalVisible = false">×</button>
+        </div>
+        <div class="admin-modal-body">
+          <div class="admin-form-row">
+            <div class="admin-form-group">
+              <label class="admin-form-label">站点名称</label>
+              <input v-model="editingSite.name" type="text" class="admin-form-input" />
+            </div>
+            <div class="admin-form-group">
+              <label class="admin-form-label">站点编码</label>
+              <input v-model="editingSite.code" type="text" class="admin-form-input" />
+            </div>
+          </div>
+          <div class="admin-form-row">
+            <div class="admin-form-group">
+              <label class="admin-form-label">域名</label>
+              <input v-model="editingSite.domain" type="text" class="admin-form-input" />
+            </div>
+            <div class="admin-form-group">
+              <label class="admin-form-label">组织 ID</label>
+              <input v-model="editingSite.organizationId" type="number" class="admin-form-input" />
+            </div>
+          </div>
+          <div class="admin-form-row admin-form-row--single">
+            <div class="admin-form-group">
+              <label class="admin-form-label">站点描述</label>
+              <textarea v-model="editingSite.description" rows="4" class="admin-form-textarea"></textarea>
+            </div>
+          </div>
+          <div class="admin-form-row admin-form-row--single">
+            <div class="admin-form-group">
+              <label class="admin-form-label">状态</label>
+              <select v-model="editingSite.status" class="admin-form-select">
+                <option v-for="item in statusOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="admin-modal-footer">
+          <button class="admin-secondary-btn" @click="modalVisible = false">取消</button>
+          <button class="admin-primary-btn" @click="handleSave">{{ isEdit ? '保存更新' : '创建站点' }}</button>
         </div>
       </div>
     </div>
@@ -405,170 +444,49 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.sites-page {
-  max-width: 1400px;
+.sites-admin-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
 }
 
-.page-header {
+.site-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.site-summary-item,
+.site-config-item {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.header-left h1 {
-  font-size: 24px;
-  font-weight: 600;
-  color: #1e293b;
-  margin: 0 0 4px;
-}
-
-.header-left p {
-  font-size: 14px;
-  color: #64748b;
-  margin: 0;
-}
-
-.primary-btn,
-.secondary-btn,
-.page-btn,
-.action-btn,
-.close-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border-radius: 8px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.primary-btn {
-  padding: 10px 18px;
-  background: #2563eb;
-  border: none;
-  color: #fff;
-  font-weight: 500;
-}
-
-.primary-btn:hover {
-  background: #1d4ed8;
-}
-
-.secondary-btn,
-.page-btn {
-  padding: 10px 16px;
-  background: #fff;
-  border: 1px solid #cbd5e1;
-  color: #334155;
-}
-
-.secondary-btn:hover,
-.page-btn:hover,
-.action-btn:hover {
-  border-color: #2563eb;
-  color: #2563eb;
-}
-
-.secondary-btn:disabled,
-.page-btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.toolbar {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  flex-wrap: wrap;
-  margin-bottom: 20px;
-}
-
-.search-box {
-  position: relative;
-  min-width: 320px;
-  flex: 1;
-}
-
-.search-icon {
-  position: absolute;
-  left: 14px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: #94a3b8;
-}
-
-.search-input,
-.filter-input,
-.filter-select,
-.form-input,
-.form-select,
-.form-textarea {
-  width: 100%;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  font-size: 14px;
-  color: #1e293b;
-  background: #fff;
-}
-
-.search-input {
-  padding: 10px 14px 10px 40px;
-}
-
-.filter-input,
-.filter-select,
-.form-input,
-.form-select {
-  padding: 10px 14px;
-}
-
-.filter-input {
-  width: 160px;
-}
-
-.filter-select {
-  width: 140px;
-}
-
-.form-textarea {
-  padding: 12px 14px;
-  resize: vertical;
-}
-
-.table-card {
-  background: #fff;
-  border-radius: 16px;
-  border: 1px solid #e2e8f0;
-  overflow: hidden;
-}
-
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.data-table th,
-.data-table td {
-  padding: 16px;
-  border-bottom: 1px solid #f1f5f9;
-  text-align: left;
-  font-size: 14px;
-  color: #334155;
-  vertical-align: top;
-}
-
-.data-table th {
-  background: #f8fafc;
-  font-weight: 600;
+.site-summary-item label,
+.site-config-item label {
+  font-size: 13px;
+  line-height: 20px;
   color: #475569;
 }
 
-.empty-state {
-  text-align: center !important;
-  color: #94a3b8 !important;
-  padding: 48px 16px !important;
+.site-config-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.site-config-item p {
+  margin: 0;
+  color: #0f172a;
+  line-height: 22px;
+}
+
+.site-config-actions,
+.table-action-btns {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .site-name-cell {
@@ -577,171 +495,23 @@ onMounted(() => {
   gap: 6px;
 }
 
-.site-name-cell strong {
-  color: #0f172a;
-}
-
-.site-desc {
-  color: #64748b;
-  font-size: 12px;
-  line-height: 1.4;
-}
-
+.site-name-cell strong,
 .code-cell {
-  font-family: Consolas, Monaco, monospace;
-}
-
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.status-badge.success {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.status-badge.default {
-  background: #e2e8f0;
-  color: #475569;
-}
-
-.date-cell {
-  white-space: nowrap;
-}
-
-.action-btns {
-  display: flex;
-  gap: 8px;
-}
-
-.action-btn {
-  width: 32px;
-  height: 32px;
-  background: #fff;
-  border: 1px solid #cbd5e1;
-  color: #475569;
-}
-
-.action-btn.danger:hover {
-  border-color: #dc2626;
-  color: #dc2626;
-}
-
-.pagination {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px;
-}
-
-.pagination-total,
-.page-info {
-  color: #64748b;
-  font-size: 14px;
-}
-
-.pagination-controls {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal-content {
-  width: min(760px, calc(100vw - 32px));
-  background: #fff;
-  border-radius: 16px;
-  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.18);
-  overflow: hidden;
-}
-
-.modal-header,
-.modal-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 20px 24px;
-  border-bottom: 1px solid #f1f5f9;
-}
-
-.modal-footer {
-  border-bottom: none;
-  border-top: 1px solid #f1f5f9;
-  justify-content: flex-end;
-  gap: 12px;
-}
-
-.modal-header h3 {
-  margin: 0;
   color: #0f172a;
 }
 
-.close-btn {
-  width: 32px;
-  height: 32px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  color: #475569;
+.org-filter-input {
+  width: 160px;
 }
 
-.modal-body {
-  padding: 24px;
-}
-
-.form-row {
-  display: grid;
-  gap: 16px;
-}
-
-.form-row.two-columns {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-
-.form-group label {
-  font-size: 14px;
-  font-weight: 500;
-  color: #334155;
-}
-
-@media (max-width: 960px) {
-  .page-header,
-  .pagination {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
-  }
-
-  .search-box {
-    min-width: 100%;
-  }
-
-  .form-row.two-columns {
+@media (max-width: 1080px) {
+  .sites-admin-grid,
+  .site-summary-grid {
     grid-template-columns: 1fr;
   }
 
-  .table-card {
-    overflow-x: auto;
+  .org-filter-input {
+    width: 100%;
   }
 }
 </style>

@@ -41,6 +41,29 @@ export interface PublishArtifactItem {
   createdAt?: string | null
 }
 
+export interface AuditLogItem {
+  id: number
+  actionType: string
+  objectType: string
+  objectId?: number | null
+  siteId?: number | null
+  operatorName: string
+  result: string
+  summary?: string | null
+  failureReason?: string | null
+  relatedJobId?: number | null
+  createdAt?: string | null
+}
+
+export interface PublishRollbackRecordItem {
+  id: number
+  rollbackJobId: number
+  targetJobId: number
+  reason?: string | null
+  operatorName: string
+  createdAt?: string | null
+}
+
 export interface PublishCheckResponseData {
   siteId: number
   unitType: string
@@ -82,5 +105,7 @@ export const fetchPublishJobDetail = (id: number) => api.get<PublishJobItem>(`/p
 export const fetchPublishImpacts = (id: number) => api.get<PublishImpactItemData[]>(`/publish/jobs/${id}/impacts`)
 export const fetchPublishArtifacts = (id: number) => api.get<PublishArtifactItem[]>(`/publish/jobs/${id}/artifacts`)
 export const fetchPublishLogs = (id: number) => api.get<string[]>(`/publish/jobs/${id}/logs`)
+export const fetchPublishAudits = (id: number) => api.get<AuditLogItem[]>(`/publish/jobs/${id}/audits`)
+export const fetchPublishRollbackRecords = (id: number) => api.get<PublishRollbackRecordItem[]>(`/publish/jobs/${id}/rollback-records`)
 export const retryPublishJob = (id: number) => api.post<PublishJobItem>(`/publish/jobs/${id}/retry`)
 export const rollbackPublishJob = (id: number, payload: PublishRollbackPayload) => api.post<PublishJobItem>(`/publish/jobs/${id}/rollback`, payload)

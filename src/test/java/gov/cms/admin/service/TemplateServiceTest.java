@@ -55,6 +55,7 @@ class TemplateServiceTest {
     @Mock private ArticleRepository articleRepository;
     @Mock private RenderContextAssembler renderContextAssembler;
     @Mock private PortalRenderService portalRenderService;
+    @Mock private SiteAccessService siteAccessService;
     @Spy private ObjectMapper objectMapper = new ObjectMapper();
     @InjectMocks private TemplateService templateService;
 

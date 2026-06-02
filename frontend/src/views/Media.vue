@@ -1,611 +1,257 @@
 <script setup lang="ts">
+import '../styles/admin-refresh.css'
+
 import { onMounted, ref } from 'vue'
-import { message, Modal } from 'ant-design-vue'
-import { DeleteOutlined, EyeOutlined, SearchOutlined, UploadOutlined } from '@ant-design/icons-vue'
+import { message } from 'ant-design-vue'
+import { DeleteOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import { usePermission } from '../composables/usePermission'
 import api from '../utils/api'
 
-interface MediaFile {
-  id: number
-  originalName: string
-  mimeType: string
-  extension: string
-  fileSize: number
-  mediaType: 'image' | 'document'
-  uploadedBy: string
-  createdAt: string
-  updatedAt: string
+interface MediaReferenceItem {
+  objectType: string
+  objectId: number
+  title: string
+  path?: string | null
 }
 
-interface ErrorResponse {
-  response?: {
-    data?: {
-      message?: string
-    }
-  }
+interface MediaItem {
+  id: number
+  filename: string
+  originalFilename?: string | null
+  contentType?: string | null
+  fileSize?: number | null
+  storagePath?: string | null
+  previewUrl?: string | null
+  status?: string | null
+  createdAt?: string | null
+  updatedAt?: string | null
+  references?: MediaReferenceItem[]
+  referenceCount?: number
+  fileMissing?: boolean
 }
 
 const { hasPermission } = usePermission()
-const canUploadMedia = hasPermission('media:manage:upload')
-const canDeleteMedia = hasPermission('media:manage:delete')
+const canUpload = hasPermission('media:manage:upload')
+const canDelete = hasPermission('media:manage:delete')
 
 const loading = ref(false)
 const uploading = ref(false)
-const mediaFiles = ref<MediaFile[]>([])
-const searchKeyword = ref('')
-const filterType = ref('')
+const rows = ref<MediaItem[]>([])
+const pagination = ref({ current: 1, pageSize: 12, total: 0 })
+const filters = ref({ keyword: '', type: '', fileState: '', referenced: '' })
 const fileInput = ref<HTMLInputElement | null>(null)
-const pagination = ref({
-  current: 1,
-  pageSize: 10,
-  total: 0
-})
 
-const acceptedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt']
-const acceptedFileTypes = '.jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt'
-const typeOptions = [
-  { value: '', label: '全部类型' },
-  { value: 'image', label: '图片' },
-  { value: 'document', label: '文档' }
-]
-
-const getErrorMessage = (error: unknown, fallback: string) => {
-  const errorWithResponse = error as ErrorResponse
-  return errorWithResponse.response?.data?.message || fallback
-}
-
-const ensurePermission = (permissionCode: string, actionName: string) => {
-  if (hasPermission(permissionCode)) {
-    return true
-  }
-  message.warning(`暂无${actionName}权限`)
-  return false
-}
-
-const fetchMediaFiles = async () => {
+const loadMedia = async () => {
   loading.value = true
   try {
-    const params: Record<string, string | number> = {
-      page: pagination.value.current - 1,
-      size: pagination.value.pageSize
-    }
-
-    if (searchKeyword.value.trim()) {
-      params.keyword = searchKeyword.value.trim()
-    }
-    if (filterType.value) {
-      params.type = filterType.value
-    }
-
-    const response = await api.get('/media', { params })
-    mediaFiles.value = response.data.content || []
+    const response = await api.get('/media', {
+      params: {
+        page: pagination.value.current - 1,
+        size: pagination.value.pageSize,
+        keyword: filters.value.keyword || undefined,
+        contentType: filters.value.type || undefined
+      }
+    })
+    rows.value = (response.data.content || []).filter((item: MediaItem) => {
+      if (filters.value.fileState === 'missing' && !item.fileMissing) return false
+      if (filters.value.fileState === 'ok' && item.fileMissing) return false
+      if (filters.value.referenced === 'yes' && !(item.referenceCount && item.referenceCount > 0)) return false
+      if (filters.value.referenced === 'no' && item.referenceCount && item.referenceCount > 0) return false
+      return true
+    })
     pagination.value.total = response.data.totalElements || 0
-  } catch (error: unknown) {
-    console.error('Failed to fetch media files:', error)
-    message.error(getErrorMessage(error, '获取媒体列表失败'))
+  } catch (error: any) {
+    message.error(error.response?.data?.message || '加载媒体列表失败')
   } finally {
     loading.value = false
   }
 }
 
-const handleSearch = () => {
-  pagination.value.current = 1
-  fetchMediaFiles()
-}
-
-const handlePageChange = (page: number, pageSize: number) => {
-  pagination.value.current = page
-  pagination.value.pageSize = pageSize
-  fetchMediaFiles()
-}
-
 const triggerUpload = () => {
-  if (!ensurePermission('media:manage:upload', '上传媒体')) {
-    return
-  }
   fileInput.value?.click()
 }
 
-const validateFile = (file: File) => {
-  if (file.size > 20 * 1024 * 1024) {
-    message.error('上传文件不能超过 20MB')
-    return false
-  }
-
-  const extension = file.name.includes('.') ? file.name.split('.').pop()?.toLowerCase() || '' : ''
-  if (!acceptedExtensions.includes(extension)) {
-    message.error('仅支持上传图片或文档文件')
-    return false
-  }
-
-  return true
-}
-
-const handleFileChange = async (event: Event) => {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file) {
+const handleUpload = async (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const files = target.files
+  if (!files?.length) {
     return
   }
-
-  if (!ensurePermission('media:manage:upload', '上传媒体')) {
-    input.value = ''
-    return
-  }
-
-  if (!validateFile(file)) {
-    input.value = ''
-    return
-  }
-
   const formData = new FormData()
-  formData.append('file', file)
-
+  Array.from(files).forEach(file => formData.append('files', file))
   uploading.value = true
   try {
-    await api.post('/media/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    })
+    await api.post('/media/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
     message.success('媒体上传成功')
-    pagination.value.current = 1
-    fetchMediaFiles()
-  } catch (error: unknown) {
-    message.error(getErrorMessage(error, '上传媒体失败'))
+    await loadMedia()
+  } catch (error: any) {
+    message.error(error.response?.data?.message || '媒体上传失败')
   } finally {
     uploading.value = false
-    input.value = ''
+    target.value = ''
   }
 }
 
-const handleOpen = async (record: MediaFile) => {
-  if (!ensurePermission('media:manage:view', '查看媒体')) {
+const handleDelete = async (record: MediaItem) => {
+  if (!canDelete) {
+    message.warning('暂无删除媒体权限')
     return
   }
-
+  if (!window.confirm(`确认删除媒体“${record.originalFilename || record.filename}”吗？`)) {
+    return
+  }
   try {
-    const response = await api.get(`/media/${record.id}/preview`, {
-      responseType: 'blob'
-    })
-    const mimeType = (response.data as Blob).type || record.mimeType || 'application/octet-stream'
-    const blob = new Blob([response.data], { type: mimeType })
-    const objectUrl = URL.createObjectURL(blob)
-
-    if (record.mediaType === 'image' || record.extension === 'pdf') {
-      window.open(objectUrl, '_blank', 'noopener,noreferrer')
-    } else {
-      const link = document.createElement('a')
-      link.href = objectUrl
-      link.download = record.originalName
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-    }
-
-    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000)
-  } catch (error: unknown) {
-    message.error(getErrorMessage(error, '打开媒体文件失败'))
+    await api.delete(`/media/${record.id}`)
+    message.success('媒体删除成功')
+    await loadMedia()
+  } catch (error: any) {
+    message.error(error.response?.data?.message || '删除媒体失败')
   }
 }
 
-const handleDelete = (record: MediaFile) => {
-  if (!ensurePermission('media:manage:delete', '删除媒体')) {
-    return
-  }
-
-  Modal.confirm({
-    title: '删除媒体文件',
-    content: `确认删除文件“${record.originalName}”吗？此操作不可恢复。`,
-    okText: '确认删除',
-    okType: 'danger',
-    cancelText: '取消',
-    onOk: async () => {
-      try {
-        await api.delete(`/media/${record.id}`)
-        message.success('媒体文件删除成功')
-        if (mediaFiles.value.length === 1 && pagination.value.current > 1) {
-          pagination.value.current -= 1
-        }
-        fetchMediaFiles()
-      } catch (error: unknown) {
-        message.error(getErrorMessage(error, '删除媒体文件失败'))
-      }
-    }
-  })
+const formatFileSize = (size?: number | null) => {
+  if (!size) return '-'
+  if (size < 1024) return `${size} B`
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`
 }
 
-const formatFileSize = (fileSize: number) => {
-  if (fileSize < 1024) {
-    return `${fileSize} B`
-  }
-  if (fileSize < 1024 * 1024) {
-    return `${(fileSize / 1024).toFixed(1)} KB`
-  }
-  return `${(fileSize / (1024 * 1024)).toFixed(2)} MB`
-}
+const formatDate = (value?: string | null) => value ? value.replace('T', ' ').slice(0, 16) : '-'
+const fileStateLabel = (item: MediaItem) => item.fileMissing ? '文件缺失' : '文件正常'
+const fileStateClass = (item: MediaItem) => item.fileMissing ? 'admin-status-badge--default' : 'admin-status-badge--success'
 
-const getMediaTypeText = (mediaType: string) => {
-  return mediaType === 'image' ? '图片' : '文档'
-}
-
-const getMediaTypeClass = (mediaType: string) => {
-  return mediaType === 'image' ? 'image' : 'document'
-}
-
-const formatDateTime = (value: string) => {
-  if (!value) {
-    return '-'
-  }
-  return new Date(value).toLocaleString('zh-CN')
+const handlePageChange = (page: number) => {
+  pagination.value.current = page
+  loadMedia()
 }
 
 onMounted(() => {
-  fetchMediaFiles()
+  loadMedia()
 })
 </script>
 
 <template>
-  <div class="media-page">
-    <div class="page-header">
-      <div class="header-left">
-        <h1>媒体管理</h1>
-        <p>管理图片和文档文件，支持上传、筛选、打开与删除</p>
+  <div class="admin-page media-page">
+    <div class="admin-page-header">
+      <div>
+        <h1 class="admin-page-title">媒体管理</h1>
+        <p class="admin-page-desc">管理上传文件、引用状态、文件有效性与删除保护。</p>
       </div>
-      <button v-if="canUploadMedia" class="primary-btn" :disabled="uploading" @click="triggerUpload">
-        <UploadOutlined />
-        <span>{{ uploading ? '上传中...' : '上传文件' }}</span>
+      <button v-if="canUpload" class="admin-primary-btn" :disabled="uploading" @click="triggerUpload">
+        <PlusOutlined />
+        <span>{{ uploading ? '上传中...' : '上传媒体' }}</span>
       </button>
-      <input
-        ref="fileInput"
-        type="file"
-        class="hidden-input"
-        :accept="acceptedFileTypes"
-        @change="handleFileChange"
-      />
+      <input ref="fileInput" type="file" multiple class="hidden-input" @change="handleUpload" />
     </div>
 
-    <div class="filter-card">
-      <div class="filter-grid">
-        <div class="filter-item keyword-item">
-          <label>关键字</label>
-          <input v-model="searchKeyword" type="text" placeholder="请输入文件名关键字" @keyup.enter="handleSearch" />
+    <div class="admin-toolbar-card">
+      <div class="admin-toolbar-row">
+        <div class="admin-search-box">
+          <SearchOutlined class="admin-search-icon" />
+          <input v-model="filters.keyword" class="admin-search-input" placeholder="搜索文件名或原始文件名" @keyup.enter="loadMedia" />
         </div>
-        <div class="filter-item">
-          <label>类型</label>
-          <select v-model="filterType">
-            <option v-for="item in typeOptions" :key="item.value || 'all'" :value="item.value">{{ item.label }}</option>
-          </select>
-        </div>
-        <div class="filter-actions">
-          <button class="secondary-btn" @click="handleSearch">
-            <SearchOutlined />
-            <span>查询</span>
-          </button>
-        </div>
+        <input v-model="filters.type" class="admin-form-input media-type-filter" placeholder="内容类型，例如 image/png" @keyup.enter="loadMedia" />
+        <select v-model="filters.fileState" class="admin-filter-select" @change="loadMedia">
+          <option value="">全部文件状态</option>
+          <option value="ok">文件正常</option>
+          <option value="missing">文件缺失</option>
+        </select>
+        <select v-model="filters.referenced" class="admin-filter-select" @change="loadMedia">
+          <option value="">全部引用状态</option>
+          <option value="yes">已被引用</option>
+          <option value="no">未被引用</option>
+        </select>
+        <button class="admin-secondary-btn" @click="loadMedia">查询</button>
       </div>
     </div>
 
-    <div class="table-card">
-      <div class="table-toolbar">
-        <span>共 {{ pagination.total }} 个媒体文件</span>
-      </div>
-
-      <div class="table-wrapper">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>文件名</th>
-              <th>类型</th>
-              <th>MIME</th>
-              <th>大小</th>
-              <th>上传人</th>
-              <th>上传时间</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody v-if="!loading && mediaFiles.length">
-            <tr v-for="record in mediaFiles" :key="record.id">
-              <td>
-                <div class="file-name">
-                  <span class="file-title">{{ record.originalName }}</span>
-                  <span class="file-extension">.{{ record.extension }}</span>
-                </div>
-              </td>
-              <td>
-                <span class="tag" :class="getMediaTypeClass(record.mediaType)">{{ getMediaTypeText(record.mediaType) }}</span>
-              </td>
-              <td>{{ record.mimeType }}</td>
-              <td>{{ formatFileSize(record.fileSize) }}</td>
-              <td>{{ record.uploadedBy }}</td>
-              <td>{{ formatDateTime(record.createdAt) }}</td>
-              <td>
-                <div class="action-group">
-                  <button class="link-btn" @click="handleOpen(record)">
-                    <EyeOutlined />
-                    <span>{{ record.mediaType === 'image' || record.extension === 'pdf' ? '预览' : '打开' }}</span>
-                  </button>
-                  <button v-if="canDeleteMedia" class="link-btn danger" @click="handleDelete(record)">
-                    <DeleteOutlined />
-                    <span>删除</span>
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-          <tbody v-else-if="!loading">
-            <tr>
-              <td colspan="7" class="empty-cell">暂无媒体文件</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div v-if="loading" class="table-loading">正在加载媒体列表...</div>
-
-      <div class="pagination-wrapper">
-        <a-pagination
-          :current="pagination.current"
-          :page-size="pagination.pageSize"
-          :total="pagination.total"
-          show-size-changer
-          :page-size-options="['10', '20', '50']"
-          @change="handlePageChange"
-          @showSizeChange="handlePageChange"
-        />
+    <div class="admin-table-card">
+      <div class="media-toolbar">共 {{ pagination.total }} 个媒体文件</div>
+      <table class="admin-data-table">
+        <thead>
+          <tr>
+            <th>文件</th>
+            <th>大小</th>
+            <th>内容类型</th>
+            <th>文件状态</th>
+            <th>引用情况</th>
+            <th>更新时间</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-if="loading"><td colspan="7" class="admin-empty-cell">加载中...</td></tr>
+          <tr v-else-if="!rows.length"><td colspan="7" class="admin-empty-cell">暂无媒体数据</td></tr>
+          <tr v-for="item in rows" :key="item.id">
+            <td>
+              <div class="media-name-cell">
+                <strong>{{ item.originalFilename || item.filename }}</strong>
+                <span class="admin-sub-text">{{ item.filename }}</span>
+              </div>
+            </td>
+            <td>{{ formatFileSize(item.fileSize) }}</td>
+            <td>{{ item.contentType || '-' }}</td>
+            <td><span :class="['admin-status-badge', fileStateClass(item)]">{{ fileStateLabel(item) }}</span></td>
+            <td>
+              <div class="media-reference-cell">
+                <span>{{ item.referenceCount || 0 }} 个引用</span>
+                <span class="admin-sub-text">{{ item.references?.[0]?.title || '暂无引用摘要' }}</span>
+              </div>
+            </td>
+            <td class="admin-muted-cell">{{ formatDate(item.updatedAt || item.createdAt) }}</td>
+            <td>
+              <div class="media-actions">
+                <a v-if="item.previewUrl" class="admin-link-action" :href="item.previewUrl" target="_blank" rel="noopener">预览</a>
+                <button v-if="canDelete" class="admin-icon-btn admin-icon-btn--danger" @click="handleDelete(item)"><DeleteOutlined /></button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="admin-pagination">
+        <span class="admin-pagination-total">共 {{ pagination.total }} 条</span>
+        <div class="admin-pagination-controls">
+          <button class="admin-page-btn" :disabled="pagination.current === 1" @click="handlePageChange(pagination.current - 1)">上一页</button>
+          <span class="admin-page-info">{{ pagination.current }} / {{ Math.ceil(pagination.total / pagination.pageSize) || 1 }}</span>
+          <button class="admin-page-btn" :disabled="pagination.current >= Math.ceil(pagination.total / pagination.pageSize)" @click="handlePageChange(pagination.current + 1)">下一页</button>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.media-page {
-  max-width: 1400px;
-}
-
-.page-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 24px;
-}
-
-.header-left h1 {
-  margin: 0 0 8px;
-  font-size: 28px;
-  font-weight: 600;
-  color: #0f172a;
-}
-
-.header-left p {
-  margin: 0;
-  color: #64748b;
-  font-size: 14px;
-}
-
-.primary-btn,
-.secondary-btn,
-.link-btn {
-  border: none;
-  border-radius: 10px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.primary-btn {
-  padding: 0 18px;
-  height: 40px;
-  background: #2563eb;
-  color: #fff;
-  font-weight: 500;
-  box-shadow: 0 6px 14px -8px rgba(37, 99, 235, 0.7);
-}
-
-.primary-btn:hover:not(:disabled) {
-  background: #1d4ed8;
-}
-
-.primary-btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.7;
-}
-
-.secondary-btn {
-  height: 40px;
-  padding: 0 16px;
-  background: #e2e8f0;
-  color: #1e293b;
-}
-
-.secondary-btn:hover {
-  background: #cbd5e1;
-}
-
-.hidden-input {
+.media-page .hidden-input {
   display: none;
 }
 
-.filter-card,
-.table-card {
-  background: #fff;
-  border-radius: 16px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 8px 32px -24px rgba(15, 23, 42, 0.2);
+.media-page .media-toolbar {
+  padding: 16px 16px 0;
+  color: #475569;
+  font-size: 14px;
+  line-height: 22px;
 }
 
-.filter-card {
-  padding: 20px;
-  margin-bottom: 20px;
+.media-page .media-type-filter {
+  width: 220px;
 }
 
-.filter-grid {
-  display: grid;
-  grid-template-columns: minmax(280px, 1.8fr) minmax(180px, 1fr) auto;
-  gap: 16px;
-  align-items: end;
-}
-
-.filter-item {
+.media-page .media-name-cell,
+.media-page .media-reference-cell {
   display: flex;
   flex-direction: column;
+  gap: 6px;
+}
+
+.media-page .media-actions {
+  display: flex;
   gap: 8px;
-}
-
-.filter-item label {
-  font-size: 13px;
-  color: #475569;
-  font-weight: 500;
-}
-
-.filter-item input,
-.filter-item select {
-  height: 40px;
-  border-radius: 10px;
-  border: 1px solid #cbd5e1;
-  padding: 0 14px;
-  font-size: 14px;
-  color: #0f172a;
-  outline: none;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.filter-item input:focus,
-.filter-item select:focus {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
-}
-
-.table-card {
-  padding: 20px;
-}
-
-.table-toolbar {
-  margin-bottom: 16px;
-  color: #475569;
-  font-size: 14px;
-}
-
-.table-wrapper {
-  overflow-x: auto;
-}
-
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 980px;
-}
-
-.data-table th,
-.data-table td {
-  padding: 14px 12px;
-  border-bottom: 1px solid #f1f5f9;
-  text-align: left;
-  vertical-align: middle;
-}
-
-.data-table th {
-  color: #64748b;
-  font-size: 13px;
-  font-weight: 600;
-  background: #f8fafc;
-}
-
-.data-table td {
-  color: #0f172a;
-  font-size: 14px;
-}
-
-.file-name {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.file-title {
-  font-weight: 500;
-}
-
-.file-extension {
-  color: #64748b;
-  font-size: 12px;
-}
-
-.tag {
-  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  min-width: 56px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 500;
 }
 
-.tag.image {
-  background: #dbeafe;
-  color: #1d4ed8;
-}
-
-.tag.document {
-  background: #dcfce7;
-  color: #15803d;
-}
-
-.action-group {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.link-btn {
-  background: transparent;
-  padding: 0;
-  color: #2563eb;
-  font-size: 14px;
-}
-
-.link-btn:hover {
-  color: #1d4ed8;
-}
-
-.link-btn.danger {
-  color: #dc2626;
-}
-
-.link-btn.danger:hover {
-  color: #b91c1c;
-}
-
-.empty-cell,
-.table-loading {
-  text-align: center;
-  color: #94a3b8;
-  padding: 48px 0;
-}
-
-.pagination-wrapper {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 20px;
-}
-
-@media (max-width: 960px) {
-  .page-header {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .filter-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .pagination-wrapper {
-    justify-content: center;
+@media (max-width: 1080px) {
+  .media-page .media-type-filter {
+    width: 100%;
   }
 }
 </style>

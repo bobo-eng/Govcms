@@ -86,6 +86,7 @@ public class PortalRenderService {
         context.setVariable("navigationContext", valueFromContext(snapshot, "navigationContext"));
         context.setVariable("columnContext", valueFromContext(snapshot, "columnContext"));
         context.setVariable("contentContext", valueFromContext(snapshot, "contentContext"));
+        context.setVariable("topicContext", valueFromContext(snapshot, "topicContext"));
         return templateEngine.process("portal/block", context);
     }
 
@@ -99,7 +100,7 @@ public class PortalRenderService {
             case "column-list" -> "portal/page/column-list";
             case "content-detail" -> "portal/page/content-detail";
             case "error-404" -> "portal/page/error-404";
-            case "topic-page" -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Topic page rendering is not supported yet.");
+            case "topic-page" -> "portal/page/topic-page";
             default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported pageType for rendering.");
         };
     }
@@ -108,11 +109,15 @@ public class PortalRenderService {
         Map<String, Object> siteContext = castMap(valueFromContext(snapshot, "siteContext"));
         Map<String, Object> columnContext = castMap(valueFromContext(snapshot, "columnContext"));
         Map<String, Object> contentContext = castMap(valueFromContext(snapshot, "contentContext"));
+        Map<String, Object> topicContext = castMap(valueFromContext(snapshot, "topicContext"));
         if ("content-detail".equals(snapshot.getPageType()) && contentContext != null && contentContext.get("title") != null) {
             return String.valueOf(contentContext.get("title"));
         }
         if ("column-list".equals(snapshot.getPageType()) && columnContext != null && columnContext.get("name") != null) {
             return String.valueOf(columnContext.get("name"));
+        }
+        if ("topic-page".equals(snapshot.getPageType()) && topicContext != null && topicContext.get("name") != null) {
+            return String.valueOf(topicContext.get("name"));
         }
         if ("error-404".equals(snapshot.getPageType())) {
             return "404 - 页面不存在";

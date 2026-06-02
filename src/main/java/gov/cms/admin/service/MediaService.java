@@ -1,5 +1,6 @@
 package gov.cms.admin.service;
 
+import gov.cms.admin.dto.MediaReferenceSummary;
 import gov.cms.admin.entity.MediaFile;
 import gov.cms.admin.repository.MediaFileRepository;
 import org.springframework.data.domain.Page;
@@ -42,10 +43,17 @@ public class MediaService {
 
     private final MediaFileRepository mediaFileRepository;
     private final MediaStorageService mediaStorageService;
+    private final MediaReferenceService mediaReferenceService;
+    private final AuditLogService auditLogService;
 
-    public MediaService(MediaFileRepository mediaFileRepository, MediaStorageService mediaStorageService) {
+    public MediaService(MediaFileRepository mediaFileRepository,
+                        MediaStorageService mediaStorageService,
+                        MediaReferenceService mediaReferenceService,
+                        AuditLogService auditLogService) {
         this.mediaFileRepository = mediaFileRepository;
         this.mediaStorageService = mediaStorageService;
+        this.mediaReferenceService = mediaReferenceService;
+        this.auditLogService = auditLogService;
     }
 
     public Page<MediaFile> getMediaFiles(String keyword, String type, Pageable pageable) {
@@ -55,6 +63,10 @@ public class MediaService {
     public MediaFile getMediaFileById(Long id) {
         return mediaFileRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "媒体文件不存在"));
+    }
+
+    public MediaReferenceSummary getReferenceSummary(Long id) {
+        return mediaReferenceService.summarize(id);
     }
 
     @Transactional
@@ -88,8 +100,14 @@ public class MediaService {
     @Transactional
     public void deleteMediaFile(Long id) {
         MediaFile mediaFile = getMediaFileById(id);
+        MediaReferenceSummary summary = mediaReferenceService.summarize(id);
+        if (summary != null && (summary.getContentReferenceCount() > 0 || summary.getTopicReferenceCount() > 0)) {
+            auditLogService.record("media_delete", "media", id, null, "blocked", "Media delete blocked", "当前媒体仍被内容或专题引用，无法删除", null);
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "当前媒体仍被内容或专题引用，无法删除");
+        }
         mediaFileRepository.delete(mediaFile);
         mediaStorageService.delete(mediaFile.getStoragePath());
+        auditLogService.record("media_delete", "media", id, null, "success", "Media deleted", null, null);
     }
 
     public MediaPreviewResource loadPreviewResource(Long id) {

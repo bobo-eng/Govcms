@@ -25,7 +25,7 @@ public class DataInitializer {
     private static final String DEFAULT_ADMIN_USERNAME = "admin";
     private static final String DEFAULT_ADMIN_PASSWORD = "admin123";
     private static final String DEFAULT_ADMIN_EMAIL = "admin@govcms.local";
-    private static final String DEFAULT_ADMIN_NAME = "?????";
+    private static final String DEFAULT_ADMIN_NAME = "超级管理员";
 
     @Bean
     public CommandLineRunner initData(
@@ -60,77 +60,93 @@ public class DataInitializer {
 
     private List<Permission> buildPermissions() {
         return Arrays.asList(
-                createPermission("sys", "\u7cfb\u7edf\u7ba1\u7406", "sys", "menu", null, "/system", "SettingOutlined", 1),
-                createPermission("sys:user", "\u7528\u6237\u7ba1\u7406", "sys:user", "menu", "sys", "/users", "UserOutlined", 1),
-                createPermission("sys:user:view", "????", "sys:user:view", "button", "sys:user", null, null, 1),
-                createPermission("sys:user:create", "????", "sys:user:create", "button", "sys:user", null, null, 2),
-                createPermission("sys:user:update", "????", "sys:user:update", "button", "sys:user", null, null, 3),
-                createPermission("sys:user:delete", "????", "sys:user:delete", "button", "sys:user", null, null, 4),
-                createPermission("sys:user:reset-password", "????", "sys:user:reset-password", "button", "sys:user", null, null, 5),
+                createPermission("sys", "系统管理", "sys", "menu", null, "/system", "SettingOutlined", 1),
+                createPermission("sys:user", "用户管理", "sys:user", "menu", "sys", "/users", "UserOutlined", 1),
+                createPermission("sys:user:view", "查看用户", "sys:user:view", "button", "sys:user", null, null, 1),
+                createPermission("sys:user:create", "创建用户", "sys:user:create", "button", "sys:user", null, null, 2),
+                createPermission("sys:user:update", "更新用户", "sys:user:update", "button", "sys:user", null, null, 3),
+                createPermission("sys:user:delete", "删除用户", "sys:user:delete", "button", "sys:user", null, null, 4),
+                createPermission("sys:user:reset-password", "重置密码", "sys:user:reset-password", "button", "sys:user", null, null, 5),
 
-                createPermission("sys:role", "\u89d2\u8272\u7ba1\u7406", "sys:role", "menu", "sys", "/roles", "TeamOutlined", 2),
-                createPermission("sys:role:view", "????", "sys:role:view", "button", "sys:role", null, null, 1),
-                createPermission("sys:role:create", "????", "sys:role:create", "button", "sys:role", null, null, 2),
-                createPermission("sys:role:update", "????", "sys:role:update", "button", "sys:role", null, null, 3),
-                createPermission("sys:role:delete", "????", "sys:role:delete", "button", "sys:role", null, null, 4),
+                createPermission("sys:role", "角色管理", "sys:role", "menu", "sys", "/roles", "TeamOutlined", 2),
+                createPermission("sys:role:view", "查看角色", "sys:role:view", "button", "sys:role", null, null, 1),
+                createPermission("sys:role:create", "创建角色", "sys:role:create", "button", "sys:role", null, null, 2),
+                createPermission("sys:role:update", "更新角色", "sys:role:update", "button", "sys:role", null, null, 3),
+                createPermission("sys:role:delete", "删除角色", "sys:role:delete", "button", "sys:role", null, null, 4),
 
-                createPermission("sys:permission", "\u6743\u9650\u7ba1\u7406", "sys:permission", "menu", "sys", "/permissions", "LockOutlined", 3),
-                createPermission("sys:permission:view", "????", "sys:permission:view", "button", "sys:permission", null, null, 1),
-                createPermission("sys:permission:create", "????", "sys:permission:create", "button", "sys:permission", null, null, 2),
-                createPermission("sys:permission:update", "????", "sys:permission:update", "button", "sys:permission", null, null, 3),
-                createPermission("sys:permission:delete", "????", "sys:permission:delete", "button", "sys:permission", null, null, 4),
+                createPermission("sys:permission", "权限管理", "sys:permission", "menu", "sys", "/permissions", "LockOutlined", 3),
+                createPermission("sys:permission:view", "查看权限", "sys:permission:view", "button", "sys:permission", null, null, 1),
+                createPermission("sys:permission:create", "创建权限", "sys:permission:create", "button", "sys:permission", null, null, 2),
+                createPermission("sys:permission:update", "更新权限", "sys:permission:update", "button", "sys:permission", null, null, 3),
+                createPermission("sys:permission:delete", "删除权限", "sys:permission:delete", "button", "sys:permission", null, null, 4),
 
-                createPermission("sys:menu", "\u83dc\u5355\u7ba1\u7406", "sys:menu", "menu", "sys", "/menus", "MenuOutlined", 4),
-                createPermission("sys:menu:view", "????", "sys:menu:view", "button", "sys:menu", null, null, 1),
-                createPermission("sys:menu:create", "????", "sys:menu:create", "button", "sys:menu", null, null, 2),
-                createPermission("sys:menu:update", "????", "sys:menu:update", "button", "sys:menu", null, null, 3),
-                createPermission("sys:menu:delete", "????", "sys:menu:delete", "button", "sys:menu", null, null, 4),
+                createPermission("sys:menu", "菜单管理", "sys:menu", "menu", "sys", "/menus", "MenuOutlined", 4),
+                createPermission("sys:menu:view", "查看菜单", "sys:menu:view", "button", "sys:menu", null, null, 1),
+                createPermission("sys:menu:create", "创建菜单", "sys:menu:create", "button", "sys:menu", null, null, 2),
+                createPermission("sys:menu:update", "更新菜单", "sys:menu:update", "button", "sys:menu", null, null, 3),
+                createPermission("sys:menu:delete", "删除菜单", "sys:menu:delete", "button", "sys:menu", null, null, 4),
 
-                createPermission("content", "\u5185\u5bb9\u7ba1\u7406", "content", "menu", null, "/content", "FileTextOutlined", 2),
-                createPermission("content:article", "\u5185\u5bb9\u7ba1\u7406", "content:article", "menu", "content", "/content", "FileTextOutlined", 1),
-                createPermission("content:article:view", "????", "content:article:view", "button", "content:article", null, null, 1),
-                createPermission("content:article:create", "????", "content:article:create", "button", "content:article", null, null, 2),
-                createPermission("content:article:update", "????", "content:article:update", "button", "content:article", null, null, 3),
-                createPermission("content:article:delete", "????", "content:article:delete", "button", "content:article", null, null, 4),
-                createPermission("content:article:submit-review", "????", "content:article:submit-review", "button", "content:article", null, null, 5),
-                createPermission("content:article:review", "????", "content:article:review", "button", "content:article", null, null, 6),
-                createPermission("content:article:reject", "????", "content:article:reject", "button", "content:article", null, null, 7),
-                createPermission("content:article:offline", "????", "content:article:offline", "button", "content:article", null, null, 8),
-                createPermission("content:article:history:view", "??????", "content:article:history:view", "button", "content:article", null, null, 9),
+                createPermission("content", "内容管理", "content", "menu", null, "/content", "FileTextOutlined", 2),
+                createPermission("content:article", "内容管理", "content:article", "menu", "content", "/content", "FileTextOutlined", 1),
+                createPermission("content:article:view", "查看内容", "content:article:view", "button", "content:article", null, null, 1),
+                createPermission("content:article:create", "创建内容", "content:article:create", "button", "content:article", null, null, 2),
+                createPermission("content:article:update", "更新内容", "content:article:update", "button", "content:article", null, null, 3),
+                createPermission("content:article:delete", "删除内容", "content:article:delete", "button", "content:article", null, null, 4),
+                createPermission("content:article:submit-review", "提交审核", "content:article:submit-review", "button", "content:article", null, null, 5),
+                createPermission("content:article:review", "审核通过", "content:article:review", "button", "content:article", null, null, 6),
+                createPermission("content:article:reject", "审核驳回", "content:article:reject", "button", "content:article", null, null, 7),
+                createPermission("content:article:offline", "内容下线", "content:article:offline", "button", "content:article", null, null, 8),
+                createPermission("content:article:history:view", "查看历史", "content:article:history:view", "button", "content:article", null, null, 9),
 
-                createPermission("content:category", "\u680f\u76ee\u7ba1\u7406", "content:category", "menu", "content", "/content/categories", "FolderOutlined", 2),
-                createPermission("content:category:view", "????", "content:category:view", "button", "content:category", null, null, 1),
-                createPermission("content:category:create", "????", "content:category:create", "button", "content:category", null, null, 2),
-                createPermission("content:category:update", "????", "content:category:update", "button", "content:category", null, null, 3),
-                createPermission("content:category:delete", "????", "content:category:delete", "button", "content:category", null, null, 4),
+                createPermission("content:category", "栏目管理", "content:category", "menu", "content", "/content/categories", "FolderOutlined", 2),
+                createPermission("content:category:view", "查看栏目", "content:category:view", "button", "content:category", null, null, 1),
+                createPermission("content:category:create", "创建栏目", "content:category:create", "button", "content:category", null, null, 2),
+                createPermission("content:category:update", "更新栏目", "content:category:update", "button", "content:category", null, null, 3),
+                createPermission("content:category:delete", "删除栏目", "content:category:delete", "button", "content:category", null, null, 4),
 
-                createPermission("template:manage", "\u6a21\u677f\u7ba1\u7406", "template:manage", "menu", "content", "/content/templates", "LayoutOutlined", 3),
-                createPermission("template:manage:view", "????", "template:manage:view", "button", "template:manage", null, null, 1),
-                createPermission("template:manage:create", "????", "template:manage:create", "button", "template:manage", null, null, 2),
-                createPermission("template:manage:update", "????", "template:manage:update", "button", "template:manage", null, null, 3),
-                createPermission("template:manage:bind", "????", "template:manage:bind", "button", "template:manage", null, null, 4),
-                createPermission("template:manage:preview", "????", "template:manage:preview", "button", "template:manage", null, null, 5),
-                createPermission("template:manage:delete", "????", "template:manage:delete", "button", "template:manage", null, null, 6),
+                createPermission("template:manage", "模板管理", "template:manage", "menu", "content", "/content/templates", "LayoutOutlined", 3),
+                createPermission("template:manage:view", "查看模板", "template:manage:view", "button", "template:manage", null, null, 1),
+                createPermission("template:manage:create", "创建模板", "template:manage:create", "button", "template:manage", null, null, 2),
+                createPermission("template:manage:update", "更新模板", "template:manage:update", "button", "template:manage", null, null, 3),
+                createPermission("template:manage:bind", "绑定模板", "template:manage:bind", "button", "template:manage", null, null, 4),
+                createPermission("template:manage:preview", "预览模板", "template:manage:preview", "button", "template:manage", null, null, 5),
+                createPermission("template:manage:delete", "删除模板", "template:manage:delete", "button", "template:manage", null, null, 6),
 
-                createPermission("publish:center", "\u53d1\u5e03\u4e2d\u5fc3", "publish:center", "menu", "content", "/content/publish", "SendOutlined", 4),
-                createPermission("publish:center:view", "??????", "publish:center:view", "button", "publish:center", null, null, 1),
-                createPermission("publish:center:execute", "????", "publish:center:execute", "button", "publish:center", null, null, 2),
-                createPermission("publish:center:rollback", "????", "publish:center:rollback", "button", "publish:center", null, null, 3),
-                createPermission("publish:center:artifact:view", "??????", "publish:center:artifact:view", "button", "publish:center", null, null, 4),
-                createPermission("publish:center:log:view", "??????", "publish:center:log:view", "button", "publish:center", null, null, 5),
+                createPermission("navigation:manage", "导航管理", "navigation:manage", "menu", "content", "/navigation", "MenuOutlined", 4),
+                createPermission("navigation:manage:view", "查看导航", "navigation:manage:view", "button", "navigation:manage", null, null, 1),
+                createPermission("navigation:manage:create", "创建导航", "navigation:manage:create", "button", "navigation:manage", null, null, 2),
+                createPermission("navigation:manage:update", "更新导航", "navigation:manage:update", "button", "navigation:manage", null, null, 3),
+                createPermission("navigation:manage:delete", "删除导航", "navigation:manage:delete", "button", "navigation:manage", null, null, 4),
 
-                createPermission("site", "\u7ad9\u70b9", "site", "menu", null, "/sites", "GlobalOutlined", 3),
-                createPermission("site:manage", "\u7ad9\u70b9\u7ba1\u7406", "site:manage", "menu", "site", "/sites", "GlobalOutlined", 1),
-                createPermission("site:manage:view", "????", "site:manage:view", "button", "site:manage", null, null, 1),
-                createPermission("site:manage:create", "????", "site:manage:create", "button", "site:manage", null, null, 2),
-                createPermission("site:manage:update", "????", "site:manage:update", "button", "site:manage", null, null, 3),
-                createPermission("site:manage:delete", "????", "site:manage:delete", "button", "site:manage", null, null, 4),
+                createPermission("topic:manage", "专题管理", "topic:manage", "menu", "content", "/topics", "FileTextOutlined", 5),
+                createPermission("topic:manage:view", "查看专题", "topic:manage:view", "button", "topic:manage", null, null, 1),
+                createPermission("topic:manage:create", "创建专题", "topic:manage:create", "button", "topic:manage", null, null, 2),
+                createPermission("topic:manage:update", "更新专题", "topic:manage:update", "button", "topic:manage", null, null, 3),
+                createPermission("topic:manage:delete", "删除专题", "topic:manage:delete", "button", "topic:manage", null, null, 4),
 
-                createPermission("media", "\u5a92\u4f53", "media", "menu", null, "/media", "CloudOutlined", 4),
-                createPermission("media:manage", "\u5a92\u4f53\u7ba1\u7406", "media:manage", "menu", "media", "/media", "CloudOutlined", 1),
-                createPermission("media:manage:view", "????", "media:manage:view", "button", "media:manage", null, null, 1),
-                createPermission("media:manage:upload", "????", "media:manage:upload", "button", "media:manage", null, null, 2),
-                createPermission("media:manage:delete", "????", "media:manage:delete", "button", "media:manage", null, null, 3)
+                createPermission("publish:center", "发布中心", "publish:center", "menu", "content", "/content/publish", "SendOutlined", 6),
+                createPermission("publish:center:view", "查看发布中心", "publish:center:view", "button", "publish:center", null, null, 1),
+                createPermission("publish:center:execute", "执行发布", "publish:center:execute", "button", "publish:center", null, null, 2),
+                createPermission("publish:center:rollback", "执行回滚", "publish:center:rollback", "button", "publish:center", null, null, 3),
+                createPermission("publish:center:artifact:view", "查看产物", "publish:center:artifact:view", "button", "publish:center", null, null, 4),
+                createPermission("publish:center:log:view", "查看日志", "publish:center:log:view", "button", "publish:center", null, null, 5),
+
+                createPermission("site", "站点", "site", "menu", null, "/sites", "GlobalOutlined", 3),
+                createPermission("site:manage", "站点管理", "site:manage", "menu", "site", "/sites", "GlobalOutlined", 1),
+                createPermission("site:manage:view", "查看站点", "site:manage:view", "button", "site:manage", null, null, 1),
+                createPermission("site:manage:self", "管理本站点", "site:manage:self", "button", "site:manage", null, null, 2),
+                createPermission("site:manage:create", "创建站点", "site:manage:create", "button", "site:manage", null, null, 3),
+                createPermission("site:manage:update", "更新站点", "site:manage:update", "button", "site:manage", null, null, 4),
+                createPermission("site:manage:delete", "删除站点", "site:manage:delete", "button", "site:manage", null, null, 5),
+
+                createPermission("media", "媒体", "media", "menu", null, "/media", "CloudOutlined", 4),
+                createPermission("media:manage", "媒体管理", "media:manage", "menu", "media", "/media", "CloudOutlined", 1),
+                createPermission("media:manage:view", "查看媒体", "media:manage:view", "button", "media:manage", null, null, 1),
+                createPermission("media:manage:upload", "上传媒体", "media:manage:upload", "button", "media:manage", null, null, 2),
+                createPermission("media:manage:delete", "删除媒体", "media:manage:delete", "button", "media:manage", null, null, 3),
+                createPermission("search:ops", "搜索运营", "search:ops", "menu", null, "/search-ops", "SearchOutlined", 9),
+                createPermission("search:ops:view", "查看搜索运营", "search:ops:view", "button", "search:ops", null, null, 1),
+                createPermission("search:ops:rebuild", "重建搜索索引", "search:ops:rebuild", "button", "search:ops", null, null, 2)
         );
     }
 
@@ -141,7 +157,23 @@ public class DataInitializer {
         }
 
         upsertRole(roleRepository.findByCode("admin").orElseGet(Role::new), roleRepository,
-                "?????", "admin", "????????", 1, new LinkedHashSet<>(permissions));
+                "超级管理员", "admin", "平台全局治理角色", 1, new LinkedHashSet<>(permissions));
+
+        Set<Permission> siteAdminPermissions = permissions.stream()
+                .filter(permission -> Set.of(
+                        "content", "content:article:view",
+                        "content:category", "content:category:view", "content:category:create", "content:category:update", "content:category:delete",
+                        "template:manage", "template:manage:view", "template:manage:create", "template:manage:update", "template:manage:bind", "template:manage:preview", "template:manage:delete",
+                        "navigation:manage", "navigation:manage:view", "navigation:manage:create", "navigation:manage:update", "navigation:manage:delete",
+                        "topic:manage", "topic:manage:view", "topic:manage:create", "topic:manage:update", "topic:manage:delete",
+                        "publish:center", "publish:center:view", "publish:center:execute", "publish:center:rollback", "publish:center:artifact:view", "publish:center:log:view",
+                        "site", "site:manage", "site:manage:self", "site:manage:update",
+                        "media", "media:manage", "media:manage:view", "media:manage:upload", "media:manage:delete",
+                        "search:ops", "search:ops:view", "search:ops:rebuild"
+                ).contains(permission.getCode()))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        upsertRole(roleRepository.findByCode("site_admin").orElseGet(Role::new), roleRepository,
+                "站点管理员", "site_admin", "本站点治理角色", 2, siteAdminPermissions);
 
         Set<Permission> editorPermissions = permissions.stream()
                 .filter(permission -> Set.of(
@@ -151,7 +183,7 @@ public class DataInitializer {
                 ).contains(permission.getCode()))
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         upsertRole(roleRepository.findByCode("editor").orElseGet(Role::new), roleRepository,
-                "??", "editor", "????????????", 2, editorPermissions);
+                "编辑", "editor", "内容生产角色", 3, editorPermissions);
 
         Set<Permission> reviewerPermissions = permissions.stream()
                 .filter(permission -> Set.of(
@@ -160,37 +192,40 @@ public class DataInitializer {
                 ).contains(permission.getCode()))
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         upsertRole(roleRepository.findByCode("reviewer").orElseGet(Role::new), roleRepository,
-                "???", "reviewer", "?????????", 3, reviewerPermissions);
+                "审核员", "reviewer", "内容审核角色", 4, reviewerPermissions);
 
         Set<Permission> publisherPermissions = permissions.stream()
                 .filter(permission -> permission.getCode().startsWith("publish:center")
-                        || Set.of("content:article:view", "content:article:offline", "content:article:history:view", "site:manage:view", "template:manage:view", "content:category:view").contains(permission.getCode()))
+                        || Set.of("content:article:view", "content:article:offline", "content:article:history:view", "site:manage:view", "template:manage:view", "content:category:view", "navigation:manage:view", "topic:manage:view").contains(permission.getCode()))
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         upsertRole(roleRepository.findByCode("publisher").orElseGet(Role::new), roleRepository,
-                "???", "publisher", "????????????", 4, publisherPermissions);
+                "发布员", "publisher", "发布执行角色", 5, publisherPermissions);
 
         Set<Permission> viewerPermissions = permissions.stream()
                 .filter(permission -> Set.of("content:article:view", "content:category:view", "template:manage:view", "site:manage:view", "media:manage:view").contains(permission.getCode()))
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         upsertRole(roleRepository.findByCode("viewer").orElseGet(Role::new), roleRepository,
-                "??", "viewer", "??????????", 5, viewerPermissions);
+                "只读", "viewer", "只读访问角色", 6, viewerPermissions);
     }
 
     private void seedMenus(MenuRepository menuRepository) {
-        upsertMenu(menuRepository, createMenu("\u4eea\u8868\u76d8", "/dashboard", "DashboardOutlined", null, 1, "content:article:view"), null);
-        upsertMenu(menuRepository, createMenu("\u7528\u6237\u7ba1\u7406", "/users", "UserOutlined", null, 2, "sys:user"), null);
-        upsertMenu(menuRepository, createMenu("\u89d2\u8272\u7ba1\u7406", "/roles", "TeamOutlined", null, 3, "sys:role"), null);
-        upsertMenu(menuRepository, createMenu("\u6743\u9650\u7ba1\u7406", "/permissions", "LockOutlined", null, 4, "sys:permission"), null);
-        upsertMenu(menuRepository, createMenu("\u83dc\u5355\u7ba1\u7406", "/menus", "MenuOutlined", null, 5, "sys:menu"), null);
+        upsertMenu(menuRepository, createMenu("仪表盘", "/dashboard", "DashboardOutlined", null, 1, "content:article:view"), null);
+        upsertMenu(menuRepository, createMenu("用户管理", "/users", "UserOutlined", null, 2, "sys:user"), null);
+        upsertMenu(menuRepository, createMenu("角色管理", "/roles", "TeamOutlined", null, 3, "sys:role"), null);
+        upsertMenu(menuRepository, createMenu("权限管理", "/permissions", "LockOutlined", null, 4, "sys:permission"), null);
+        upsertMenu(menuRepository, createMenu("菜单管理", "/menus", "MenuOutlined", null, 5, "sys:menu"), null);
 
-        Menu contentMenu = upsertMenu(menuRepository, createMenu("\u5185\u5bb9\u7ba1\u7406", "/content", "FileTextOutlined", null, 6, "content"), null);
-        upsertMenu(menuRepository, createMenu("\u5ba1\u6838\u5de5\u4f5c\u533a", "/content/review", "AuditOutlined", contentMenu.getId(), 1, "content:article:review"), contentMenu.getId());
-        upsertMenu(menuRepository, createMenu("\u680f\u76ee\u7ba1\u7406", "/content/categories", "FolderOutlined", contentMenu.getId(), 2, "content:category"), contentMenu.getId());
-        upsertMenu(menuRepository, createMenu("\u6a21\u677f\u7ba1\u7406", "/content/templates", "LayoutOutlined", contentMenu.getId(), 3, "template:manage"), contentMenu.getId());
-        upsertMenu(menuRepository, createMenu("\u53d1\u5e03\u4e2d\u5fc3", "/content/publish", "SendOutlined", contentMenu.getId(), 4, "publish:center"), contentMenu.getId());
+        Menu contentMenu = upsertMenu(menuRepository, createMenu("内容管理", "/content", "FileTextOutlined", null, 6, "content"), null);
+        upsertMenu(menuRepository, createMenu("审核工作区", "/content/review", "AuditOutlined", contentMenu.getId(), 1, "content:article:review"), contentMenu.getId());
+        upsertMenu(menuRepository, createMenu("栏目管理", "/content/categories", "FolderOutlined", contentMenu.getId(), 2, "content:category"), contentMenu.getId());
+        upsertMenu(menuRepository, createMenu("模板管理", "/content/templates", "LayoutOutlined", contentMenu.getId(), 3, "template:manage"), contentMenu.getId());
+        upsertMenu(menuRepository, createMenu("导航管理", "/navigation", "MenuOutlined", contentMenu.getId(), 4, "navigation:manage"), contentMenu.getId());
+        upsertMenu(menuRepository, createMenu("专题管理", "/topics", "FileTextOutlined", contentMenu.getId(), 5, "topic:manage"), contentMenu.getId());
+        upsertMenu(menuRepository, createMenu("发布中心", "/content/publish", "SendOutlined", contentMenu.getId(), 6, "publish:center"), contentMenu.getId());
 
-        upsertMenu(menuRepository, createMenu("\u7ad9\u70b9\u7ba1\u7406", "/sites", "GlobalOutlined", null, 7, "site:manage"), null);
-        upsertMenu(menuRepository, createMenu("\u5a92\u4f53\u7ba1\u7406", "/media", "CloudOutlined", null, 8, "media:manage"), null);
+        upsertMenu(menuRepository, createMenu("站点管理", "/sites", "GlobalOutlined", null, 7, "site:manage"), null);
+        upsertMenu(menuRepository, createMenu("媒体管理", "/media", "CloudOutlined", null, 8, "media:manage"), null);
+        upsertMenu(menuRepository, createMenu("搜索运营", "/search-ops", "SearchOutlined", null, 9, "search:ops"), null);
     }
 
     private Menu upsertMenu(MenuRepository menuRepository, Menu desiredMenu, Long parentId) {
@@ -284,3 +319,5 @@ public class DataInitializer {
         return menu;
     }
 }
+
+

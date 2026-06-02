@@ -40,6 +40,7 @@ class CategoryServiceTest {
     @Mock private ArticleRepository articleRepository;
     @Mock private TemplateRepository templateRepository;
     @Mock private TemplateBindingRepository templateBindingRepository;
+    @Mock private SiteAccessService siteAccessService;
     @InjectMocks private CategoryService categoryService;
 
     @Test

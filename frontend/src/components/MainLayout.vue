@@ -16,7 +16,10 @@ import {
   SearchOutlined,
   FolderOutlined,
   GlobalOutlined,
-  CloudOutlined
+  CloudOutlined,
+  AuditOutlined,
+  LayoutOutlined,
+  SendOutlined
 } from '@ant-design/icons-vue'
 import api from '../utils/api'
 import { clearSession, getRoles, getUsername } from '../utils/session'
@@ -49,13 +52,17 @@ const iconMap: Record<string, any> = {
   SettingOutlined,
   FolderOutlined,
   GlobalOutlined,
-  CloudOutlined
+  CloudOutlined,
+  AuditOutlined,
+  LayoutOutlined,
+  SendOutlined,
+  SearchOutlined,
 }
 
 const convertToAntMenu = (menus: any[]): MenuItem[] => {
   return menus.map(menu => {
     const item: MenuItem = {
-      key: menu.path ? menu.path.replace('/', '') : `menu-${menu.id}`,
+      key: menu.path ? menu.path.replace('/', '') : 'menu-' + menu.id,
       label: menu.name,
       icon: iconMap[menu.icon] ? h(iconMap[menu.icon]) : undefined,
       path: menu.path
@@ -148,7 +155,7 @@ watch(() => route.path, () => {
 onMounted(async () => {
   username.value = getUsername() || 'Admin'
   const roleCode = getRoles()[0] || ''
-  roleLabel.value = ({ admin: '\u7ba1\u7406\u5458', editor: '\u7f16\u8f91', reviewer: '\u5ba1\u6838\u5458', publisher: '\u53d1\u5e03\u5458' } as Record<string, string>)[roleCode] || '\u7528\u6237'
+  roleLabel.value = ({ admin: '\u7ba1\u7406\u5458', site_admin: '\u7ad9\u70b9\u7ba1\u7406\u5458', editor: '\u7f16\u8f91', reviewer: '\u5ba1\u6838\u5458', publisher: '\u53d1\u5e03\u5458' } as Record<string, string>)[roleCode] || '\u7528\u6237'
   await fetchMenus()
   updateSelectedKeys()
 })
@@ -207,9 +214,9 @@ onMounted(async () => {
       </div>
     </aside>
 
-    <!-- 闂佸憡鐟ラ崢鏍疾閼哥數鈻旈悹鍥ㄥ絻閺佸爼鎮?-->
+    <!-- 主内容区 -->
     <div class="main-wrapper" :class="{ collapsed }">
-      <!-- 婵＄偑鍊曢悥濂稿磿鐎电硶鍋撴担鍐棈闁?-->
+      <!-- 顶部导航栏 -->
       <header class="top-header">
         <div class="header-left">
           <MenuFoldOutlined v-if="collapsed" class="trigger" @click="collapsed = !collapsed" />
@@ -229,7 +236,7 @@ onMounted(async () => {
         </div>
       </header>
 
-      <!-- 婵＄偑鍊楅弫璇差焽娴兼潙绀冮柛娑卞弾閸?-->
+      <!-- 页面内容 -->
       <main class="main-content">
         <router-view />
       </main>
@@ -446,13 +453,15 @@ onMounted(async () => {
 }
 
 .top-header {
-  height: 64px;
+  height: calc(64px + env(safe-area-inset-top, 0px));
+  padding-top: env(safe-area-inset-top, 0px);
   background: #ffffff;
   border-bottom: 1px solid #e2e8f0;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 24px;
+  padding-left: 24px;
+  padding-right: 24px;
   position: sticky;
   top: 0;
   z-index: 50;
@@ -557,3 +566,6 @@ onMounted(async () => {
   }
 }
 </style>
+
+
+

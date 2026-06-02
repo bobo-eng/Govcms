@@ -2,6 +2,7 @@ package gov.cms.admin.service;
 
 import gov.cms.admin.entity.Site;
 import gov.cms.admin.repository.SiteRepository;
+import gov.cms.admin.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -21,6 +22,12 @@ class SiteServiceTest {
 
     @Mock
     private SiteRepository siteRepository;
+
+    @Mock
+    private SiteAccessService siteAccessService;
+
+    @Mock
+    private UserRepository userRepository;
 
     @InjectMocks
     private SiteService siteService;
@@ -56,6 +63,33 @@ class SiteServiceTest {
         when(siteRepository.existsByCodeIgnoreCaseAndIdNot("gov-main", 1L)).thenReturn(true);
 
         ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> siteService.updateSite(1L, update));
+
+        assertEquals(HttpStatus.CONFLICT, exception.getStatusCode());
+    }
+
+    @Test
+    void updateSiteRejectsDisablingBoundManagedSite() {
+        Site existing = buildSite();
+        existing.setId(1L);
+        Site update = buildSite();
+        update.setStatus("disabled");
+        when(siteRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(siteRepository.existsByCodeIgnoreCaseAndIdNot("gov-main", 1L)).thenReturn(false);
+        when(siteRepository.existsByDomainIgnoreCaseAndIdNot("www.example.gov.cn", 1L)).thenReturn(false);
+        when(userRepository.existsByManagedSiteId(1L)).thenReturn(true);
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> siteService.updateSite(1L, update));
+
+        assertEquals(HttpStatus.CONFLICT, exception.getStatusCode());
+    }
+
+    @Test
+    void deleteSiteRejectsBoundManagedSite() {
+        Site existing = buildSite();
+        existing.setId(1L);
+        when(userRepository.existsByManagedSiteId(1L)).thenReturn(true);
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> siteService.deleteSite(1L));
 
         assertEquals(HttpStatus.CONFLICT, exception.getStatusCode());
     }

@@ -9,5 +9,7 @@ public interface MediaStorageService {
 
     Resource load(String storagePath);
 
+    boolean exists(String storagePath);
+
     void delete(String storagePath);
 }

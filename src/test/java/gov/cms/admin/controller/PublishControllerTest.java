@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import gov.cms.admin.config.SecurityConfig;
 import gov.cms.admin.dto.PublishRequest;
 import gov.cms.admin.dto.PublishRollbackRequest;
+import gov.cms.admin.entity.AuditLog;
+import gov.cms.admin.entity.PublishRollbackRecord;
 import gov.cms.admin.security.JwtAuthenticationFilter;
 import gov.cms.admin.service.CustomUserDetailsService;
 import gov.cms.admin.service.PublishService;
@@ -89,6 +91,20 @@ class PublishControllerTest {
     @WithMockUser(authorities = "publish:center:artifact:view")
     void artifactsReturnsOk() throws Exception {
         mockMvc.perform(get("/api/publish/jobs/{id}/artifacts", 10L))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(authorities = "publish:center:view")
+    void auditsReturnsOk() throws Exception {
+        mockMvc.perform(get("/api/publish/jobs/{id}/audits", 10L))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(authorities = "publish:center:view")
+    void rollbackRecordsReturnsOk() throws Exception {
+        mockMvc.perform(get("/api/publish/jobs/{id}/rollback-records", 10L))
                 .andExpect(status().isOk());
     }
 }

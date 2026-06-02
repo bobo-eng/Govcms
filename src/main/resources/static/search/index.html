@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>站内搜索</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --primary: #2563eb;
+      --primary-soft: #dbeafe;
+      --warning-bg: #fffbeb;
+      --warning-border: #fbbf24;
+      --warning-text: #92400e;
+      --highlight: #fef08a;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: Arial, "Microsoft YaHei", sans-serif; }
+    .page { max-width: 1160px; margin: 0 auto; padding: 28px 20px 40px; }
+    .hero, .panel, .result-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04); }
+    .hero { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+    .hero h1 { margin: 0; font-size: 28px; }
+    .hero p { margin: 0; color: var(--muted); }
+    .search-wrap { position: relative; }
+    .search-row, .filter-row, .summary-row, .pagination { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .search-row { margin-top: 4px; }
+    .input, .select, .button { border: 1px solid #cbd5e1; border-radius: 12px; padding: 11px 14px; font-size: 14px; }
+    .input, .select { background: #fff; color: var(--text); }
+    .input.keyword { flex: 1 1 360px; }
+    .button { cursor: pointer; background: #e2e8f0; color: var(--text); }
+    .button.primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .filter-row { margin-top: 8px; }
+    .summary-row { justify-content: space-between; color: var(--muted); margin: 18px 0 12px; }
+    .chip-list { display: flex; gap: 10px; flex-wrap: wrap; }
+    .chip { border-radius: 999px; padding: 6px 10px; font-size: 12px; background: #e2e8f0; color: #0f172a; }
+    .chip.active { background: var(--primary-soft); color: #1d4ed8; }
+    .results { display: flex; flex-direction: column; gap: 14px; }
+    .result-card { padding: 18px; }
+    .result-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+    .result-title { margin: 0 0 8px; font-size: 20px; }
+    .result-title a { color: inherit; text-decoration: none; }
+    .result-title a:hover { color: var(--primary); }
+    .result-summary { margin: 0 0 12px; line-height: 1.6; color: #334155; }
+    .meta { display: flex; gap: 10px; flex-wrap: wrap; color: var(--muted); font-size: 12px; }
+    .type-badge { padding: 5px 10px; border-radius: 999px; font-size: 12px; background: #eef2ff; color: #4338ca; }
+    .type-badge.topic { background: #dcfce7; color: #166534; }
+    .type-badge.category { background: #fef3c7; color: #92400e; }
+    .suggestions { position: absolute; left: 0; right: 110px; top: calc(100% + 8px); background: #fff; border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12); z-index: 10; overflow: hidden; }
+    .suggestion-group { padding: 10px 0; }
+    .suggestion-title { padding: 0 14px 8px; font-size: 12px; color: var(--muted); }
+    .suggestion-item { width: 100%; border: none; background: transparent; display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; cursor: pointer; text-align: left; }
+    .suggestion-item:hover { background: #f8fafc; }
+    .suggestion-meta { color: var(--muted); font-size: 12px; }
+    mark { background: var(--highlight); color: inherit; padding: 0 2px; border-radius: 3px; }
+    .empty-state, .warning-box { padding: 18px; border-radius: 16px; border: 1px solid var(--border); background: var(--card); color: var(--muted); }
+    .warning-box { border-color: var(--warning-border); background: var(--warning-bg); color: var(--warning-text); }
+    .recommend-box { margin-top: 12px; }
+    .recommend-list { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .recommend-chip { border: 1px solid #cbd5e1; background: #fff; border-radius: 999px; padding: 6px 10px; cursor: pointer; }
+    .pagination { justify-content: center; margin-top: 20px; }
+    .page-indicator { min-width: 120px; text-align: center; color: var(--muted); }
+    .hidden { display: none !important; }
+    @media (max-width: 768px) {
+      .page { padding: 20px 14px 32px; }
+      .result-head, .summary-row { flex-direction: column; align-items: flex-start; }
+      .button, .input, .select { width: 100%; }
+      .search-row .button { width: auto; }
+      .suggestions { right: 0; top: calc(100% + 8px); }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="hero">
+      <div>
+        <h1>站内搜索</h1>
+        <p>支持按内容、专题、栏目检索已发布对象，并提供建议词、筛选与分页浏览。</p>
+      </div>
+      <div class="search-wrap">
+        <div class="search-row">
+          <input id="keyword" class="input keyword" placeholder="请输入关键词，例如：新闻发布会" autocomplete="off" />
+          <button id="searchBtn" class="button primary">搜索</button>
+        </div>
+        <div id="suggestions" class="suggestions hidden"></div>
+      </div>
+      <div class="filter-row">
+        <select id="type" class="select">
+          <option value="">全部类型</option>
+          <option value="content">内容</option>
+          <option value="topic">专题</option>
+          <option value="category">栏目</option>
+        </select>
+        <select id="categoryId" class="select">
+          <option value="">全部栏目</option>
+        </select>
+      </div>
+      <div id="siteWarning" class="warning-box hidden">缺少站点参数，请在地址中带上 siteId 后访问，例如：/search/index.html?siteId=1</div>
+    </section>
+
+    <div class="summary-row">
+      <div id="summaryText">请输入关键词开始搜索</div>
+      <div id="activeFilters" class="chip-list"></div>
+    </div>
+
+    <div id="results" class="results"></div>
+
+    <div class="pagination">
+      <button id="prevBtn" class="button">上一页</button>
+      <div id="pageInfo" class="page-indicator">第 1 页</div>
+      <button id="nextBtn" class="button">下一页</button>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(location.search)
+    const state = {
+      siteId: params.get('siteId') || '',
+      keyword: params.get('keyword') || '',
+      type: params.get('type') || '',
+      categoryId: params.get('categoryId') || '',
+      page: Math.max(Number(params.get('page') || '0'), 0),
+      size: 10,
+      total: 0,
+      suggestionKeyword: '',
+      suggestionsOpen: false,
+      popularSuggestions: []
+    }
+
+    const dom = {
+      keyword: document.getElementById('keyword'),
+      type: document.getElementById('type'),
+      categoryId: document.getElementById('categoryId'),
+      summaryText: document.getElementById('summaryText'),
+      activeFilters: document.getElementById('activeFilters'),
+      results: document.getElementById('results'),
+      pageInfo: document.getElementById('pageInfo'),
+      prevBtn: document.getElementById('prevBtn'),
+      nextBtn: document.getElementById('nextBtn'),
+      siteWarning: document.getElementById('siteWarning'),
+      searchBtn: document.getElementById('searchBtn'),
+      suggestions: document.getElementById('suggestions')
+    }
+
+    const typeLabels = { content: '内容', topic: '专题', category: '栏目' }
+    const historyKey = () => `govcms-search-history:${state.siteId || 'default'}`
+
+    dom.keyword.value = state.keyword
+    dom.type.value = state.type
+
+    function escapeHtml(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+    }
+
+    function escapeRegExp(value) {
+      return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    }
+
+    function highlightText(value, keyword) {
+      const safeValue = escapeHtml(value)
+      if (!keyword) return safeValue
+      const pattern = new RegExp(`(${escapeRegExp(keyword)})`, 'ig')
+      return safeValue.replace(pattern, '<mark>$1</mark>')
+    }
+
+    function loadLocalHistory() {
+      try {
+        return JSON.parse(localStorage.getItem(historyKey()) || '[]')
+      } catch (_) {
+        return []
+      }
+    }
+
+    function saveLocalHistory(keyword) {
+      const trimmed = (keyword || '').trim()
+      if (!trimmed) return
+      const next = [trimmed, ...loadLocalHistory().filter(item => item !== trimmed)].slice(0, 10)
+      localStorage.setItem(historyKey(), JSON.stringify(next))
+    }
+
+    function buildSuggestionItems() {
+      const keyword = state.suggestionKeyword.trim().toLowerCase()
+      const historyItems = loadLocalHistory()
+        .filter(item => !keyword || item.toLowerCase().startsWith(keyword))
+        .map(item => ({ keyword: item, source: 'history' }))
+      const popularItems = state.popularSuggestions
+        .filter(item => !keyword || String(item.keyword || '').toLowerCase().startsWith(keyword))
+        .map(item => ({ ...item, source: 'popular' }))
+
+      const merged = []
+      const seen = new Set()
+      ;[...historyItems, ...popularItems].forEach(item => {
+        if (!item.keyword || seen.has(item.keyword)) return
+        seen.add(item.keyword)
+        merged.push(item)
+      })
+      return merged.slice(0, 8)
+    }
+
+    function renderSuggestions() {
+      const historyItems = []
+      const popularItems = []
+      buildSuggestionItems().forEach(item => {
+        if (item.source === 'history') historyItems.push(item)
+        else popularItems.push(item)
+      })
+      if (!historyItems.length && !popularItems.length) {
+        dom.suggestions.classList.add('hidden')
+        dom.suggestions.innerHTML = ''
+        return
+      }
+      const groups = []
+      if (historyItems.length) {
+        groups.push(`
+          <div class="suggestion-group">
+            <div class="suggestion-title">本地历史</div>
+            ${historyItems.map(item => `<button class="suggestion-item" data-keyword="${escapeHtml(item.keyword)}"><span>${highlightText(item.keyword, state.suggestionKeyword)}</span><span class="suggestion-meta">最近搜索</span></button>`).join('')}
+          </div>
+        `)
+      }
+      if (popularItems.length) {
+        groups.push(`
+          <div class="suggestion-group">
+            <div class="suggestion-title">热门搜索</div>
+            ${popularItems.map(item => `<button class="suggestion-item" data-keyword="${escapeHtml(item.keyword)}"><span>${highlightText(item.keyword, state.suggestionKeyword)}</span><span class="suggestion-meta">${item.count || 0} 次</span></button>`).join('')}
+          </div>
+        `)
+      }
+      dom.suggestions.innerHTML = groups.join('')
+      dom.suggestions.classList.remove('hidden')
+      dom.suggestions.querySelectorAll('.suggestion-item').forEach(button => {
+        button.addEventListener('click', () => {
+          const keyword = button.getAttribute('data-keyword') || ''
+          dom.keyword.value = keyword
+          state.suggestionsOpen = false
+          dom.suggestions.classList.add('hidden')
+          runSearch(0)
+        })
+      })
+    }
+
+    async function loadPopularSuggestions() {
+      if (!state.siteId) return
+      const keyword = dom.keyword.value.trim()
+      const response = await fetch(`/api/portal/search/suggestions?siteId=${encodeURIComponent(state.siteId)}&keyword=${encodeURIComponent(keyword)}&limit=8`)
+      state.popularSuggestions = await response.json()
+      state.suggestionKeyword = keyword
+      renderSuggestions()
+    }
+
+    function updateQueryString() {
+      const query = new URLSearchParams()
+      if (state.siteId) query.set('siteId', state.siteId)
+      if (state.keyword) query.set('keyword', state.keyword)
+      if (state.type) query.set('type', state.type)
+      if (state.categoryId && state.type !== 'content') {
+        state.categoryId = ''
+      }
+      if (state.categoryId) query.set('categoryId', state.categoryId)
+      if (state.page > 0) query.set('page', String(state.page))
+      history.replaceState({}, '', `${location.pathname}?${query.toString()}`)
+    }
+
+    function syncFilterState() {
+      dom.keyword.value = state.keyword
+      dom.type.value = state.type
+      if (state.type && state.type !== 'content') {
+        dom.categoryId.value = ''
+        dom.categoryId.classList.add('hidden')
+      } else {
+        dom.categoryId.classList.remove('hidden')
+        dom.categoryId.value = state.categoryId
+      }
+    }
+
+    function renderFilterChips() {
+      const chips = []
+      if (state.keyword) chips.push(`<div class="chip active">关键词：${escapeHtml(state.keyword)}</div>`)
+      if (state.type) chips.push(`<div class="chip active">类型：${typeLabels[state.type] || state.type}</div>`)
+      if (state.categoryId && state.type !== 'topic' && state.type !== 'category') {
+        const selectedOption = dom.categoryId.options[dom.categoryId.selectedIndex]
+        chips.push(`<div class="chip active">栏目：${escapeHtml(selectedOption ? selectedOption.text : state.categoryId)}</div>`)
+      }
+      dom.activeFilters.innerHTML = chips.join('')
+    }
+
+    function renderResults(items) {
+      if (!items.length) {
+        const recommendation = state.popularSuggestions.length
+          ? `<div class="recommend-box"><div>可尝试这些热门词：</div><div class="recommend-list">${state.popularSuggestions.slice(0, 6).map(item => `<button class="recommend-chip" data-keyword="${escapeHtml(item.keyword)}">${escapeHtml(item.keyword)}</button>`).join('')}</div></div>`
+          : ''
+        dom.results.innerHTML = `<div class="empty-state">未找到匹配结果，请尝试更换关键词、切换类型，或先执行索引重建。${recommendation}</div>`
+        dom.results.querySelectorAll('.recommend-chip').forEach(button => {
+          button.addEventListener('click', () => {
+            dom.keyword.value = button.getAttribute('data-keyword') || ''
+            runSearch(0)
+          })
+        })
+        return
+      }
+      dom.results.innerHTML = items.map(item => {
+        const typeClass = item.objectType === 'topic' ? 'topic' : (item.objectType === 'category' ? 'category' : '')
+        const summary = item.summary || (item.objectType === 'category' ? '该栏目暂无简介。' : '暂无摘要。')
+        const categoryMeta = item.objectType === 'content' && item.categoryName ? `<span>栏目：${highlightText(item.categoryName, state.keyword)}</span>` : ''
+        const publishedAt = item.publishedAt ? `<span>发布时间：${escapeHtml(item.publishedAt.replace('T', ' ').slice(0, 16))}</span>` : ''
+        return `
+          <article class="result-card">
+            <div class="result-head">
+              <div>
+                <h2 class="result-title"><a href="${escapeHtml(item.path)}">${highlightText(item.title || '-', state.keyword)}</a></h2>
+                <p class="result-summary">${highlightText(summary, state.keyword)}</p>
+                <div class="meta">
+                  ${categoryMeta}
+                  ${publishedAt}
+                  <span>路径：${escapeHtml(item.path)}</span>
+                </div>
+              </div>
+              <span class="type-badge ${typeClass}">${typeLabels[item.objectType] || item.objectType}</span>
+            </div>
+          </article>
+        `
+      }).join('')
+    }
+
+    function updatePagination() {
+      const totalPages = Math.max(Math.ceil(state.total / state.size), 1)
+      dom.pageInfo.textContent = `第 ${state.page + 1} / ${totalPages} 页`
+      dom.prevBtn.disabled = state.page <= 0
+      dom.nextBtn.disabled = (state.page + 1) * state.size >= state.total
+    }
+
+    async function loadCategories() {
+      if (!state.siteId) return
+      const response = await fetch(`/api/portal/search/categories?siteId=${encodeURIComponent(state.siteId)}`)
+      const data = await response.json()
+      dom.categoryId.innerHTML = '<option value="">全部栏目</option>'
+      ;(data || []).forEach(item => {
+        const option = document.createElement('option')
+        option.value = String(item.id)
+        option.textContent = item.name
+        dom.categoryId.appendChild(option)
+      })
+      dom.categoryId.value = state.categoryId
+      syncFilterState()
+    }
+
+    async function runSearch(nextPage = state.page) {
+      state.keyword = dom.keyword.value.trim()
+      state.type = dom.type.value
+      state.categoryId = state.type === 'content' ? dom.categoryId.value : ''
+      state.page = Math.max(nextPage, 0)
+      syncFilterState()
+      renderFilterChips()
+      updateQueryString()
+
+      if (!state.siteId) {
+        dom.siteWarning.classList.remove('hidden')
+        dom.summaryText.textContent = '缺少 siteId，无法执行搜索'
+        dom.results.innerHTML = '<div class="empty-state">请带上站点参数后再使用搜索，例如 /search/index.html?siteId=1</div>'
+        updatePagination()
+        return
+      }
+
+      dom.siteWarning.classList.add('hidden')
+      const query = new URLSearchParams({ siteId: state.siteId, keyword: state.keyword, page: String(state.page), size: String(state.size) })
+      if (state.type) query.set('type', state.type)
+      if (state.categoryId) query.set('categoryId', state.categoryId)
+
+      dom.searchBtn.disabled = true
+      dom.summaryText.textContent = '正在搜索...'
+      try {
+        const response = await fetch(`/api/portal/search?${query.toString()}`)
+        const data = await response.json()
+        state.total = Number(data.total || 0)
+        saveLocalHistory(state.keyword)
+        await loadPopularSuggestions()
+        dom.summaryText.textContent = state.total
+          ? `共找到 ${state.total} 条结果，当前展示第 ${state.page + 1} 页`
+          : '未找到匹配结果'
+        renderResults(data.items || [])
+      } catch (error) {
+        dom.summaryText.textContent = '搜索失败'
+        dom.results.innerHTML = '<div class="warning-box">搜索服务暂时不可用，请稍后重试或联系管理员检查索引状态。</div>'
+      } finally {
+        dom.searchBtn.disabled = false
+        updatePagination()
+      }
+    }
+
+    dom.searchBtn.addEventListener('click', () => runSearch(0))
+    dom.keyword.addEventListener('focus', () => loadPopularSuggestions())
+    dom.keyword.addEventListener('input', () => loadPopularSuggestions())
+    dom.keyword.addEventListener('keydown', event => {
+      if (event.key === 'Enter') {
+        dom.suggestions.classList.add('hidden')
+        runSearch(0)
+      }
+    })
+    dom.type.addEventListener('change', () => runSearch(0))
+    dom.categoryId.addEventListener('change', () => runSearch(0))
+    dom.prevBtn.addEventListener('click', () => runSearch(state.page - 1))
+    dom.nextBtn.addEventListener('click', () => runSearch(state.page + 1))
+    document.addEventListener('click', event => {
+      if (!dom.suggestions.contains(event.target) && event.target !== dom.keyword) {
+        dom.suggestions.classList.add('hidden')
+      }
+    })
+
+    syncFilterState()
+    renderFilterChips()
+    updatePagination()
+    loadCategories().then(async () => {
+      await loadPopularSuggestions()
+      if (state.keyword || state.type || state.categoryId) {
+        runSearch(state.page)
+      }
+    })
+  </script>
+</body>
+</html>

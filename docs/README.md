@@ -47,6 +47,14 @@
   - 产品定义稿，聚焦超级管理员、站点管理员、编辑、审核员、发布员、访客的角色分层、边界与矩阵。
 - `docs/17-navigation-topic-site-admin-modeling.md`
   - 产品建模稿，聚焦导航、专题与站点管理员的对象定义、边界与发布关系。
+- `docs/18-admin-ux-visual-and-interaction-guidelines.md`
+  - 后台体验统一化视觉与交互总规范。
+- `docs/19-admin-ux-key-page-guidance.md`
+  - 后台高频页面改版说明稿，覆盖 Users、Categories、Sites、PublishCenter、SearchOps。
+- `docs/20-admin-ux-refresh-priority.md`
+  - 后台体验统一化首批改版优先级与实施分期建议。
+- `docs/21-admin-ux-residual-checklist.md`
+  - 后台体验统一化残留样式、残留页面与后续收尾优先级清单。
 
 ## 历史参考输入
 
@@ -57,3 +65,5 @@
 - `system_design.json`
 
 后续若这些历史材料与本目录内容冲突，以本目录内容为准。
+
+
