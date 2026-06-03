@@ -15,6 +15,23 @@ spring:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.MySQLDialect
+  quartz:
+    job-store-type: jdbc
+    jdbc:
+      initialize-schema: always
+    properties:
+      org:
+        quartz:
+          scheduler:
+            instanceName: govcms-scheduler
+            instanceId: AUTO
+          jobStore:
+            tablePrefix: QRTZ_
+            useProperties: false
+            isClustered: false
+          threadPool:
+            class: org.quartz.simpl.SimpleThreadPool
+            threadCount: 5
 
 server:
   port: 8080
