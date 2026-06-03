@@ -25,6 +25,17 @@ spring:
             plan:
               synchronization:
                 strategy: sync
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      database: 0
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
   quartz:
     job-store-type: jdbc
     jdbc:

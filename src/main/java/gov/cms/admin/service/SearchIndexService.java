@@ -37,6 +37,7 @@ public class SearchIndexService {
     private final AuditLogRepository auditLogRepository;
     private final SiteAccessService siteAccessService;
     private final HibernateSearchService hibernateSearchService;
+    private final SuggestionIndexerService suggestionIndexerService;
 
     public SearchIndexService(SearchIndexEntryRepository searchIndexEntryRepository,
                               ArticleRepository articleRepository,
@@ -46,7 +47,8 @@ public class SearchIndexService {
                               AuditLogService auditLogService,
                               AuditLogRepository auditLogRepository,
                               SiteAccessService siteAccessService,
-                              HibernateSearchService hibernateSearchService) {
+                              HibernateSearchService hibernateSearchService,
+                              SuggestionIndexerService suggestionIndexerService) {
         this.searchIndexEntryRepository = searchIndexEntryRepository;
         this.articleRepository = articleRepository;
         this.topicRepository = topicRepository;
@@ -56,11 +58,13 @@ public class SearchIndexService {
         this.auditLogRepository = auditLogRepository;
         this.siteAccessService = siteAccessService;
         this.hibernateSearchService = hibernateSearchService;
+        this.suggestionIndexerService = suggestionIndexerService;
     }
 
     @Transactional
     public void rebuildSiteIndex(Long siteId) {
         searchIndexEntryRepository.deleteAll(searchIndexEntryRepository.findBySiteId(siteId));
+        suggestionIndexerService.clearSiteIndex(siteId);
         for (Category category : categoryRepository.findBySiteIdAndStatusOrderBySortOrderAscIdAsc(siteId, "enabled")) {
             syncCategoryEntry(category.getId());
         }
@@ -109,6 +113,7 @@ public class SearchIndexService {
                 Optional.ofNullable(article.getContent()).orElse(""),
                 Optional.ofNullable(category.getName()).orElse("")));
         searchIndexEntryRepository.save(entry);
+        suggestionIndexerService.indexTitle(entry.getSiteId(), entry.getTitle());
     }
 
     @Transactional
@@ -142,6 +147,7 @@ public class SearchIndexService {
                 Optional.ofNullable(topic.getSeoKeywords()).orElse(""),
                 Optional.ofNullable(topic.getSeoDescription()).orElse("")));
         searchIndexEntryRepository.save(entry);
+        suggestionIndexerService.indexTitle(entry.getSiteId(), entry.getTitle());
     }
 
     @Transactional
@@ -175,6 +181,7 @@ public class SearchIndexService {
                 Optional.ofNullable(category.getSeoKeywords()).orElse(""),
                 Optional.ofNullable(category.getSeoDescription()).orElse("")));
         searchIndexEntryRepository.save(entry);
+        suggestionIndexerService.indexTitle(entry.getSiteId(), entry.getTitle());
     }
 
     @Transactional

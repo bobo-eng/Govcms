@@ -7,7 +7,7 @@ export interface SearchKeywordStatItem {
 
 export interface SearchSuggestionItem {
   keyword: string
-  source: 'history' | 'popular'
+  source: 'title' | 'popular'
   count?: number | null
 }
 

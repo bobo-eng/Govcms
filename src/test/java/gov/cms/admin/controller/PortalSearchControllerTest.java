@@ -7,6 +7,7 @@ import gov.cms.admin.dto.SearchSuggestionItem;
 import gov.cms.admin.security.JwtAuthenticationFilter;
 import gov.cms.admin.service.CustomUserDetailsService;
 import gov.cms.admin.service.SearchIndexService;
+import gov.cms.admin.service.SuggestionService;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,6 +37,7 @@ class PortalSearchControllerTest {
     @Autowired private MockMvc mockMvc;
 
     @MockBean private SearchIndexService searchIndexService;
+    @MockBean private SuggestionService suggestionService;
     @MockBean private CustomUserDetailsService customUserDetailsService;
     @MockBean private JwtAuthenticationFilter jwtAuthenticationFilter;
 
@@ -58,7 +60,7 @@ class PortalSearchControllerTest {
 
     @Test
     void suggestionsReturnsOk() throws Exception {
-        when(searchIndexService.listSuggestions(1L, "政", 8, 7)).thenReturn(List.of(new SearchSuggestionItem("政务公开", "popular", 5L)));
+        when(suggestionService.suggest(1L, "政", 8)).thenReturn(List.of(new SearchSuggestionItem("政务公开", "popular", 5L)));
 
         mockMvc.perform(get("/api/portal/search/suggestions").param("siteId", "1").param("keyword", "政"))
                 .andExpect(status().isOk())

@@ -44,6 +44,7 @@ class SearchIndexServiceTest {
     @Mock private AuditLogRepository auditLogRepository;
     @Mock private SiteAccessService siteAccessService;
     @Mock private HibernateSearchService hibernateSearchService;
+    @Mock private SuggestionIndexerService suggestionIndexerService;
 
     @InjectMocks private SearchIndexService searchIndexService;
 
