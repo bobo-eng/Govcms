@@ -58,6 +58,18 @@ public class PublishJob {
     @Column
     private LocalDateTime finishedAt;
 
+    @Column(length = 20)
+    private String environment;
+
+    @Column(length = 20)
+    private String approvalStatus;
+
+    @Column
+    private LocalDateTime scheduledAt;
+
+    @Column(length = 64)
+    private String previewToken;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -113,6 +125,19 @@ public class PublishJob {
     public void setStartedAt(LocalDateTime startedAt) { this.startedAt = startedAt; }
     public LocalDateTime getFinishedAt() { return finishedAt; }
     public void setFinishedAt(LocalDateTime finishedAt) { this.finishedAt = finishedAt; }
+
+    public String getEnvironment() { return environment; }
+    public void setEnvironment(String environment) { this.environment = environment; }
+
+    public String getApprovalStatus() { return approvalStatus; }
+    public void setApprovalStatus(String approvalStatus) { this.approvalStatus = approvalStatus; }
+
+    public LocalDateTime getScheduledAt() { return scheduledAt; }
+    public void setScheduledAt(LocalDateTime scheduledAt) { this.scheduledAt = scheduledAt; }
+
+    public String getPreviewToken() { return previewToken; }
+    public void setPreviewToken(String previewToken) { this.previewToken = previewToken; }
+
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
