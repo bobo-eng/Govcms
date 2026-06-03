@@ -71,6 +71,8 @@ gm:
     sm2:
       private-key-hex: ${GM_SM2_PRIVATE_KEY:}
       public-key-hex: ${GM_SM2_PUBLIC_KEY:}
+    sm4:
+      key-hex: ${GM_SM4_KEY:}
 
 app:
   media:
