@@ -19,8 +19,12 @@ import gov.cms.admin.repository.PublishJobRepository;
 import gov.cms.admin.repository.TemplateBindingRepository;
 import gov.cms.admin.repository.TemplateRepository;
 import gov.cms.admin.repository.TopicRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.TransactionCallbackWithoutResult;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -52,7 +56,8 @@ public class PublishExecutor {
   private final TemplateBindingRepository templateBindingRepository;
   private final TopicRepository topicRepository;
   private final ObjectMapper objectMapper;
-  private String publishStoragePath = "./storage/publish";
+  private final TransactionTemplate transactionTemplate;
+  private final String publishStoragePath;
 
   public PublishExecutor(PublishJobRepository publishJobRepository,
                          PublishArtifactRepository publishArtifactRepository,
@@ -66,7 +71,9 @@ public class PublishExecutor {
                          TemplateRepository templateRepository,
                          TemplateBindingRepository templateBindingRepository,
                          TopicRepository topicRepository,
-                         ObjectMapper objectMapper) {
+                         ObjectMapper objectMapper,
+                         PlatformTransactionManager transactionManager,
+                         @Value("${app.publish.storage-path:./storage/publish}") String publishStoragePath) {
     this.publishJobRepository = publishJobRepository;
     this.publishArtifactRepository = publishArtifactRepository;
     this.publishImpactItemRepository = publishImpactItemRepository;
@@ -80,17 +87,17 @@ public class PublishExecutor {
     this.templateBindingRepository = templateBindingRepository;
     this.topicRepository = topicRepository;
     this.objectMapper = objectMapper;
+    this.transactionTemplate = new TransactionTemplate(transactionManager);
+    this.publishStoragePath = publishStoragePath;
   }
 
-  @Transactional
   public void execute(Long jobId, String environmentName) {
     PublishJob job = publishJobRepository.findById(jobId)
         .orElseThrow(() -> new IllegalArgumentException("Publish job not found: " + jobId));
 
-    String targetEnv = environmentName != null ? environmentName : job.getEnvironment();
-    if (targetEnv == null) {
-      targetEnv = PublishEnvironment.PRODUCTION.name().toLowerCase();
-    }
+    String targetEnv = environmentName != null ? environmentName
+        : (job.getEnvironment() != null ? job.getEnvironment()
+            : PublishEnvironment.PRODUCTION.name().toLowerCase());
 
     String renderingState = targetEnv.equalsIgnoreCase("staging")
         ? "staging_rendering" : "production_rendering";
@@ -106,20 +113,29 @@ public class PublishExecutor {
     logs.add("Unit: " + job.getUnitType() + " -> " + job.getUnitIds());
 
     try {
-      executeJob(job, targetEnv, impacts, logs);
+      transactionTemplate.execute(new TransactionCallbackWithoutResult() {
+        @Override
+        protected void doInTransactionWithoutResult(TransactionStatus status) {
+          try {
+            executeJob(job, targetEnv, impacts, logs);
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
 
-      ParsedSnapshot snapshot = parseSnapshot(job.getSourceSnapshot());
-      applyContentStatusAfterSuccess(job, snapshot.unitType, snapshot.mode, snapshot.unitIds, logs);
-      syncSearchIndexAfterSuccess(job, snapshot.unitType, snapshot.mode, snapshot.unitIds, logs);
+          ParsedSnapshot snapshot = parseSnapshot(job.getSourceSnapshot());
+          applyContentStatusAfterSuccess(job, snapshot.unitType, snapshot.mode, snapshot.unitIds, logs);
+          syncSearchIndexAfterSuccess(job, snapshot.unitType, snapshot.mode, snapshot.unitIds, logs);
 
-      job.setStatus(targetEnv.equalsIgnoreCase("staging") ? "staging_ready" : "published");
-      job.setFinishedAt(LocalDateTime.now());
-      if (targetEnv.equalsIgnoreCase("staging")) {
-        job.setPreviewToken(UUID.randomUUID().toString().replace("-", ""));
-      }
-      job.setLogContent(String.join("\n", logs));
-      job.setFailureReason(null);
-      publishJobRepository.save(job);
+          job.setStatus(targetEnv.equalsIgnoreCase("staging") ? "staging_ready" : "published");
+          job.setFinishedAt(LocalDateTime.now());
+          if (targetEnv.equalsIgnoreCase("staging")) {
+            job.setPreviewToken(UUID.randomUUID().toString().replace("-", ""));
+          }
+          job.setLogContent(String.join("\n", logs));
+          job.setFailureReason(null);
+          publishJobRepository.save(job);
+        }
+      });
     } catch (Exception e) {
       job.setStatus("failed");
       job.setFailureReason(e.getMessage());

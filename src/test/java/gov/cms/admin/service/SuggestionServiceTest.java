@@ -19,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -38,7 +39,7 @@ class SuggestionServiceTest {
     @BeforeEach
     void setUp() {
         suggestionService = new SuggestionService(redisTemplate);
-        org.mockito.Mockito.lenient().when(redisTemplate.opsForZSet()).thenReturn(zSetOperations);
+        lenient().when(redisTemplate.opsForZSet()).thenReturn(zSetOperations);
     }
 
     @Test
@@ -127,7 +128,7 @@ class SuggestionServiceTest {
         @SuppressWarnings("unchecked")
         ZSetOperations.TypedTuple<String> tuple = mock(ZSetOperations.TypedTuple.class);
         when(tuple.getValue()).thenReturn("政务公开");
-        org.mockito.Mockito.lenient().when(tuple.getScore()).thenReturn(5.0);
+        lenient().when(tuple.getScore()).thenReturn(5.0);
 
         Set<ZSetOperations.TypedTuple<String>> hotQueries = new LinkedHashSet<>();
         hotQueries.add(tuple);

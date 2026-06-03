@@ -37,18 +37,14 @@ public class SuggestionIndexerService {
 
     public void indexTitlesBulk(Long siteId, List<SearchIndexEntry> entries) {
         String key = String.format(KEY_TITLES, siteId);
-        Set<ZSetOperations.TypedTuple<String>> tuples = entries.stream()
-                .filter(e -> e.getTitle() != null && !e.getTitle().isBlank())
-                .map(e -> {
-                    double score = e.getPublishedAt() != null
-                            ? e.getPublishedAt().toEpochSecond(ZoneOffset.UTC)
-                            : System.currentTimeMillis() / 1000.0;
-                    return new org.springframework.data.redis.core.DefaultTypedTuple<>(
-                            e.getTitle().trim().toLowerCase(), score);
-                })
-                .collect(Collectors.toSet());
-        if (!tuples.isEmpty()) {
-            redisTemplate.opsForZSet().add(key, tuples);
+        for (SearchIndexEntry entry : entries) {
+            if (entry.getTitle() == null || entry.getTitle().isBlank()) {
+                continue;
+            }
+            double score = entry.getPublishedAt() != null
+                    ? entry.getPublishedAt().toEpochSecond(ZoneOffset.UTC)
+                    : System.currentTimeMillis() / 1000.0;
+            redisTemplate.opsForZSet().add(key, entry.getTitle().trim().toLowerCase(), score);
         }
     }
 

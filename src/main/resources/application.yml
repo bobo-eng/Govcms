@@ -76,3 +76,5 @@ gm:
 app:
   media:
     storage-path: ./storage/media
+  publish:
+    storage-path: ./storage/publish

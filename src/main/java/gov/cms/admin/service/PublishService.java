@@ -38,6 +38,7 @@ import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
 import org.quartz.Trigger;
 import org.quartz.TriggerBuilder;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -59,6 +60,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -87,7 +89,7 @@ public class PublishService {
     private final SearchIndexService searchIndexService;
     private final Scheduler scheduler;
     private final PublishExecutor publishExecutor;
-    private String publishStoragePath = "./storage/publish";
+    private final String publishStoragePath;
 
     public PublishService(PublishJobRepository publishJobRepository,
                           PublishImpactItemRepository publishImpactItemRepository,
@@ -111,7 +113,8 @@ public class PublishService {
                           AuditLogService auditLogService,
                           SearchIndexService searchIndexService,
                           Scheduler scheduler,
-                          PublishExecutor publishExecutor) {
+                          PublishExecutor publishExecutor,
+                          @Value("${app.publish.storage-path:./storage/publish}") String publishStoragePath) {
         this.publishJobRepository = publishJobRepository;
         this.publishImpactItemRepository = publishImpactItemRepository;
         this.publishArtifactRepository = publishArtifactRepository;
@@ -135,6 +138,7 @@ public class PublishService {
         this.searchIndexService = searchIndexService;
         this.scheduler = scheduler;
         this.publishExecutor = publishExecutor;
+        this.publishStoragePath = publishStoragePath;
     }
 
     public PublishCheckResponse check(PublishRequest request) {
@@ -203,6 +207,9 @@ public class PublishService {
         }
 
         String targetEnv = environment != null ? environment.toLowerCase() : "production";
+        if (!Set.of("staging", "production").contains(targetEnv)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid environment: " + environment);
+        }
         PublishJob job = new PublishJob();
         job.setSiteId(normalized.getSiteId());
         job.setUnitType(normalized.getUnitType());

@@ -92,7 +92,7 @@ public class HibernateSearchService {
     return item;
   }
 
-  @Transactional(readOnly = true)
+  @Transactional
   public void rebuildIndex() {
     SearchSession searchSession = Search.session(entityManager);
     try {

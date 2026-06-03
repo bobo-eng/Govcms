@@ -68,6 +68,7 @@ public class PublishController {
     }
 
     @GetMapping("/jobs/{id}/preview")
+    @PreAuthorize("hasAuthority('publish:center:view')")
     public ResponseEntity<String> previewToken(@PathVariable Long id) {
         PublishJob job = publishService.getJob(id);
         if (job == null || job.getPreviewToken() == null) {
