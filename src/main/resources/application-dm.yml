@@ -11,3 +11,6 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.DmDialect
         format_sql: true
+  quartz:
+    jdbc:
+      initialize-schema: never
