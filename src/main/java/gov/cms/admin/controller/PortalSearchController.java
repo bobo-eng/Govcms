@@ -30,8 +30,10 @@ public class PortalSearchController {
                                                        @RequestParam(required = false, defaultValue = "0") int page,
                                                        @RequestParam(required = false, defaultValue = "10") int size,
                                                        @RequestParam(required = false) String type,
-                                                       @RequestParam(required = false) Long categoryId) {
-        return ResponseEntity.ok(searchIndexService.search(siteId, keyword, page, size, type, categoryId));
+                                                       @RequestParam(required = false) Long categoryId,
+                                                       @RequestParam(required = false, defaultValue = "publishedAt") String sort,
+                                                       @RequestParam(required = false, defaultValue = "desc") String direction) {
+        return ResponseEntity.ok(searchIndexService.search(siteId, keyword, page, size, type, categoryId, sort, direction));
     }
 
     @GetMapping("/suggestions")

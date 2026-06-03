@@ -39,3 +39,35 @@ export const rebuildSearchIndexCategory = (categoryId: number, limit = 10, days 
 
 export const fetchSearchSuggestions = (siteId: number, keyword = '', limit = 8) =>
   api.get<SearchSuggestionItem[]>('/portal/search/suggestions', { params: { siteId, keyword, limit } })
+
+export interface PortalSearchParams {
+  siteId: number
+  keyword?: string
+  page?: number
+  size?: number
+  type?: string
+  categoryId?: number
+  sort?: string
+  direction?: 'asc' | 'desc'
+}
+
+export interface PortalSearchItem {
+  objectType: string
+  objectId: number
+  title: string
+  summary?: string | null
+  path?: string | null
+  categoryName?: string | null
+  topicName?: string | null
+  publishedAt?: string | null
+}
+
+export interface PortalSearchResponse {
+  items: PortalSearchItem[]
+  total: number
+  page: number
+  size: number
+}
+
+export const portalSearch = (params: PortalSearchParams) =>
+  api.get<PortalSearchResponse>('/portal/search', { params })

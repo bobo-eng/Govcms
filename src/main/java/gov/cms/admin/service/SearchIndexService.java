@@ -36,6 +36,7 @@ public class SearchIndexService {
     private final AuditLogService auditLogService;
     private final AuditLogRepository auditLogRepository;
     private final SiteAccessService siteAccessService;
+    private final HibernateSearchService hibernateSearchService;
 
     public SearchIndexService(SearchIndexEntryRepository searchIndexEntryRepository,
                               ArticleRepository articleRepository,
@@ -44,7 +45,8 @@ public class SearchIndexService {
                               SearchQueryLogService searchQueryLogService,
                               AuditLogService auditLogService,
                               AuditLogRepository auditLogRepository,
-                              SiteAccessService siteAccessService) {
+                              SiteAccessService siteAccessService,
+                              HibernateSearchService hibernateSearchService) {
         this.searchIndexEntryRepository = searchIndexEntryRepository;
         this.articleRepository = articleRepository;
         this.topicRepository = topicRepository;
@@ -53,6 +55,7 @@ public class SearchIndexService {
         this.auditLogService = auditLogService;
         this.auditLogRepository = auditLogRepository;
         this.siteAccessService = siteAccessService;
+        this.hibernateSearchService = hibernateSearchService;
     }
 
     @Transactional
@@ -180,20 +183,24 @@ public class SearchIndexService {
     }
 
     public PortalSearchResponse search(Long siteId, String keyword, int page, int size, String type, Long categoryId) {
+        return search(siteId, keyword, page, size, type, categoryId, "publishedAt", "desc");
+    }
+
+    public PortalSearchResponse search(Long siteId, String keyword, int page, int size,
+                                       String type, Long categoryId, String sortField, String sortDirection) {
         if (siteId == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "siteId is required.");
         }
         int safePage = Math.max(page, 0);
         int safeSize = Math.max(size, 1);
         String safeKeyword = keyword == null ? "" : keyword.trim();
-        var resultPage = searchIndexEntryRepository.search(siteId, safeKeyword, type, categoryId, PageRequest.of(safePage, safeSize));
-        PortalSearchResponse response = new PortalSearchResponse();
-        response.setTotal(resultPage.getTotalElements());
-        response.setPage(safePage);
-        response.setSize(safeSize);
-        response.setItems(resultPage.getContent().stream().map(this::toItem).toList());
-        searchQueryLogService.record(siteId, safeKeyword, type, categoryId, resultPage.getTotalElements());
+        PortalSearchResponse response = hibernateSearchService.search(siteId, safeKeyword, safePage, safeSize, type, categoryId, sortField, sortDirection);
+        searchQueryLogService.record(siteId, safeKeyword, type, categoryId, response.getTotal());
         return response;
+    }
+
+    public void rebuildSearchIndex() {
+        hibernateSearchService.rebuildIndex();
     }
 
     public List<SearchSuggestionItem> listSuggestions(Long siteId, String keyword, int limit, int days) {

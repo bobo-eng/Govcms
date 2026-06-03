@@ -9,6 +9,11 @@ import jakarta.persistence.Index;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import org.hibernate.search.engine.backend.types.Sortable;
+import org.hibernate.search.mapper.pojo.mapping.definition.annotation.FullTextField;
+import org.hibernate.search.mapper.pojo.mapping.definition.annotation.GenericField;
+import org.hibernate.search.mapper.pojo.mapping.definition.annotation.Indexed;
+import org.hibernate.search.mapper.pojo.mapping.definition.annotation.KeywordField;
 
 import java.time.LocalDateTime;
 
@@ -17,6 +22,7 @@ import java.time.LocalDateTime;
         @Index(name = "idx_search_site_type_object", columnList = "siteId, objectType, objectId", unique = true),
         @Index(name = "idx_search_site_status", columnList = "siteId, status")
 })
+@Indexed
 public class SearchIndexEntry {
 
     @Id
@@ -24,42 +30,54 @@ public class SearchIndexEntry {
     private Long id;
 
     @Column(nullable = false)
+    @GenericField
     private Long siteId;
 
     @Column(nullable = false, length = 40)
+    @KeywordField
     private String objectType;
 
     @Column(nullable = false)
     private Long objectId;
 
     @Column(nullable = false, length = 500)
+    @FullTextField(analyzer = "standard")
+    @KeywordField(name = "title_sort", sortable = Sortable.YES)
     private String title;
 
     @Column(length = 2000)
+    @FullTextField(analyzer = "standard")
     private String summary;
 
     @Column(length = 1000)
+    @FullTextField(analyzer = "standard")
     private String keywords;
 
     @Column(nullable = false, length = 500)
     private String path;
 
     @Column(nullable = false, length = 20)
+    @KeywordField(sortable = Sortable.YES)
     private String status;
 
     @Column
+    @GenericField(sortable = Sortable.YES)
     private LocalDateTime publishedAt;
 
     @Column
+    @GenericField(sortable = Sortable.YES)
     private Long categoryId;
 
     @Column(length = 200)
+    @FullTextField(analyzer = "standard")
     private String categoryName;
 
     @Column(length = 200)
+    @FullTextField(analyzer = "standard")
     private String topicName;
 
     @Column(columnDefinition = "TEXT")
+    @FullTextField(analyzer = "standard")
     private String searchText;
 
     @Column(nullable = false, updatable = false)

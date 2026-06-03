@@ -9,6 +9,7 @@ public class PortalSearchItem {
     private String summary;
     private String path;
     private String categoryName;
+    private String topicName;
     private LocalDateTime publishedAt;
 
     public String getObjectType() { return objectType; }
@@ -23,6 +24,8 @@ public class PortalSearchItem {
     public void setPath(String path) { this.path = path; }
     public String getCategoryName() { return categoryName; }
     public void setCategoryName(String categoryName) { this.categoryName = categoryName; }
+    public String getTopicName() { return topicName; }
+    public void setTopicName(String topicName) { this.topicName = topicName; }
     public LocalDateTime getPublishedAt() { return publishedAt; }
     public void setPublishedAt(LocalDateTime publishedAt) { this.publishedAt = publishedAt; }
 }

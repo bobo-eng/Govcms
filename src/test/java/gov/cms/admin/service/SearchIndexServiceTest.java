@@ -1,5 +1,6 @@
 package gov.cms.admin.service;
 
+import gov.cms.admin.dto.PortalSearchItem;
 import gov.cms.admin.dto.PortalSearchResponse;
 import gov.cms.admin.dto.SearchKeywordStatItem;
 import gov.cms.admin.dto.SearchIndexStatusResponse;
@@ -19,8 +20,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -44,6 +43,7 @@ class SearchIndexServiceTest {
     @Mock private AuditLogService auditLogService;
     @Mock private AuditLogRepository auditLogRepository;
     @Mock private SiteAccessService siteAccessService;
+    @Mock private HibernateSearchService hibernateSearchService;
 
     @InjectMocks private SearchIndexService searchIndexService;
 
@@ -79,17 +79,23 @@ class SearchIndexServiceTest {
 
     @Test
     void searchReturnsPagedResultsAndRecordsQuery() {
-        SearchIndexEntry entry = new SearchIndexEntry();
-        entry.setObjectType("content");
-        entry.setObjectId(11L);
-        entry.setTitle("新闻标题");
-        entry.setSummary("摘要");
-        entry.setPath("/news/11.html");
-        entry.setCategoryName("新闻");
-        entry.setPublishedAt(LocalDateTime.now());
+        PortalSearchItem item = new PortalSearchItem();
+        item.setObjectType("content");
+        item.setObjectId(11L);
+        item.setTitle("新闻标题");
+        item.setSummary("摘要");
+        item.setPath("/news/11.html");
+        item.setCategoryName("新闻");
+        item.setPublishedAt(LocalDateTime.now());
 
-        when(searchIndexEntryRepository.search(1L, "新闻", "content", null, PageRequest.of(0, 10)))
-                .thenReturn(new PageImpl<>(List.of(entry), PageRequest.of(0, 10), 1));
+        PortalSearchResponse expectedResponse = new PortalSearchResponse();
+        expectedResponse.setItems(List.of(item));
+        expectedResponse.setTotal(1);
+        expectedResponse.setPage(0);
+        expectedResponse.setSize(10);
+
+        when(hibernateSearchService.search(1L, "新闻", 0, 10, "content", null, "publishedAt", "desc"))
+                .thenReturn(expectedResponse);
 
         PortalSearchResponse response = searchIndexService.search(1L, "新闻", 0, 10, "content", null);
 
