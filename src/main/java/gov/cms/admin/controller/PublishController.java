@@ -49,8 +49,31 @@ public class PublishController {
 
     @PostMapping("/jobs")
     @PreAuthorize("hasAuthority('publish:center:execute')")
-    public ResponseEntity<PublishJob> createAndExecute(@RequestBody PublishRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(publishService.createAndExecute(request));
+    public ResponseEntity<PublishJob> createAndQueue(@RequestBody PublishRequest request,
+                                                     @RequestParam(required = false, defaultValue = "production") String environment,
+                                                     @RequestParam(required = false) java.time.LocalDateTime scheduledAt) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(publishService.createAndQueue(request, environment, scheduledAt));
+    }
+
+    @PostMapping("/jobs/{id}/approve")
+    @PreAuthorize("hasAuthority('publish:center:execute')")
+    public ResponseEntity<PublishJob> approveJob(@PathVariable Long id) {
+        return ResponseEntity.ok(publishService.approveJob(id));
+    }
+
+    @PostMapping("/jobs/{id}/reject")
+    @PreAuthorize("hasAuthority('publish:center:execute')")
+    public ResponseEntity<PublishJob> rejectJob(@PathVariable Long id) {
+        return ResponseEntity.ok(publishService.rejectJob(id));
+    }
+
+    @GetMapping("/jobs/{id}/preview")
+    public ResponseEntity<String> previewToken(@PathVariable Long id) {
+        PublishJob job = publishService.getJob(id);
+        if (job == null || job.getPreviewToken() == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+        return ResponseEntity.ok(job.getPreviewToken());
     }
 
     @GetMapping("/jobs")

@@ -26,6 +26,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.quartz.Scheduler;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -61,6 +62,8 @@ class PublishServiceTest {
     @Spy private ObjectMapper objectMapper = new ObjectMapper();
     @Mock private AuditLogService auditLogService;
     @Mock private SiteAccessService siteAccessService;
+    @Mock private Scheduler scheduler;
+    @Mock private PublishExecutor publishExecutor;
 
     @InjectMocks
     private PublishService publishService;
@@ -135,7 +138,7 @@ class PublishServiceTest {
         when(articleService.publishCheck(9L)).thenReturn(articleCheck);
         when(publishImpactCalculator.calculate(any())).thenReturn(plan);
 
-        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> publishService.createAndExecute(request));
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class, () -> publishService.createAndQueue(request, "production", null));
 
         assertEquals(HttpStatus.CONFLICT, exception.getStatusCode());
     }
