@@ -94,4 +94,10 @@ class Sm4EncryptorTest {
                 () -> encryptor.decrypt(corrupted));
         assertTrue(ex.getMessage().contains("SM4 decryption failed"));
     }
+
+    @Test
+    void decrypt_withInvalidBase64_shouldReturnAsIs() {
+        String invalid = "not-valid-base64!!!";
+        assertEquals(invalid, encryptor.decrypt(invalid));
+    }
 }

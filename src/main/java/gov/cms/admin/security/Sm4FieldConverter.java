@@ -7,7 +7,7 @@ import jakarta.persistence.Converter;
 @Converter(autoApply = false)
 public class Sm4FieldConverter implements AttributeConverter<String, String> {
 
-    private Sm4Encryptor encryptor;
+    private volatile Sm4Encryptor encryptor;
 
     @Override
     public String convertToDatabaseColumn(String attribute) {
