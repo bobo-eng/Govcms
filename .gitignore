@@ -36,3 +36,6 @@ docs/*.docx
 
 # Worktrees
 .worktrees/
+
+# Dameng local credentials
+application-dm.yml
