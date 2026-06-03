@@ -20,7 +20,7 @@ GovCMS 的正式交付标准不仅是功能可用，还必须满足信创适配�
 
 ### 2.1 目标环境
 
-- 数据库：`KingbaseES`
+- 数据库：`Dameng DM8`（生产）；开发环境保留 MySQL 兼容
 - 应用服务器：`TongWeb`
 - Web 服务器：`Nginx`
 - 操作系统：国产 OS 兼容（如麒麟、UOS）
@@ -126,12 +126,12 @@ flowchart TD
 
 当前仓库与正式交付口径的主要差距如下：
 
-- 当前默认数据库仍是 `MySQL`
-- 当前默认运行方式仍是本地 `spring-boot:run`
-- 当前认证仍是普通 JWT 签名链路
-- 当前没有国密签名、验签、加解密服务抽象
-- 当前没有 TongWeb 部署包和配置说明
-- 当前没有 KingbaseES 兼容矩阵和迁移说明
+- 开发环境默认数据库仍是 `MySQL`，生产已适配 `Dameng DM8`
+- 当前默认运行方式仍是本地 `spring-boot:run`，TongWeb 部署包和配置尚未完成
+- JWT 令牌签名仍为 HMAC，SM2/SM3 签名链路已具备但尚未接入 JWT 流程
+- 国密加解密服务抽象（`GmCryptoService`、`Sm4Encryptor`、`Sm4FieldConverter`）已完成，敏感字段加密已落地
+- 发布产物摘要校验与验签尚未实现
+- 国密 TLS/HTTPS 配置依赖运维侧 Nginx 证书部署，不在应用代码范围内
 
 ## 7. 首期交付验收
 

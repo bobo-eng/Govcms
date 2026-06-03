@@ -12,10 +12,11 @@ Current scope covers RBAC, content lifecycle, category/template/navigation/topic
 
 ## Tech Stack
 
-- **Backend**: Java 17, Spring Boot 3.2, Spring Security, JWT, Spring Data JPA, Thymeleaf, MySQL 8
+- **Backend**: Java 17, Spring Boot 3.2, Spring Security, JWT, Spring Data JPA, Thymeleaf, MySQL 8 (dev), Dameng DM8 (prod)
 - **Frontend**: Vue 3, TypeScript, Vite, Ant Design Vue 4, Axios
 - **Build**: Maven (backend), npm (frontend)
 - **Storage**: Local filesystem (`./storage/media`, `./storage/publish`)
+- **Cryptography**: BouncyCastle GM (SM2/SM3/SM4); SM4 field-level transparent encryption via JPA `AttributeConverter`
 
 ## Common Commands
 
@@ -77,7 +78,7 @@ repository/     Spring Data JPA repositories
 service/        Business logic; constructor injection only
 controller/     REST API controllers; returns DTOs, never raw entities
 dto/            Request/response records and POJOs
-security/       JWT filter and utility
+security/       JWT filter, GM crypto service (SM2/SM3/SM4), `Sm4Encryptor`, `Sm4FieldConverter`
 config/         Security config, DataInitializer (seeds permissions/roles/menus/admin user)
 exception/      GlobalExceptionHandler
 ```
@@ -128,6 +129,17 @@ Articles flow through six statuses: `draft` → `pending_review` → `rejected` 
 - `SearchIndexService` rebuilds indexes for articles, categories, and topics
 - Portal search endpoint is public (`/api/portal/search/**`)
 
+### National Cryptography (GM)
+
+- `GmCryptoService` (`BouncyCastleGmCryptoService`) provides SM2 signing/verification, SM3 digest, and SM4 encryption/decryption
+- `Sm4Encryptor` is a Spring-managed component that wraps SM4 with Base64 encoding; key from `gm.crypto.sm4.key-hex`
+- `Sm4FieldConverter` is a JPA `AttributeConverter` applied to `User.email` and `User.fullName` for transparent encryption at rest
+- Converter uses `SpringContextHolder` to look up the `Sm4Encryptor` bean and caches it in a `volatile` field
+- Deterministic SM4 (fixed zero IV) is used so that encrypted values remain stable for DB `unique` constraints and exact-match queries
+- `UserService` encrypts email parameters before calling `existsByEmail` / `existsByEmailAndIdNot` because Spring Data JPA does not apply `AttributeConverter` to query parameters
+- `gm.crypto.enabled=false` disables encryption entirely (plaintext passthrough); missing key when enabled throws `IllegalStateException`
+- Read-time compatibility: if decryption encounters invalid Base64, the raw value is returned as-is (supports legacy plaintext migration)
+
 ### Media
 
 - Uploaded files stored in `./storage/media` (configurable via `app.media.storage-path`)
@@ -138,8 +150,11 @@ Articles flow through six statuses: `draft` → `pending_review` → `rejected` 
 
 - `application.yml` — base config, default profile `local`
 - `application-local.yml` — local MySQL connection (database `govcms`, user `root` / `123456`)
-- `application-test.yml` — test profile
+- `application-dm.yml` — Dameng DM8 connection for local DM testing (`ddl-auto: validate`)
+- `application-prod.yml` — production template with HikariCP, DM8, Redis, Quartz cluster, and media/publish storage paths
+- `application-test.yml` — test profile; provides `gm.crypto.sm4.key-hex` for test encryption
 - JWT secret and expiration in `application.yml` (not production-grade)
+- GM crypto keys via environment variables: `GM_SM2_PRIVATE_KEY`, `GM_SM2_PUBLIC_KEY`, `GM_SM4_KEY`
 - CORS is open (`*`) for local development
 
 ## API Conventions
@@ -184,6 +199,5 @@ When product behavior conflicts with code, the `docs/` directory takes precedenc
 
 - Publish center is synchronous; async orchestration and multi-environment deployment are not yet implemented
 - Search uses database tables, not a dedicated search engine
-- Audit logs cover key publish actions but do not yet have a dedicated admin UI
-- JWT signing is standard HMAC, not SM2/SM3 (national cryptography) — required for final delivery but not yet integrated
-- Default database is MySQL; target production database is KingbaseES
+- Audit logs cover key publish actions and have a dedicated admin UI (`/audit-logs`)
+- Default dev database is MySQL; production database is Dameng DM8
