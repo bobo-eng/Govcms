@@ -11,6 +11,8 @@ public class GmCryptoProperties {
 
     private Sm2 sm2 = new Sm2();
 
+    private Sm4 sm4 = new Sm4();
+
     public boolean isEnabled() {
         return enabled;
     }
@@ -25,6 +27,14 @@ public class GmCryptoProperties {
 
     public void setSm2(Sm2 sm2) {
         this.sm2 = sm2;
+    }
+
+    public Sm4 getSm4() {
+        return sm4;
+    }
+
+    public void setSm4(Sm4 sm4) {
+        this.sm4 = sm4;
     }
 
     public static class Sm2 {
@@ -45,6 +55,18 @@ public class GmCryptoProperties {
 
         public void setPublicKeyHex(String publicKeyHex) {
             this.publicKeyHex = publicKeyHex;
+        }
+    }
+
+    public static class Sm4 {
+        private String keyHex;
+
+        public String getKeyHex() {
+            return keyHex;
+        }
+
+        public void setKeyHex(String keyHex) {
+            this.keyHex = keyHex;
         }
     }
 }
