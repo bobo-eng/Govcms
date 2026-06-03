@@ -8,6 +8,10 @@ export interface PublishJobItem {
   mode: string
   status: string
   operatorName: string
+  environment?: string | null
+  approvalStatus?: string | null
+  scheduledAt?: string | null
+  previewToken?: string | null
   outputRoot?: string | null
   resultSummary?: string | null
   failureReason?: string | null
@@ -99,7 +103,11 @@ export interface PublishRollbackPayload {
 
 export const publishCheck = (payload: PublishRequestPayload) => api.post<PublishCheckResponseData>('/publish/check', payload)
 export const publishImpact = (payload: PublishRequestPayload) => api.post<PublishImpactResponseData>('/publish/impact', payload)
-export const createPublishJob = (payload: PublishRequestPayload) => api.post<PublishJobItem>('/publish/jobs', payload)
+export const createPublishJob = (payload: PublishRequestPayload, environment = 'production', scheduledAt?: string | null) =>
+  api.post<PublishJobItem>('/publish/jobs', payload, { params: { environment, scheduledAt } })
+export const approvePublishJob = (id: number) => api.post<PublishJobItem>(`/publish/jobs/${id}/approve`)
+export const rejectPublishJob = (id: number) => api.post<PublishJobItem>(`/publish/jobs/${id}/reject`)
+export const fetchPreviewToken = (id: number) => api.get<string>(`/publish/jobs/${id}/preview`)
 export const fetchPublishJobs = (params: Record<string, any> = {}) => api.get<PublishJobItem[]>('/publish/jobs', { params })
 export const fetchPublishJobDetail = (id: number) => api.get<PublishJobItem>(`/publish/jobs/${id}`)
 export const fetchPublishImpacts = (id: number) => api.get<PublishImpactItemData[]>(`/publish/jobs/${id}/impacts`)
