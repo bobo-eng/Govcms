@@ -4,6 +4,7 @@ import gov.cms.admin.entity.PublishJob;
 import gov.cms.admin.repository.PublishJobRepository;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
@@ -16,6 +17,7 @@ import java.nio.file.Paths;
 import java.util.Optional;
 
 @RestController
+@CrossOrigin(origins = "*")
 public class PortalPreviewController {
 
     private final PublishJobRepository publishJobRepository;
