@@ -377,7 +377,7 @@ onMounted(async () => {
       <div class="admin-toolbar-row">
         <div class="admin-search-box">
           <SearchOutlined class="admin-search-icon" />
-          <input v-model="searchKeyword" class="admin-search-input" placeholder="按用户名、姓名或邮箱搜索" @keyup.enter="handleSearch" />
+          <input v-model="searchKeyword" class="admin-search-input" placeholder="按用户名搜索" @keyup.enter="handleSearch" />
         </div>
         <button class="admin-secondary-btn" @click="handleSearch">查询</button>
         <button v-if="canUpdateUser" class="admin-secondary-btn" :disabled="!hasSelection || batchLoading" @click="handleBatchDisable">
