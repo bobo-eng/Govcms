@@ -1,0 +1,13 @@
+spring:
+  datasource:
+    url: jdbc:dm://localhost:5236/GOVCMS1
+    username: GOVCMS1
+    password: ${DM_PASSWORD:}
+    driver-class-name: dm.jdbc.driver.DmDriver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.DmDialect
+        format_sql: true
