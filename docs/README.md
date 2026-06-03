@@ -55,6 +55,8 @@
   - 后台体验统一化首批改版优先级与实施分期建议。
 - `docs/21-admin-ux-residual-checklist.md`
   - 后台体验统一化残留样式、残留页面与后续收尾优先级清单。
+- `docs/deployment-guide.md`
+  - 生产环境部署手册，覆盖 DM8 数据库、应用部署、Nginx 配置、备份与回滚、国密密钥生成。
 
 ## 历史参考输入
 

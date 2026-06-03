@@ -32,8 +32,8 @@
 | 搜索 | 已实现站内搜索增强、数据库索引、高亮、热词/零结果统计与索引重建入口 | L1 / L3 | 已进入增强可用阶段，但仍缺搜索建议和复杂相关度模型 |
 | 媒体依赖 | 已实现引用追踪、删除保护与缺失媒体告警 | L1 / L2 / L3 | 已形成门户依赖基础能力 |
 | 审计日志 | 已实现发布、回滚、阻断、媒体删除保护、站点管理员分配首批留痕 | L1 / L2 | 已形成轻量审计基础 |
-| 信创适配 | 未实现 | L1 / L2 / L3 | 当前默认仍是 MySQL + Spring Boot 本地运行 |
-| 国密能力 | 未实现 | L1 / L2 / L3 | 当前仍是普通 JWT 签名和普通配置方案 |
+| 信创适配 | 已部分实现 | L1 / L2 / L3 | DM8 数据库适配已完成；TongWeb 部署待推进 |
+| 国密能力 | 已部分实现 | L1 / L2 / L3 | SM2/SM3/SM4 服务抽象与 SM4 字段加密已落地；JWT 国密签名待接入 |
 
 ## 3. 技术现状与目标差距
 
@@ -41,14 +41,14 @@
 
 - 后端：`Spring Boot 3.2 + Spring Security + Spring Data JPA + JWT`
 - 前端：`Vue 3 + TypeScript + Vite + Ant Design Vue`
-- 数据库：`MySQL 8`
+- 数据库：开发 `MySQL 8`，生产 `Dameng DM8`
 - 部署形态：本地 `spring-boot:run` 与前端 `npm run dev`
 - 文件存储：本地文件系统 `./storage/media` 与 `./storage/publish`
 - 搜索实现：数据库表索引
 
 ### 正式目标技术口径
 
-- 数据库目标：`KingbaseES`
+- 数据库目标：`Dameng DM8`
 - 应用服务器目标：`TongWeb`
 - Web 层目标：`Nginx`
 - 运行环境目标：国产 OS / 政务云兼容
