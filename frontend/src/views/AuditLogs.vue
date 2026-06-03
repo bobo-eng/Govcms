@@ -4,6 +4,7 @@ import '../styles/admin-refresh.css'
 import { computed, onMounted, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue'
+import type { TablePaginationConfig } from 'ant-design-vue'
 import { usePermission } from '../composables/usePermission'
 import { getAuditLogs, type AuditLogItem, type AuditLogQueryParams } from '../api/auditLogs'
 import { fetchSiteOptions, type SiteOptionItem } from '../api/sites'
@@ -15,14 +16,14 @@ const loading = ref(false)
 const auditLogs = ref<AuditLogItem[]>([])
 const siteOptions = ref<SiteOptionItem[]>([])
 
-const queryParams = ref<AuditLogQueryParams>(({
-  siteId: null,
+const queryParams = ref<AuditLogQueryParams>({
+  siteId: undefined,
   actionType: undefined,
   result: undefined,
   operatorName: undefined,
   page: 0,
   size: 20
-}))
+})
 
 const pagination = ref({
   current: 1,
@@ -105,8 +106,10 @@ const fetchAuditLogs = async () => {
     pagination.value.total = res.data.totalElements || 0
     pagination.value.current = (res.data.number || 0) + 1
     pagination.value.pageSize = res.data.size || 20
-  } catch (err: any) {
-    message.error(err.response?.data?.error || '加载审计日志失败')
+  } catch (err: unknown) {
+    const msg =
+      err instanceof Error ? err.message : '加载审计日志失败'
+    message.error(msg)
   } finally {
     loading.value = false
   }
@@ -117,7 +120,7 @@ const fetchSites = async () => {
     const res = await fetchSiteOptions()
     siteOptions.value = res.data || []
   } catch {
-    // ignore
+    message.warning('加载站点列表失败')
   }
 }
 
@@ -129,7 +132,7 @@ const handleSearch = () => {
 
 const handleReset = () => {
   queryParams.value = {
-    siteId: isScopedSiteAdmin.value ? siteOptions.value[0]?.id : null,
+    siteId: isScopedSiteAdmin.value ? siteOptions.value[0]?.id : undefined,
     actionType: undefined,
     result: undefined,
     operatorName: undefined,
@@ -140,11 +143,13 @@ const handleReset = () => {
   fetchAuditLogs()
 }
 
-const handleTableChange = (pag: any) => {
-  queryParams.value.page = pag.current - 1
-  queryParams.value.size = pag.pageSize
-  pagination.value.current = pag.current
-  pagination.value.pageSize = pag.pageSize
+const handleTableChange = (pag: TablePaginationConfig) => {
+  const current = pag.current ?? 1
+  const pageSize = pag.pageSize ?? 20
+  queryParams.value.page = current - 1
+  queryParams.value.size = pageSize
+  pagination.value.current = current
+  pagination.value.pageSize = pageSize
   fetchAuditLogs()
 }
 
