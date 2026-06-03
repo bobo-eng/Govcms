@@ -60,6 +60,7 @@ public class BouncyCastleGmCryptoService implements GmCryptoService {
         try {
             Cipher cipher = Cipher.getInstance("SM4/CBC/PKCS5Padding", "BC");
             SecretKeySpec keySpec = new SecretKeySpec(key, "SM4");
+            // TODO: 当前使用固定全零 IV，业务启用 SM4 前必须改为随机 IV 并随密文存储/传输
             IvParameterSpec ivSpec = new IvParameterSpec(new byte[16]);
             cipher.init(Cipher.ENCRYPT_MODE, keySpec, ivSpec);
             return cipher.doFinal(data);
@@ -73,6 +74,7 @@ public class BouncyCastleGmCryptoService implements GmCryptoService {
         try {
             Cipher cipher = Cipher.getInstance("SM4/CBC/PKCS5Padding", "BC");
             SecretKeySpec keySpec = new SecretKeySpec(key, "SM4");
+            // TODO: 当前使用固定全零 IV，业务启用 SM4 前必须改为随机 IV 并随密文存储/传输
             IvParameterSpec ivSpec = new IvParameterSpec(new byte[16]);
             cipher.init(Cipher.DECRYPT_MODE, keySpec, ivSpec);
             return cipher.doFinal(data);

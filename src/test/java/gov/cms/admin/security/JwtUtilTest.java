@@ -52,4 +52,18 @@ class JwtUtilTest {
         String tampered = token.substring(0, token.length() - 5) + "xxxxx";
         assertFalse(jwtUtil.validateToken(tampered));
     }
+
+    @Test
+    void validateToken_withExpiredToken_shouldReturnFalse() throws InterruptedException {
+        JwtProperties shortExpirationProps = new JwtProperties();
+        shortExpirationProps.setExpiration(1L);
+        JwtUtil shortLivedJwtUtil = new JwtUtil(
+                new BouncyCastleGmCryptoService(),
+                new GmCryptoProperties(),
+                shortExpirationProps
+        );
+        String token = shortLivedJwtUtil.generateToken("admin");
+        Thread.sleep(10);
+        assertFalse(shortLivedJwtUtil.validateToken(token));
+    }
 }

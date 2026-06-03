@@ -138,10 +138,6 @@ public class JwtUtil {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(data);
     }
 
-    private String base64UrlEncode(String data) {
-        return base64UrlEncode(data.getBytes(StandardCharsets.UTF_8));
-    }
-
     private byte[] base64UrlDecode(String data) {
         return Base64.getUrlDecoder().decode(data);
     }
