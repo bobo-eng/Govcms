@@ -37,6 +37,7 @@ const router = createRouter({
         { path: 'content', name: 'Content', component: Content },
         { path: 'content/review', name: 'Review', component: Review },
         { path: 'content/publish', name: 'PublishCenter', component: PublishCenter },
+        { path: 'publish/tasks', name: 'PublishTasks', component: () => import('../views/PublishTasks.vue') },
         { path: 'content/categories', name: 'Categories', component: Categories },
         { path: 'content/templates', name: 'Templates', component: Templates },
         { path: 'sites', name: 'Sites', component: Sites },
