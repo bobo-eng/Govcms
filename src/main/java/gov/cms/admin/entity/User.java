@@ -3,7 +3,9 @@ package gov.cms.admin.entity;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import gov.cms.admin.security.Sm4FieldConverter;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -34,9 +36,11 @@ public class User {
     @Column(nullable = false)
     private String password;
 
+    @Convert(converter = Sm4FieldConverter.class)
     @Column(nullable = false, unique = true, length = 100)
     private String email;
 
+    @Convert(converter = Sm4FieldConverter.class)
     @Column(length = 100)
     private String fullName;
 
