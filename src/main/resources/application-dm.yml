@@ -6,7 +6,7 @@ spring:
     driver-class-name: dm.jdbc.driver.DmDriver
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     properties:
       hibernate:
         dialect: org.hibernate.dialect.DmDialect

@@ -5,6 +5,7 @@ import gov.cms.admin.entity.User;
 import gov.cms.admin.repository.RoleRepository;
 import gov.cms.admin.repository.SiteRepository;
 import gov.cms.admin.repository.UserRepository;
+import gov.cms.admin.security.Sm4Encryptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -26,18 +27,21 @@ public class UserService {
     private final SiteRepository siteRepository;
     private final RoleRepository roleRepository;
     private final AuditLogService auditLogService;
+    private final Sm4Encryptor sm4Encryptor;
 
     @Autowired
     public UserService(UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
                        SiteRepository siteRepository,
                        RoleRepository roleRepository,
-                       AuditLogService auditLogService) {
+                       AuditLogService auditLogService,
+                       Sm4Encryptor sm4Encryptor) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.siteRepository = siteRepository;
         this.roleRepository = roleRepository;
         this.auditLogService = auditLogService;
+        this.sm4Encryptor = sm4Encryptor;
     }
 
     public Page<User> getUsers(Pageable pageable) {
@@ -61,7 +65,8 @@ public class UserService {
         if (userRepository.existsByUsername(user.getUsername())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "用户名已存在");
         }
-        if (userRepository.existsByEmail(user.getEmail())) {
+        String encryptedEmail = sm4Encryptor.encrypt(user.getEmail());
+        if (userRepository.existsByEmail(encryptedEmail)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "邮箱已存在");
         }
 
@@ -89,7 +94,8 @@ public class UserService {
             if (updateRequest.getEmail().isBlank()) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "邮箱不能为空");
             }
-            if (userRepository.existsByEmailAndIdNot(updateRequest.getEmail(), id)) {
+            String encryptedEmail = sm4Encryptor.encrypt(updateRequest.getEmail());
+            if (userRepository.existsByEmailAndIdNot(encryptedEmail, id)) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "邮箱已存在");
             }
             existingUser.setEmail(updateRequest.getEmail().trim());

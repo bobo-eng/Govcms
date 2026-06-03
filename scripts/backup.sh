@@ -16,8 +16,14 @@ mkdir -p "$BACKUP_DIR"
 
 echo "[$(date)] Starting backup to $BACKUP_DIR"
 
+DISQL_CMD="${DISQL_PATH:-disql}"
+if ! command -v "$DISQL_CMD" >/dev/null 2>&1; then
+    echo "Error: disql not found in PATH. Set DISQL_PATH environment variable to the full path."
+    exit 1
+fi
+
 echo "Backing up database..."
-disql "$DB_USER/$DB_PASSWORD@$DB_HOST:$DB_PORT" -e "BACKUP DATABASE FULL TO '$BACKUP_DIR/db.bak' COMPRESSED;"
+"$DISQL_CMD" "$DB_USER/$DB_PASSWORD@$DB_HOST:$DB_PORT" -e "BACKUP DATABASE FULL TO '$BACKUP_DIR/db.bak' COMPRESSED;"
 
 echo "Backing up storage..."
 tar czf "$BACKUP_DIR/storage.tar.gz" -C "$STORAGE_DIR" .
