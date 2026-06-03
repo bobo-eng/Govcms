@@ -49,4 +49,49 @@ class Sm4EncryptorTest {
         String restored = encryptor.decrypt(encrypted);
         assertEquals(original, restored);
     }
+
+    @Test
+    void encrypt_withMissingKey_shouldThrow() {
+        GmCryptoService gmCryptoService = new BouncyCastleGmCryptoService();
+        GmCryptoProperties props = new GmCryptoProperties();
+        props.getSm4().setKeyHex(null);
+        Sm4Encryptor noKeyEncryptor = new Sm4Encryptor(gmCryptoService, props);
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> noKeyEncryptor.encrypt("test@example.com"));
+        assertTrue(ex.getMessage().contains("key-hex is not configured"));
+    }
+
+    @Test
+    void decrypt_withMissingKey_shouldThrow() {
+        GmCryptoService gmCryptoService = new BouncyCastleGmCryptoService();
+        GmCryptoProperties props = new GmCryptoProperties();
+        props.getSm4().setKeyHex(null);
+        Sm4Encryptor noKeyEncryptor = new Sm4Encryptor(gmCryptoService, props);
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> noKeyEncryptor.decrypt("dGVzdA=="));
+        assertTrue(ex.getMessage().contains("key-hex is not configured"));
+    }
+
+    @Test
+    void encrypt_whenDisabled_shouldReturnPlaintext() {
+        GmCryptoService gmCryptoService = new BouncyCastleGmCryptoService();
+        GmCryptoProperties props = new GmCryptoProperties();
+        props.setEnabled(false);
+        Sm4Encryptor disabledEncryptor = new Sm4Encryptor(gmCryptoService, props);
+
+        String original = "test@example.com";
+        assertEquals(original, disabledEncryptor.encrypt(original));
+    }
+
+    @Test
+    void decrypt_withCorruptedBase64_shouldThrow() {
+        // Valid Base64 but not valid SM4 ciphertext -> decryption should fail
+        String corrupted = "dGVzdA=="; // "test" in Base64, not SM4 ciphertext
+
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> encryptor.decrypt(corrupted));
+        assertTrue(ex.getMessage().contains("SM4 decryption failed"));
+    }
 }

@@ -21,9 +21,12 @@ public class Sm4Encryptor {
         if (plaintext == null || plaintext.isBlank()) {
             return plaintext;
         }
+        if (!isEnabled()) {
+            return plaintext;
+        }
         String keyHex = resolveKeyHex();
         if (keyHex == null || keyHex.isBlank()) {
-            return plaintext;
+            throw new IllegalStateException("SM4 encryption is enabled but gm.crypto.sm4.key-hex is not configured");
         }
         try {
             byte[] encrypted = gmCryptoService.sm4Encrypt(
@@ -40,19 +43,28 @@ public class Sm4Encryptor {
         if (ciphertext == null || ciphertext.isBlank()) {
             return ciphertext;
         }
+        if (!isEnabled()) {
+            return ciphertext;
+        }
         String keyHex = resolveKeyHex();
         if (keyHex == null || keyHex.isBlank()) {
-            return ciphertext;
+            throw new IllegalStateException("SM4 encryption is enabled but gm.crypto.sm4.key-hex is not configured");
         }
         try {
-            byte[] decrypted = gmCryptoService.sm4Decrypt(
-                    Base64.getDecoder().decode(ciphertext),
-                    hexToBytes(keyHex)
-            );
+            byte[] decoded = Base64.getDecoder().decode(ciphertext);
+            byte[] decrypted = gmCryptoService.sm4Decrypt(decoded, hexToBytes(keyHex));
             return new String(decrypted, StandardCharsets.UTF_8);
-        } catch (Exception e) {
+        } catch (IllegalArgumentException e) {
+            // Not valid Base64 -> treat as existing plaintext (read-time compatibility)
             return ciphertext;
+        } catch (Exception e) {
+            // Valid Base64 but SM4 decryption failed -> possible data corruption
+            throw new RuntimeException("SM4 decryption failed", e);
         }
+    }
+
+    private boolean isEnabled() {
+        return gmCryptoProperties != null && gmCryptoProperties.isEnabled();
     }
 
     private String resolveKeyHex() {
