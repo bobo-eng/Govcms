@@ -315,11 +315,24 @@ onMounted(async () => {
           </tr>
         </thead>
         <tbody>
-          <tr v-if="loading">
-            <td colspan="6" class="admin-empty-cell">加载中...</td>
-          </tr>
+          <template v-if="loading">
+            <tr v-for="n in 6" :key="`sk-${n}`">
+              <td colspan="6">
+                <div class="admin-skeleton-row" style="margin: 8px 16px;"></div>
+              </td>
+            </tr>
+          </template>
           <tr v-else-if="!articles.length">
-            <td colspan="6" class="admin-empty-cell">暂无数据</td>
+            <td colspan="6">
+              <div class="admin-empty-box">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <rect x="3" y="3" width="18" height="18" rx="4"/>
+                  <path d="M9 9h6H9z"/>
+                </svg>
+                <p>暂无内容稿件</p>
+                <button v-if="canCreate" class="admin-primary-btn" @click="openCreate">新建内容</button>
+              </div>
+            </td>
           </tr>
           <tr v-for="item in articles" :key="item.id">
             <td>
