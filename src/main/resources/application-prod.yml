@@ -82,3 +82,18 @@ app:
     storage-path: /var/govcms/storage/media
   publish:
     storage-path: /var/govcms/storage/publish
+  rate-limit:
+    enabled: true
+    rules:
+      - path: "/api/auth/login"
+        capacity: 5
+        refill: 1
+        period: MINUTES
+      - path: "/api/portal/search"
+        capacity: 60
+        refill: 1
+        period: SECONDS
+      - path: "/api/publish/"
+        capacity: 10
+        refill: 1
+        period: MINUTES
