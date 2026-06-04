@@ -15,6 +15,11 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -36,13 +41,15 @@ public class DataInitializer {
             MenuRepository menuRepository,
             UserRepository userRepository,
             PasswordEncoder passwordEncoder,
-            NotificationRepository notificationRepository
+            NotificationRepository notificationRepository,
+            DataSource dataSource
     ) {
         return args -> {
             seedPermissions(permissionRepository);
             seedRoles(permissionRepository, roleRepository);
             seedMenus(menuRepository);
             seedDefaultAdmin(userRepository, roleRepository, passwordEncoder);
+            ensureNotificationTable(dataSource);
             seedNotifications(notificationRepository, userRepository);
         };
     }
@@ -296,6 +303,49 @@ public class DataInitializer {
             adminUser.setFullName(DEFAULT_ADMIN_NAME);
         }
         userRepository.save(adminUser);
+    }
+
+    private void ensureNotificationTable(DataSource dataSource) {
+        try (Connection conn = dataSource.getConnection()) {
+            DatabaseMetaData metaData = conn.getMetaData();
+            try (ResultSet tables = metaData.getTables(null, null, "notifications", new String[]{"TABLE"})) {
+                if (tables.next()) {
+                    return;
+                }
+            }
+
+            String dbProduct = metaData.getDatabaseProductName().toLowerCase();
+            String createSql;
+            if (dbProduct.contains("mysql")) {
+                createSql = "CREATE TABLE notifications ("
+                        + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
+                        + "user_id BIGINT NOT NULL, "
+                        + "title VARCHAR(200) NOT NULL, "
+                        + "content VARCHAR(1000) NOT NULL, "
+                        + "type VARCHAR(20) NOT NULL DEFAULT 'info', "
+                        + "`read` TINYINT(1) NOT NULL DEFAULT 0, "
+                        + "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "
+                        + "INDEX idx_user_id (user_id), "
+                        + "INDEX idx_user_read (user_id, `read`)"
+                        + ")";
+            } else {
+                createSql = "CREATE TABLE notifications ("
+                        + "id BIGINT IDENTITY(1,1) PRIMARY KEY, "
+                        + "user_id BIGINT NOT NULL, "
+                        + "title VARCHAR(200) NOT NULL, "
+                        + "content VARCHAR(1000) NOT NULL, "
+                        + "type VARCHAR(20) NOT NULL DEFAULT 'info', "
+                        + "\"read\" NUMBER(1,0) DEFAULT 0 NOT NULL, "
+                        + "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL"
+                        + ")";
+            }
+
+            try (var stmt = conn.createStatement()) {
+                stmt.execute(createSql);
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to create notifications table", e);
+        }
     }
 
     private void seedNotifications(NotificationRepository notificationRepository, UserRepository userRepository) {
