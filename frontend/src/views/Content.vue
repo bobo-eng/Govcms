@@ -79,6 +79,14 @@ const statusOptions = [
   { value: 'offline', label: '已下线' }
 ]
 
+const statusCounts = computed(() => {
+  const map: Record<string, number> = {}
+  articles.value.forEach(a => {
+    map[a.status || 'draft'] = (map[a.status || 'draft'] || 0) + 1
+  })
+  return map
+})
+
 const statusLabel = (status?: string) => {
   const map: Record<string, string> = {
     draft: '草稿',
@@ -306,6 +314,19 @@ onMounted(async () => {
       </button>
     </div>
 
+    <div class="admin-stats-row">
+      <div
+        v-for="s in statusOptions.filter(x => x.value)"
+        :key="s.value"
+        class="admin-stat-card"
+        :class="{ active: filters.status === s.value }"
+        @click="filters.status = s.value; pagination.current = 1; loadArticles()"
+      >
+        <span class="admin-stat-value">{{ statusCounts[s.value] || 0 }}</span>
+        <span class="admin-stat-label">{{ s.label }}</span>
+      </div>
+    </div>
+
     <div class="admin-toolbar-card">
       <div class="admin-toolbar-row">
         <div class="admin-search-box">
@@ -520,5 +541,42 @@ onMounted(async () => {
   margin: 10px 0 0;
   padding-left: 18px;
   color: #334155;
+}
+
+.admin-stats-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.admin-stat-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px 20px;
+  min-width: 100px;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.admin-stat-card:hover,
+.admin-stat-card.active {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+}
+
+.admin-stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.admin-stat-label {
+  font-size: 13px;
+  color: #64748b;
+  margin-top: 4px;
 }
 </style>
