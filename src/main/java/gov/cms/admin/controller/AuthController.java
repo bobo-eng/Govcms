@@ -42,7 +42,7 @@ public class AuthController {
                     new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
             );
 
-            String token = jwtUtil.generateToken(request.getUsername());
+            String token = jwtUtil.generateToken(request.getUsername(), request.isRememberMe());
 
             // Fetch user roles and permissions
             User user = userRepository.findByUsername(request.getUsername()).orElse(null);

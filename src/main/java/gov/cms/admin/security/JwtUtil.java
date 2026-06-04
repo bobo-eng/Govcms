@@ -34,9 +34,16 @@ public class JwtUtil {
         this.signingKeyPair = resolveKeyPair();
     }
 
+    private static final long JWT_EXPIRATION_REMEMBER = 604800000L; // 7 days
+
     public String generateToken(String username) {
+        return generateToken(username, false);
+    }
+
+    public String generateToken(String username, boolean rememberMe) {
         Instant now = Instant.now();
-        Instant expiration = now.plusMillis(jwtProperties.getExpiration());
+        long expirationMillis = rememberMe ? JWT_EXPIRATION_REMEMBER : jwtProperties.getExpiration();
+        Instant expiration = now.plusMillis(expirationMillis);
 
         Map<String, Object> header = Map.of("alg", "SM2", "typ", "JWT");
         Map<String, Object> payload = new HashMap<>();
