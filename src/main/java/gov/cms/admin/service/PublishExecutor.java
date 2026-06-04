@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import gov.cms.admin.dto.RenderContextSnapshot;
 import gov.cms.admin.dto.RenderRequest;
 import gov.cms.admin.entity.Article;
+import gov.cms.admin.security.GmCryptoService;
 import gov.cms.admin.entity.ArticleStatus;
 import gov.cms.admin.entity.PublishArtifact;
 import gov.cms.admin.entity.PublishEnvironment;
@@ -58,6 +59,8 @@ public class PublishExecutor {
   private final ObjectMapper objectMapper;
   private final TransactionTemplate transactionTemplate;
   private final String publishStoragePath;
+  private final GmCryptoService gmCryptoService;
+  private final boolean gmCryptoEnabled;
 
   public PublishExecutor(PublishJobRepository publishJobRepository,
                          PublishArtifactRepository publishArtifactRepository,
@@ -73,7 +76,9 @@ public class PublishExecutor {
                          TopicRepository topicRepository,
                          ObjectMapper objectMapper,
                          PlatformTransactionManager transactionManager,
-                         @Value("${app.publish.storage-path:./storage/publish}") String publishStoragePath) {
+                         @Value("${app.publish.storage-path:./storage/publish}") String publishStoragePath,
+                         GmCryptoService gmCryptoService,
+                         @Value("${gm.crypto.enabled:true}") boolean gmCryptoEnabled) {
     this.publishJobRepository = publishJobRepository;
     this.publishArtifactRepository = publishArtifactRepository;
     this.publishImpactItemRepository = publishImpactItemRepository;
@@ -89,6 +94,8 @@ public class PublishExecutor {
     this.objectMapper = objectMapper;
     this.transactionTemplate = new TransactionTemplate(transactionManager);
     this.publishStoragePath = publishStoragePath;
+    this.gmCryptoService = gmCryptoService;
+    this.gmCryptoEnabled = gmCryptoEnabled;
   }
 
   public void execute(Long jobId, String environmentName) {
@@ -191,13 +198,28 @@ public class PublishExecutor {
       Path outputPath = resolveEnvOutputPath(job.getSiteId(), targetEnv, impact.getPath());
       Files.createDirectories(outputPath.getParent());
       String backupPath = backupIfExists(job.getSiteId(), targetEnv, job.getId(), outputPath);
-      Files.writeString(outputPath, Optional.ofNullable(renderResult.getRenderedHtml()).orElse(""), StandardCharsets.UTF_8);
+      byte[] htmlBytes = Optional.ofNullable(renderResult.getRenderedHtml())
+          .orElse("").getBytes(StandardCharsets.UTF_8);
+      String sm3Hex = null;
+      if (gmCryptoEnabled) {
+        MessageDigest md = gmCryptoService.createSm3Digest();
+        try (java.security.DigestOutputStream dos =
+                 new java.security.DigestOutputStream(Files.newOutputStream(outputPath), md)) {
+          dos.write(htmlBytes);
+        }
+        sm3Hex = java.util.HexFormat.of().formatHex(md.digest());
+        Path sm3Path = outputPath.resolveSibling(outputPath.getFileName().toString() + ".sm3");
+        Files.writeString(sm3Path, sm3Hex, StandardCharsets.UTF_8);
+      } else {
+        Files.write(outputPath, htmlBytes);
+      }
       PublishArtifact artifact = new PublishArtifact();
       artifact.setJobId(job.getId());
       artifact.setArtifactType("html");
       artifact.setOutputPath(impact.getPath());
       artifact.setBackupPath(backupPath);
       artifact.setChecksum(sha256(Files.readAllBytes(outputPath)));
+      artifact.setSm3Digest(sm3Hex);
       artifact.setVersion(job.getId() + "-" + impact.getId());
       publishArtifactRepository.save(artifact);
       logs.add("Rendered " + impact.getPageType() + " -> " + impact.getPath());
