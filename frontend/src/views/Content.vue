@@ -125,10 +125,14 @@ const loadCategories = async (siteId?: number) => {
   categoryOptions.value = response.data || []
 }
 
-const clearFilters = () => {
+const clearFilters = async () => {
   filters.value = { keyword: '', status: '', siteId: undefined, primaryCategoryId: undefined }
+  await onFilterChange()
+}
+
+const onFilterChange = async () => {
   pagination.value.current = 1
-  loadArticles()
+  await loadArticles()
 }
 
 const loadArticles = async () => {
@@ -336,11 +340,11 @@ onMounted(async () => {
           <option :value="undefined">全部站点</option>
           <option v-for="site in sites" :key="site.id" :value="site.id">{{ site.name }}</option>
         </select>
-        <select v-model="filters.primaryCategoryId" class="admin-filter-select" @change="loadArticles">
+        <select v-model="filters.primaryCategoryId" class="admin-filter-select" @change="onFilterChange">
           <option :value="undefined">全部栏目</option>
           <option v-for="item in categoryOptions" :key="item.id" :value="item.id">{{ item.name }}</option>
         </select>
-        <select v-model="filters.status" class="admin-filter-select" @change="loadArticles">
+        <select v-model="filters.status" class="admin-filter-select" @change="onFilterChange">
           <option v-for="item in statusOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
         </select>
         <button class="admin-secondary-btn" @click="loadArticles">查询</button>
