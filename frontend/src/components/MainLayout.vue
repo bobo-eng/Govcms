@@ -33,6 +33,23 @@ interface MenuItem {
   children?: MenuItem[]
 }
 
+interface NotificationItem {
+  id: number
+  title: string
+  content: string
+  type: string
+  read: boolean
+  createdAt: string
+}
+
+interface MenuApiItem {
+  id: number
+  name: string
+  path?: string
+  icon?: string
+  children?: MenuApiItem[]
+}
+
 const router = useRouter()
 const route = useRoute()
 const collapsed = ref(false)
@@ -42,7 +59,7 @@ const openKeys = ref<string[]>([])
 const menuItems = ref<MenuItem[]>([])
 const username = ref(getUsername() || 'Admin')
 const roleLabel = ref('\u7528\u6237')
-const notifications = ref<any[]>([])
+const notifications = ref<NotificationItem[]>([])
 const unreadCount = ref(0)
 const notificationVisible = ref(false)
 
@@ -63,12 +80,12 @@ const iconMap: Record<string, any> = {
   SearchOutlined,
 }
 
-const convertToAntMenu = (menus: any[]): MenuItem[] => {
+const convertToAntMenu = (menus: MenuApiItem[]): MenuItem[] => {
   return menus.map(menu => {
     const item: MenuItem = {
       key: menu.path ? menu.path.replace('/', '') : 'menu-' + menu.id,
       label: menu.name,
-      icon: iconMap[menu.icon] ? h(iconMap[menu.icon]) : undefined,
+      icon: menu.icon && iconMap[menu.icon] ? h(iconMap[menu.icon]) : undefined,
       path: menu.path
     }
 
@@ -88,8 +105,8 @@ const fetchMenus = async () => {
     openKeys.value = menuItems.value
       .filter(item => item.children && item.children.length > 0)
       .map(item => item.key)
-  } catch (error) {
-    console.error('Failed to fetch menus:', error)
+  } catch (err) {
+    console.warn('fetchMenus failed:', err)
     menuItems.value = []
   } finally {
     loading.value = false
@@ -163,8 +180,8 @@ const fetchUnreadCount = async () => {
   try {
     const res = await api.get('/notifications/unread-count')
     unreadCount.value = res.data.count || 0
-  } catch {
-    // silent fail
+  } catch (err) {
+    console.warn('fetchUnreadCount failed:', err)
   }
 }
 
@@ -172,7 +189,8 @@ const fetchNotifications = async () => {
   try {
     const res = await api.get('/notifications?page=0&size=5')
     notifications.value = res.data.content || []
-  } catch {
+  } catch (err) {
+    console.warn('fetchNotifications failed:', err)
     notifications.value = []
   }
 }
@@ -182,8 +200,8 @@ const markAsRead = async (id: number) => {
     await api.put(`/notifications/${id}/read`)
     await fetchUnreadCount()
     await fetchNotifications()
-  } catch {
-    // silent fail
+  } catch (err) {
+    console.warn('markAsRead failed:', err)
   }
 }
 
@@ -192,8 +210,8 @@ const markAllAsRead = async () => {
     await api.put('/notifications/read-all')
     await fetchUnreadCount()
     await fetchNotifications()
-  } catch {
-    // silent fail
+  } catch (err) {
+    console.warn('markAllAsRead failed:', err)
   }
 }
 
@@ -202,6 +220,12 @@ watch(() => route.path, () => {
 })
 
 let pollInterval: ReturnType<typeof setInterval> | null = null
+
+const onVisibilityChange = () => {
+  if (!document.hidden) {
+    fetchUnreadCount()
+  }
+}
 
 onMounted(async () => {
   username.value = getUsername() || 'Admin'
@@ -213,11 +237,6 @@ onMounted(async () => {
   await fetchNotifications()
 
   pollInterval = setInterval(fetchUnreadCount, 30000)
-  const onVisibilityChange = () => {
-    if (!document.hidden) {
-      fetchUnreadCount()
-    }
-  }
   document.addEventListener('visibilitychange', onVisibilityChange)
 })
 
@@ -225,6 +244,7 @@ onUnmounted(() => {
   if (pollInterval) {
     clearInterval(pollInterval)
   }
+  document.removeEventListener('visibilitychange', onVisibilityChange)
 })
 </script>
 

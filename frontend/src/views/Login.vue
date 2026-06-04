@@ -8,6 +8,12 @@ import { clearSession, saveSession, loadSession } from '../utils/session'
 const router = useRouter()
 const loading = ref(false)
 
+const ROLE_DEFAULT_ROUTES: Record<string, string> = {
+  reviewer: '/content/review',
+  publisher: '/content/publish',
+  editor: '/content'
+}
+
 const formState = reactive({
   username: '',
   password: '',
@@ -18,12 +24,7 @@ onMounted(() => {
   const session = loadSession()
   if (session?.token && session?.rememberMe) {
     const roleCode = session.roles?.[0] || ''
-    const defaultRoute: Record<string, string> = {
-      reviewer: '/content/review',
-      publisher: '/content/publish',
-      editor: '/content'
-    }
-    router.push(defaultRoute[roleCode] || '/dashboard')
+    router.push(ROLE_DEFAULT_ROUTES[roleCode] || '/dashboard')
   }
 })
 
@@ -53,12 +54,7 @@ const onFinish = async () => {
       })
       message.success('登录成功')
       const roleCode = res.data.roles?.[0] || ''
-      const defaultRoute: Record<string, string> = {
-        reviewer: '/content/review',
-        publisher: '/content/publish',
-        editor: '/content'
-      }
-      router.push(defaultRoute[roleCode] || '/dashboard')
+      router.push(ROLE_DEFAULT_ROUTES[roleCode] || '/dashboard')
       return
     }
 

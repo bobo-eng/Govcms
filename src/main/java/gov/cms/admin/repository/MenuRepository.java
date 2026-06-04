@@ -25,4 +25,6 @@ public interface MenuRepository extends JpaRepository<Menu, Long> {
     Optional<Menu> findByPermissionId(String permissionId);
 
     Optional<Menu> findByPath(String path);
+
+    Optional<Menu> findByNameAndParentId(String name, Long parentId);
 }

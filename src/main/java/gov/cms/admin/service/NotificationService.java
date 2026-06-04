@@ -1,5 +1,6 @@
 package gov.cms.admin.service;
 
+import gov.cms.admin.dto.NotificationDto;
 import gov.cms.admin.entity.Notification;
 import gov.cms.admin.repository.NotificationRepository;
 import org.springframework.data.domain.Page;
@@ -16,8 +17,9 @@ public class NotificationService {
         this.notificationRepository = notificationRepository;
     }
 
-    public Page<Notification> findByUserId(Long userId, int page, int size) {
-        return notificationRepository.findByUserIdOrderByCreatedAtDesc(userId, PageRequest.of(page, size));
+    public Page<NotificationDto> findByUserId(Long userId, int page, int size) {
+        return notificationRepository.findByUserIdOrderByCreatedAtDesc(userId, PageRequest.of(page, size))
+                .map(NotificationDto::from);
     }
 
     public long countUnreadByUserId(Long userId) {
@@ -37,14 +39,7 @@ public class NotificationService {
 
     @Transactional
     public void markAllAsRead(Long userId) {
-        notificationRepository.findByUserIdOrderByCreatedAtDesc(userId, PageRequest.of(0, Integer.MAX_VALUE))
-                .getContent()
-                .forEach(n -> {
-                    if (!n.isRead()) {
-                        n.setRead(true);
-                        notificationRepository.save(n);
-                    }
-                });
+        notificationRepository.markAllAsReadByUserId(userId);
     }
 
     @Transactional

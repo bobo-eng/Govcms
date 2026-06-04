@@ -251,7 +251,7 @@ public class DataInitializer {
         upsertMenu(menuRepository, createMenu("专题管理", "/content/topics", "FileTextOutlined", contentMenu.getId(), 6, "topic:manage"), contentMenu.getId());
         upsertMenu(menuRepository, createMenu("发布中心", "/content/publish", "SendOutlined", contentMenu.getId(), 7, "publish:center"), contentMenu.getId());
 
-        Menu siteOpsMenu = upsertMenu(menuRepository, createMenu("站点运营", "/site-ops", "GlobalOutlined", null, 4, "site:manage"), null);
+        Menu siteOpsMenu = upsertMenu(menuRepository, createMenu("站点运营", "/site-ops", "GlobalOutlined", null, 4, "site"), null);
         upsertMenu(menuRepository, createMenu("站点管理", "/site-ops/sites", "GlobalOutlined", siteOpsMenu.getId(), 1, "site:manage"), siteOpsMenu.getId());
         upsertMenu(menuRepository, createMenu("媒体管理", "/site-ops/media", "CloudOutlined", siteOpsMenu.getId(), 2, "media:manage"), siteOpsMenu.getId());
         upsertMenu(menuRepository, createMenu("搜索运营", "/site-ops/search-ops", "SearchOutlined", siteOpsMenu.getId(), 3, "search:ops"), siteOpsMenu.getId());
@@ -260,6 +260,7 @@ public class DataInitializer {
     private Menu upsertMenu(MenuRepository menuRepository, Menu desiredMenu, Long parentId) {
         Menu menu = menuRepository.findByPermissionId(desiredMenu.getPermissionId())
                 .or(() -> menuRepository.findByPath(desiredMenu.getPath()))
+                .or(() -> menuRepository.findByNameAndParentId(desiredMenu.getName(), parentId))
                 .orElseGet(Menu::new);
         menu.setName(desiredMenu.getName());
         menu.setPath(desiredMenu.getPath());
@@ -308,7 +309,8 @@ public class DataInitializer {
     private void ensureNotificationTable(DataSource dataSource) {
         try (Connection conn = dataSource.getConnection()) {
             DatabaseMetaData metaData = conn.getMetaData();
-            try (ResultSet tables = metaData.getTables(null, null, "notifications", new String[]{"TABLE"})) {
+            String tableName = metaData.storesUpperCaseIdentifiers() ? "NOTIFICATIONS" : "notifications";
+            try (ResultSet tables = metaData.getTables(null, null, tableName, new String[]{"TABLE"})) {
                 if (tables.next()) {
                     return;
                 }
@@ -316,8 +318,8 @@ public class DataInitializer {
 
             String dbProduct = metaData.getDatabaseProductName().toLowerCase();
             String createSql;
-            if (dbProduct.contains("mysql")) {
-                createSql = "CREATE TABLE notifications ("
+            if (dbProduct.contains("mysql") || dbProduct.contains("h2")) {
+                createSql = "CREATE TABLE IF NOT EXISTS notifications ("
                         + "id BIGINT AUTO_INCREMENT PRIMARY KEY, "
                         + "user_id BIGINT NOT NULL, "
                         + "title VARCHAR(200) NOT NULL, "
@@ -353,7 +355,7 @@ public class DataInitializer {
         if (admin == null) {
             return;
         }
-        if (notificationRepository.countByUserIdAndReadFalse(admin.getId()) > 0) {
+        if (notificationRepository.countByUserId(admin.getId()) > 0) {
             return; // already seeded
         }
 
