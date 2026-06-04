@@ -7,6 +7,8 @@ import gov.cms.admin.repository.SiteRepository;
 import gov.cms.admin.repository.UserRepository;
 import gov.cms.admin.security.Sm4Encryptor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -124,6 +126,7 @@ public class UserService {
         return userRepository.save(existingUser);
     }
 
+    @CacheEvict(value = "userPermissions", key = "#id")
     @Transactional
     public User assignRoles(Long id, Set<Long> roleIds) {
         User user = getUserById(id);
@@ -154,6 +157,20 @@ public class UserService {
 
     public Set<Long> getRoleIds(Long id) {
         return getUserById(id).getRoles().stream().map(Role::getId).collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    @Cacheable(value = "userPermissions", key = "#userId")
+    public Set<String> getPermissionCodes(Long userId) {
+        User user = getUserById(userId);
+        if (user.getRoles() == null || user.getRoles().isEmpty()) {
+            return Set.of();
+        }
+        return user.getRoles().stream()
+                .flatMap(role -> role.getPermissions() != null
+                        ? role.getPermissions().stream()
+                        : java.util.stream.Stream.empty())
+                .map(gov.cms.admin.entity.Permission::getCode)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     @Transactional
