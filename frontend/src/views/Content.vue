@@ -51,6 +51,16 @@ const historyItems = ref<ArticleLifecycleHistoryItem[]>([])
 const publishCheck = ref<ArticlePublishCheckResponseData | null>(null)
 const filters = ref({ keyword: '', status: '', siteId: undefined as number | undefined, primaryCategoryId: undefined as number | undefined })
 const pagination = ref({ current: 1, pageSize: 10, total: 0 })
+let keywordDebounceTimer: ReturnType<typeof setTimeout> | null = null
+
+watch(() => filters.value.keyword, () => {
+  if (keywordDebounceTimer) clearTimeout(keywordDebounceTimer)
+  keywordDebounceTimer = setTimeout(() => {
+    pagination.value.current = 1
+    loadArticles()
+  }, 300)
+})
+
 const form = ref<ArticleForm>({ title: '', summary: '', author: '', content: '', siteId: undefined, primaryCategoryId: undefined })
 
 const canCreate = computed(() => hasPermission('content:article:create'))
@@ -105,6 +115,12 @@ const loadCategories = async (siteId?: number) => {
   }
   const response = await fetchCategories({ siteId })
   categoryOptions.value = response.data || []
+}
+
+const clearFilters = () => {
+  filters.value = { keyword: '', status: '', siteId: undefined, primaryCategoryId: undefined }
+  pagination.value.current = 1
+  loadArticles()
 }
 
 const loadArticles = async () => {
@@ -293,7 +309,7 @@ onMounted(async () => {
     <div class="admin-toolbar-card">
       <div class="admin-toolbar-row">
         <div class="admin-search-box">
-          <input v-model="filters.keyword" class="admin-search-input" placeholder="搜索标题、摘要或作者" @keyup.enter="loadArticles" />
+          <input v-model="filters.keyword" class="admin-search-input" placeholder="搜索标题、摘要或作者" />
         </div>
         <select v-model="filters.siteId" class="admin-filter-select">
           <option :value="undefined">全部站点</option>
@@ -307,6 +323,7 @@ onMounted(async () => {
           <option v-for="item in statusOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
         </select>
         <button class="admin-secondary-btn" @click="loadArticles">查询</button>
+        <button class="admin-secondary-btn" @click="clearFilters">清空</button>
       </div>
     </div>
 
@@ -371,6 +388,11 @@ onMounted(async () => {
       <div class="admin-pagination">
         <span class="admin-pagination-total">共 {{ pagination.total }} 条</span>
         <div class="admin-pagination-controls">
+          <select v-model="pagination.pageSize" class="admin-filter-select" @change="pagination.current = 1; loadArticles()">
+            <option :value="10">10 条/页</option>
+            <option :value="20">20 条/页</option>
+            <option :value="50">50 条/页</option>
+          </select>
           <button class="admin-page-btn" :disabled="pagination.current <= 1" @click="pagination.current -= 1; loadArticles()">上一页</button>
           <span class="admin-page-info">第 {{ pagination.current }} 页</span>
           <button class="admin-page-btn" :disabled="pagination.current * pagination.pageSize >= pagination.total" @click="pagination.current += 1; loadArticles()">下一页</button>
