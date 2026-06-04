@@ -394,11 +394,21 @@ onMounted(async () => {
             <td>
               <div class="article-actions">
                 <button class="admin-link-action" @click="openEdit(item)">详情</button>
-                <button v-if="canUpdate && (item.status === 'draft' || item.status === 'rejected')" class="admin-link-action" @click="openEdit(item)">编辑</button>
-                <button v-if="canDelete && (item.status === 'draft' || item.status === 'rejected')" class="admin-link-action" @click="removeArticle(item)">删除</button>
-                <button v-if="canSubmit && (item.status === 'draft' || item.status === 'rejected')" class="admin-link-action" @click="submitReviewAction(item)">提交审核</button>
-                <button v-if="item.status === 'approved'" class="admin-link-action" @click="gotoPublish(item, 'incremental')">去发布中心</button>
-                <button v-if="item.status === 'published'" class="admin-link-action" @click="gotoPublish(item, 'offline')">下线</button>
+
+                <template v-if="item.status === 'draft' || item.status === 'rejected'">
+                  <button v-if="canUpdate" class="admin-link-action" @click="openEdit(item)">编辑</button>
+                  <button v-if="canSubmit" class="admin-link-action" @click="submitReviewAction(item)">提交审核</button>
+                  <button v-if="canDelete" class="admin-link-action danger-link" @click="removeArticle(item)">删除</button>
+                </template>
+
+                <template v-if="item.status === 'approved'">
+                  <button class="admin-link-action primary-link" @click="gotoPublish(item, 'incremental')">去发布中心</button>
+                </template>
+
+                <template v-if="item.status === 'published'">
+                  <button class="admin-link-action" @click="gotoPublish(item, 'offline')">下线</button>
+                </template>
+
                 <button class="admin-link-action" @click="viewPublishCheck(item)">发布检查</button>
               </div>
             </td>
@@ -578,5 +588,13 @@ onMounted(async () => {
   font-size: 13px;
   color: #64748b;
   margin-top: 4px;
+}
+
+.primary-link {
+  color: #2563eb;
+  font-weight: 600;
+}
+.danger-link {
+  color: #dc2626;
 }
 </style>
