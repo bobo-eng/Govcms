@@ -6,31 +6,14 @@
   <title th:text="${pageTitle}">专题页</title>
   <meta name="keywords" th:if="${topicContext != null}" th:content="${topicContext['seoKeywords']}" />
   <meta name="description" th:if="${topicContext != null}" th:content="${topicContext['seoDescription']}" />
-  <style>
-    body{margin:0;font-family:Arial,"Microsoft YaHei",sans-serif;background:#f8fafc;color:#0f172a}
-    .page{max-width:1180px;margin:0 auto;padding:24px}.warn{background:#fff7ed;color:#9a3412;padding:12px 16px;border-radius:12px;margin-bottom:16px}
-    .hero{background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:20px;margin-bottom:16px}
-    .meta{color:#64748b;font-size:14px}.article-list{display:grid;gap:12px}.article-card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px}.article-card a{color:#2563eb;text-decoration:none}.empty{padding:16px;background:#fff;border-radius:12px;border:1px dashed #cbd5e1;color:#64748b}
-  </style>
+  <link rel="stylesheet" href="/css/portal.css">
 </head>
 <body class="portal-topic-page">
-  <div class="page">
-    <div th:if="${warnings != null and !warnings.isEmpty()}" class="warn">
-      <div th:each="item : ${warnings}" th:text="${item}">warning</div>
-    </div>
-    <section class="hero">
-      <h1 th:text="${topicContext != null ? topicContext['name'] : '专题页'}">专题页</h1>
-      <p th:if="${topicContext != null and topicContext['summary'] != null and topicContext['summary'] != ''}" th:text="${topicContext['summary']}">专题摘要</p>
-      <div class="meta">聚合模式：<span th:text="${topicContext != null ? topicContext['aggregationMode'] : '-'}">manual</span></div>
-    </section>
-    <section class="article-list">
-      <article th:each="item : ${topicContext != null ? topicContext['items'] : {}}" class="article-card">
-        <h3><a th:href="${item['path']}" th:text="${item['title']}">文章标题</a></h3>
-        <p th:text="${item['summary']}">摘要</p>
-        <small><span th:text="${item['author']}">作者</span> <span th:text="${item['createdAt']}">时间</span></small>
-      </article>
-      <div th:if="${topicContext == null or topicContext['itemCount'] == 0}" class="empty">暂无内容</div>
-    </section>
+  <div th:if="${warnings != null and !warnings.isEmpty()}" class="pb-warn">
+    <div th:each="item : ${warnings}" th:text="${item}">warning</div>
   </div>
+  <section th:each="slot : ${layoutSlots}" class="pb-slot" th:attr="data-slot=${slot.name}">
+    <div th:utext="${slotHtml[slot.name]}"></div>
+  </section>
 </body>
 </html>

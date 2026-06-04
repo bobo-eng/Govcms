@@ -61,6 +61,8 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/api/portal/search/**", "/search/**").permitAll()
+                .requestMatchers("/css/**", "/js/**", "/images/**", "/favicon.ico").permitAll()
+                .requestMatchers("/nanjing-demo/**").permitAll()
                 .requestMatchers("/api/menus/user").authenticated()
                 .anyRequest().authenticated()
             )

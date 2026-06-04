@@ -4,3 +4,11 @@ spring:
     username: root
     password: 123456
     driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+
+gm:
+  crypto:
+    sm4:
+      key-hex: 0123456789abcdeffedcba9876543210
