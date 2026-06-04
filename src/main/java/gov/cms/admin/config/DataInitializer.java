@@ -1,10 +1,12 @@
 package gov.cms.admin.config;
 
 import gov.cms.admin.entity.Menu;
+import gov.cms.admin.entity.Notification;
 import gov.cms.admin.entity.Permission;
 import gov.cms.admin.entity.Role;
 import gov.cms.admin.entity.User;
 import gov.cms.admin.repository.MenuRepository;
+import gov.cms.admin.repository.NotificationRepository;
 import gov.cms.admin.repository.PermissionRepository;
 import gov.cms.admin.repository.RoleRepository;
 import gov.cms.admin.repository.UserRepository;
@@ -33,13 +35,15 @@ public class DataInitializer {
             RoleRepository roleRepository,
             MenuRepository menuRepository,
             UserRepository userRepository,
-            PasswordEncoder passwordEncoder
+            PasswordEncoder passwordEncoder,
+            NotificationRepository notificationRepository
     ) {
         return args -> {
             seedPermissions(permissionRepository);
             seedRoles(permissionRepository, roleRepository);
             seedMenus(menuRepository);
             seedDefaultAdmin(userRepository, roleRepository, passwordEncoder);
+            seedNotifications(notificationRepository, userRepository);
         };
     }
 
@@ -292,6 +296,32 @@ public class DataInitializer {
             adminUser.setFullName(DEFAULT_ADMIN_NAME);
         }
         userRepository.save(adminUser);
+    }
+
+    private void seedNotifications(NotificationRepository notificationRepository, UserRepository userRepository) {
+        User admin = userRepository.findByUsername(DEFAULT_ADMIN_USERNAME).orElse(null);
+        if (admin == null) {
+            return;
+        }
+        if (notificationRepository.countByUserIdAndReadFalse(admin.getId()) > 0) {
+            return; // already seeded
+        }
+
+        Notification n1 = new Notification();
+        n1.setUserId(admin.getId());
+        n1.setTitle("欢迎登录 GovCMS");
+        n1.setContent("欢迎使用 GovCMS 政府内容管理系统。");
+        n1.setType("info");
+        n1.setRead(false);
+        notificationRepository.save(n1);
+
+        Notification n2 = new Notification();
+        n2.setUserId(admin.getId());
+        n2.setTitle("您的文章已通过审核");
+        n2.setContent("您提交的文章已由审核员通过，请前往发布中心执行发布。");
+        n2.setType("info");
+        n2.setRead(false);
+        notificationRepository.save(n2);
     }
 
     private boolean isLegacyCorruptedName(String value) {
