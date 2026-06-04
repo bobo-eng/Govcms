@@ -56,6 +56,15 @@ public class BouncyCastleGmCryptoService implements GmCryptoService {
     }
 
     @Override
+    public MessageDigest createSm3Digest() {
+        try {
+            return MessageDigest.getInstance("SM3", "BC");
+        } catch (Exception e) {
+            throw new RuntimeException("SM3 摘要初始化失败", e);
+        }
+    }
+
+    @Override
     public byte[] sm4Encrypt(byte[] data, byte[] key) {
         try {
             Cipher cipher = Cipher.getInstance("SM4/CBC/PKCS5Padding", "BC");

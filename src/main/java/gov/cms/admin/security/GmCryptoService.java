@@ -11,6 +11,8 @@ public interface GmCryptoService {
 
     byte[] sm3Digest(byte[] data);
 
+    java.security.MessageDigest createSm3Digest();
+
     byte[] sm4Encrypt(byte[] data, byte[] key);
 
     byte[] sm4Decrypt(byte[] data, byte[] key);
