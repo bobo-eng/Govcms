@@ -37,5 +37,11 @@ docs/*.docx
 # Worktrees
 .worktrees/
 
+# Claude Code
+.claude/
+
+# Hibernate Search index
+SearchIndexEntry/
+
 # Dameng local credentials
 application-dm.yml
