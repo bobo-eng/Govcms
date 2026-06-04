@@ -223,23 +223,27 @@ public class DataInitializer {
         }
 
         upsertMenu(menuRepository, createMenu("仪表盘", "/dashboard", "DashboardOutlined", null, 1, "sys:dashboard:view"), null);
-        upsertMenu(menuRepository, createMenu("用户管理", "/users", "UserOutlined", null, 2, "sys:user"), null);
-        upsertMenu(menuRepository, createMenu("角色管理", "/roles", "TeamOutlined", null, 3, "sys:role"), null);
-        upsertMenu(menuRepository, createMenu("权限管理", "/permissions", "LockOutlined", null, 4, "sys:permission"), null);
-        upsertMenu(menuRepository, createMenu("菜单管理", "/menus", "MenuOutlined", null, 5, "sys:menu"), null);
 
-        Menu contentMenu = upsertMenu(menuRepository, createMenu("内容管理", "/content", "FileTextOutlined", null, 6, "content"), null);
+        Menu systemMenu = upsertMenu(menuRepository, createMenu("系统管理", "/system", "SettingOutlined", null, 2, "sys"), null);
+        upsertMenu(menuRepository, createMenu("用户管理", "/system/users", "UserOutlined", systemMenu.getId(), 1, "sys:user"), systemMenu.getId());
+        upsertMenu(menuRepository, createMenu("角色管理", "/system/roles", "TeamOutlined", systemMenu.getId(), 2, "sys:role"), systemMenu.getId());
+        upsertMenu(menuRepository, createMenu("权限管理", "/system/permissions", "LockOutlined", systemMenu.getId(), 3, "sys:permission"), systemMenu.getId());
+        upsertMenu(menuRepository, createMenu("菜单管理", "/system/menus", "MenuOutlined", systemMenu.getId(), 4, "sys:menu"), systemMenu.getId());
+        upsertMenu(menuRepository, createMenu("审计日志", "/system/audit-logs", "AuditOutlined", systemMenu.getId(), 5, "sys:audit:view"), systemMenu.getId());
+
+        Menu contentMenu = upsertMenu(menuRepository, createMenu("内容管理", "/content", "FileTextOutlined", null, 3, "content"), null);
         upsertMenu(menuRepository, createMenu("审核工作区", "/content/review", "AuditOutlined", contentMenu.getId(), 1, "content:article:review"), contentMenu.getId());
-        upsertMenu(menuRepository, createMenu("栏目管理", "/content/categories", "FolderOutlined", contentMenu.getId(), 2, "content:category"), contentMenu.getId());
-        upsertMenu(menuRepository, createMenu("模板管理", "/content/templates", "LayoutOutlined", contentMenu.getId(), 3, "template:manage"), contentMenu.getId());
-        upsertMenu(menuRepository, createMenu("导航管理", "/navigation", "MenuOutlined", contentMenu.getId(), 4, "navigation:manage"), contentMenu.getId());
-        upsertMenu(menuRepository, createMenu("专题管理", "/topics", "FileTextOutlined", contentMenu.getId(), 5, "topic:manage"), contentMenu.getId());
-        upsertMenu(menuRepository, createMenu("发布中心", "/content/publish", "SendOutlined", contentMenu.getId(), 6, "publish:center"), contentMenu.getId());
+        upsertMenu(menuRepository, createMenu("内容管理", "/content/articles", "FileTextOutlined", contentMenu.getId(), 2, "content:article"), contentMenu.getId());
+        upsertMenu(menuRepository, createMenu("栏目管理", "/content/categories", "FolderOutlined", contentMenu.getId(), 3, "content:category"), contentMenu.getId());
+        upsertMenu(menuRepository, createMenu("模板管理", "/content/templates", "LayoutOutlined", contentMenu.getId(), 4, "template:manage"), contentMenu.getId());
+        upsertMenu(menuRepository, createMenu("导航管理", "/content/navigation", "MenuOutlined", contentMenu.getId(), 5, "navigation:manage"), contentMenu.getId());
+        upsertMenu(menuRepository, createMenu("专题管理", "/content/topics", "FileTextOutlined", contentMenu.getId(), 6, "topic:manage"), contentMenu.getId());
+        upsertMenu(menuRepository, createMenu("发布中心", "/content/publish", "SendOutlined", contentMenu.getId(), 7, "publish:center"), contentMenu.getId());
 
-        upsertMenu(menuRepository, createMenu("站点管理", "/sites", "GlobalOutlined", null, 7, "site:manage"), null);
-        upsertMenu(menuRepository, createMenu("媒体管理", "/media", "CloudOutlined", null, 8, "media:manage"), null);
-        upsertMenu(menuRepository, createMenu("搜索运营", "/search-ops", "SearchOutlined", null, 9, "search:ops"), null);
-        upsertMenu(menuRepository, createMenu("审计日志", "/system/audit-logs", "AuditOutlined", null, 10, "publish:center"), null);
+        Menu siteOpsMenu = upsertMenu(menuRepository, createMenu("站点运营", "/site-ops", "GlobalOutlined", null, 4, "site:manage"), null);
+        upsertMenu(menuRepository, createMenu("站点管理", "/site-ops/sites", "GlobalOutlined", siteOpsMenu.getId(), 1, "site:manage"), siteOpsMenu.getId());
+        upsertMenu(menuRepository, createMenu("媒体管理", "/site-ops/media", "CloudOutlined", siteOpsMenu.getId(), 2, "media:manage"), siteOpsMenu.getId());
+        upsertMenu(menuRepository, createMenu("搜索运营", "/site-ops/search-ops", "SearchOutlined", siteOpsMenu.getId(), 3, "search:ops"), siteOpsMenu.getId());
     }
 
     private Menu upsertMenu(MenuRepository menuRepository, Menu desiredMenu, Long parentId) {
