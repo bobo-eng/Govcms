@@ -1,5 +1,6 @@
 package gov.cms.admin.controller;
 
+import gov.cms.admin.dto.ArtifactVerifyResponse;
 import gov.cms.admin.dto.PublishCheckResponse;
 import gov.cms.admin.dto.PublishImpactResponse;
 import gov.cms.admin.dto.PublishRequest;
@@ -9,7 +10,9 @@ import gov.cms.admin.entity.PublishArtifact;
 import gov.cms.admin.entity.PublishImpactItem;
 import gov.cms.admin.entity.PublishJob;
 import gov.cms.admin.entity.PublishRollbackRecord;
+import gov.cms.admin.security.GmCryptoService;
 import gov.cms.admin.service.PublishService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -22,6 +25,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 
 @RestController
@@ -30,9 +36,15 @@ import java.util.List;
 public class PublishController {
 
     private final PublishService publishService;
+    private final GmCryptoService gmCryptoService;
+    private final boolean gmCryptoEnabled;
 
-    public PublishController(PublishService publishService) {
+    public PublishController(PublishService publishService,
+                             GmCryptoService gmCryptoService,
+                             @Value("${gm.crypto.enabled:true}") boolean gmCryptoEnabled) {
         this.publishService = publishService;
+        this.gmCryptoService = gmCryptoService;
+        this.gmCryptoEnabled = gmCryptoEnabled;
     }
 
     @PostMapping("/check")
@@ -132,5 +144,34 @@ public class PublishController {
     @PreAuthorize("hasAuthority('publish:center:rollback')")
     public ResponseEntity<PublishJob> rollback(@PathVariable Long id, @RequestBody(required = false) PublishRollbackRequest request) {
         return ResponseEntity.ok(publishService.rollback(id, request));
+    }
+
+    @GetMapping("/artifacts/{id}/verify")
+    @PreAuthorize("hasAuthority('publish:center:view')")
+    public ResponseEntity<ArtifactVerifyResponse> verifyArtifact(@PathVariable Long id) {
+        PublishArtifact artifact = publishService.getArtifact(id);
+        if (artifact == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
+        String expected = artifact.getSm3Digest();
+        if (expected == null || expected.isBlank()) {
+            return ResponseEntity.ok(new ArtifactVerifyResponse(id, "UNKNOWN", null, null));
+        }
+        if (!gmCryptoEnabled) {
+            return ResponseEntity.ok(new ArtifactVerifyResponse(id, "UNKNOWN", expected, null));
+        }
+        Path path = Paths.get(publishService.resolveArtifactPath(artifact));
+        if (!Files.exists(path)) {
+            return ResponseEntity.ok(new ArtifactVerifyResponse(id, "INVALID", expected, "FILE_MISSING"));
+        }
+        try {
+            byte[] data = Files.readAllBytes(path);
+            byte[] digest = gmCryptoService.sm3Digest(data);
+            String actual = java.util.HexFormat.of().formatHex(digest);
+            String status = expected.equalsIgnoreCase(actual) ? "VALID" : "INVALID";
+            return ResponseEntity.ok(new ArtifactVerifyResponse(id, status, expected, actual));
+        } catch (Exception e) {
+            return ResponseEntity.ok(new ArtifactVerifyResponse(id, "INVALID", expected, e.getMessage()));
+        }
     }
 }

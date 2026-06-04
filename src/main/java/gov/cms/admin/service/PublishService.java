@@ -753,6 +753,14 @@ public class PublishService {
         return publishRollbackRecordRepository.findByTargetJobIdOrRollbackJobIdOrderByCreatedAtDesc(jobId, jobId);
     }
 
+    public PublishArtifact getArtifact(Long id) {
+        return publishArtifactRepository.findById(id).orElse(null);
+    }
+
+    public String resolveArtifactPath(PublishArtifact artifact) {
+        return Paths.get(publishStoragePath, artifact.getOutputPath()).toString();
+    }
+
     private List<String> collectMediaWarnings(PublishRequest request) {
         List<String> warnings = new ArrayList<>();
         switch (request.getUnitType()) {
