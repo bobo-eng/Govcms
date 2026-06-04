@@ -97,3 +97,12 @@ app:
         capacity: 10
         refill: 1
         period: MINUTES
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when_authorized
