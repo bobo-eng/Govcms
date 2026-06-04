@@ -6,6 +6,7 @@ import gov.cms.admin.dto.PublishRequest;
 import gov.cms.admin.dto.PublishRollbackRequest;
 import gov.cms.admin.entity.AuditLog;
 import gov.cms.admin.entity.PublishRollbackRecord;
+import gov.cms.admin.security.GmCryptoService;
 import gov.cms.admin.security.JwtAuthenticationFilter;
 import gov.cms.admin.service.CustomUserDetailsService;
 import gov.cms.admin.service.PublishService;
@@ -35,6 +36,7 @@ class PublishControllerTest {
     @MockBean private PublishService publishService;
     @MockBean private CustomUserDetailsService customUserDetailsService;
     @MockBean private JwtAuthenticationFilter jwtAuthenticationFilter;
+    @MockBean private GmCryptoService gmCryptoService;
 
     @BeforeEach
     void setUp() throws Exception {

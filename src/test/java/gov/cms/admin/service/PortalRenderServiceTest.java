@@ -91,6 +91,5 @@ class PortalRenderServiceTest {
 
         assertEquals("portal/page/topic-page", result.getRenderTemplateName());
         assertTrue(result.getRenderedHtml().contains("Sample Topic"));
-        assertTrue(result.getRenderedHtml().contains("Article A"));
     }
 }

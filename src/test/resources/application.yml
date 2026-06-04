@@ -2,3 +2,7 @@ gm:
   crypto:
     sm4:
       key-hex: 0123456789abcdef0123456789abcdef
+
+app:
+  rate-limit:
+    enabled: false
