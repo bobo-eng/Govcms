@@ -14,6 +14,8 @@ import gov.cms.admin.repository.CategoryRepository;
 import gov.cms.admin.repository.SiteRepository;
 import gov.cms.admin.repository.TemplateBindingRepository;
 import gov.cms.admin.repository.TemplateRepository;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -72,6 +74,12 @@ public class CategoryService {
         return buildTree(categories);
     }
 
+    @Cacheable(value = "categoryTree", key = "#siteId")
+    @Transactional(readOnly = true)
+    public List<CategoryTreeNode> getTreeBySiteId(Long siteId) {
+        return getCategoryTree(siteId, null, null);
+    }
+
     @Transactional(readOnly = true)
     public List<Category> getCategories(Long siteId, Long parentId, String keyword, String status) {
         if (siteId == null) {
@@ -91,6 +99,7 @@ public class CategoryService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "栏目不存在"));
     }
 
+    @CacheEvict(value = "categoryTree", key = "#request.siteId")
     @Transactional
     public Category createCategory(CategoryRequest request) {
         Category normalized = normalizeRequest(request, null, null);
@@ -108,6 +117,7 @@ public class CategoryService {
         return saved;
     }
 
+    @CacheEvict(value = "categoryTree", key = "#request.siteId")
     @Transactional
     public Category updateCategory(Long id, CategoryRequest request) {
         if (request == null || request.getSiteId() == null) {
@@ -140,6 +150,7 @@ public class CategoryService {
         return saved;
     }
 
+    @CacheEvict(value = "categoryTree", key = "#request.siteId")
     @Transactional
     public Category updateSort(Long id, CategorySortRequest request) {
         if (request == null || request.getSiteId() == null) {
@@ -151,6 +162,7 @@ public class CategoryService {
         return categoryRepository.save(category);
     }
 
+    @CacheEvict(value = "categoryTree", key = "#request.siteId")
     @Transactional
     public Category moveCategory(Long id, CategoryMoveRequest request) {
         if (request == null || request.getSiteId() == null) {
@@ -201,6 +213,7 @@ public class CategoryService {
         return saved;
     }
 
+    @CacheEvict(value = "categoryTree", key = "#request.siteId")
     @Transactional
     public Category updateStatus(Long id, CategoryStatusUpdateRequest request) {
         if (request == null || request.getSiteId() == null) {
@@ -240,6 +253,7 @@ public class CategoryService {
         return response;
     }
 
+    @CacheEvict(value = "categoryTree", key = "#siteId")
     @Transactional
     public void deleteCategory(Long id, Long siteId) {
         if (siteId == null) {
