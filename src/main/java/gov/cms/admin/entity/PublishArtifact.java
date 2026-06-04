@@ -33,6 +33,9 @@ public class PublishArtifact {
     @Column(length = 200)
     private String checksum;
 
+    @Column(length = 64)
+    private String sm3Digest;
+
     @Column(length = 60)
     private String version;
 
@@ -58,6 +61,8 @@ public class PublishArtifact {
     public void setBackupPath(String backupPath) { this.backupPath = backupPath; }
     public String getChecksum() { return checksum; }
     public void setChecksum(String checksum) { this.checksum = checksum; }
+    public String getSm3Digest() { return sm3Digest; }
+    public void setSm3Digest(String sm3Digest) { this.sm3Digest = sm3Digest; }
     public String getVersion() { return version; }
     public void setVersion(String version) { this.version = version; }
     public LocalDateTime getCreatedAt() { return createdAt; }
