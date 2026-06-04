@@ -36,7 +36,13 @@ const onFinish = async () => {
         permissions: res.data.permissions || []
       })
       message.success('登录成功')
-      router.push('/dashboard')
+      const roleCode = res.data.roles?.[0] || ''
+      const defaultRoute: Record<string, string> = {
+        reviewer: '/content/review',
+        publisher: '/content/publish',
+        editor: '/content'
+      }
+      router.push(defaultRoute[roleCode] || '/dashboard')
       return
     }
 
