@@ -2,7 +2,7 @@
 import '../styles/admin-refresh.css'
 
 import { computed, onMounted, ref, watch } from 'vue'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
 import { usePermission } from '../composables/usePermission'
 import { fetchCategories } from '../api/categories'
@@ -214,14 +214,22 @@ const removeArticle = async (record: ArticleItem) => {
     message.warning('没有删除内容权限')
     return
   }
-  if (!window.confirm(`确认删除《${record.title}》吗？`)) return
-  try {
-    await deleteArticle(record.id)
-    message.success('删除成功')
-    await loadArticles()
-  } catch (error: any) {
-    message.error(error.response?.data?.message || '删除失败')
-  }
+  Modal.confirm({
+    title: '确认删除',
+    content: `删除后《${record.title}》将无法恢复，是否继续？`,
+    okText: '删除',
+    okType: 'danger',
+    cancelText: '取消',
+    async onOk() {
+      try {
+        await deleteArticle(record.id)
+        message.success('删除成功')
+        await loadArticles()
+      } catch (error: any) {
+        message.error(error.response?.data?.message || '删除失败')
+      }
+    }
+  })
 }
 
 const submitReviewAction = async (record: ArticleItem) => {
