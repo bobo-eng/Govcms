@@ -130,7 +130,8 @@ flowchart TD
 - 当前默认运行方式仍是本地 `spring-boot:run`，TongWeb 部署包和配置尚未完成
 - JWT 令牌签名仍为 HMAC，SM2/SM3 签名链路已具备但尚未接入 JWT 流程
 - 国密加解密服务抽象（`GmCryptoService`、`Sm4Encryptor`、`Sm4FieldConverter`）已完成，敏感字段加密已落地
-- 发布产物摘要校验与验签尚未实现
+- 发布产物 SM3 摘要校验已实现（`PublishArtifact.sm3Digest` + `.sm3` sidecar + `/api/publish/artifacts/{id}/verify`）
+- 应用层健康检查（DB、Redis、Hibernate Search、Quartz）已通过 Spring Boot Actuator 落地
 - 国密 TLS/HTTPS 配置依赖运维侧 Nginx 证书部署，不在应用代码范围内
 
 ## 7. 首期交付验收
@@ -152,7 +153,7 @@ flowchart TD
 - 敏感数据加密链路可用（SM4 字段加密已落地）
 - 国密签名与验签服务可用（SM2/SM3 服务抽象已完成，JWT 签名待接入）
 - 国密 TLS/HTTPS 依赖运维侧证书部署
-- 发布产物摘要校验与验签待完成
+- 发布产物 SM3 摘要校验与验签已完成
 
 ### 7.4 交付验收
 

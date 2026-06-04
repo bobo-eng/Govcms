@@ -33,7 +33,10 @@
 | 媒体依赖 | 已实现引用追踪、删除保护与缺失媒体告警 | L1 / L2 / L3 | 已形成门户依赖基础能力 |
 | 审计日志 | 已实现发布、回滚、阻断、媒体删除保护、站点管理员分配首批留痕 | L1 / L2 | 已形成轻量审计基础 |
 | 信创适配 | 已部分实现 | L1 / L2 / L3 | DM8 数据库适配已完成；TongWeb 部署待推进 |
-| 国密能力 | 已部分实现 | L1 / L2 / L3 | SM2/SM3/SM4 服务抽象与 SM4 字段加密已落地；JWT 国密签名待接入 |
+| 国密能力 | 已部分实现 | L1 / L2 / L3 | SM2/SM3/SM4 服务抽象、SM4 字段加密、SM3 发布产物摘要校验已落地；JWT 国密签名待接入 |
+| Redis 缓存 | 已实现 | L2 / L3 | `categoryTree` 与 `userPermissions` 两级缓存已落地 |
+| 限流防护 | 已实现 | L2 / L3 | Bucket4j + Redis 分布式令牌桶限流已落地 |
+| 健康检查 | 已实现 | L2 / L3 | Spring Boot Actuator + DB/Redis/Hibernate Search/Quartz 自定义 HealthIndicator 已落地 |
 
 ## 3. 技术现状与目标差距
 

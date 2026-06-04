@@ -16,7 +16,10 @@ Current scope covers RBAC, content lifecycle, category/template/navigation/topic
 - **Frontend**: Vue 3, TypeScript, Vite, Ant Design Vue 4, Axios
 - **Build**: Maven (backend), npm (frontend)
 - **Storage**: Local filesystem (`./storage/media`, `./storage/publish`)
-- **Cryptography**: BouncyCastle GM (SM2/SM3/SM4); SM4 field-level transparent encryption via JPA `AttributeConverter`
+- **Cache**: Spring Cache abstraction backed by Redis (`categoryTree`, `userPermissions`)
+- **Rate Limiting**: Bucket4j 8.10.1 with Redis-backed distributed token bucket
+- **Health Checks**: Spring Boot Actuator with custom `HealthIndicator` components (DB, Redis, Hibernate Search, Quartz)
+- **Cryptography**: BouncyCastle GM (SM2/SM3/SM4); SM4 field-level transparent encryption via JPA `AttributeConverter`; SM3 streaming digest for publish artifacts
 
 ## Common Commands
 
@@ -78,7 +81,7 @@ repository/     Spring Data JPA repositories
 service/        Business logic; constructor injection only
 controller/     REST API controllers; returns DTOs, never raw entities
 dto/            Request/response records and POJOs
-security/       JWT filter, GM crypto service (SM2/SM3/SM4), `Sm4Encryptor`, `Sm4FieldConverter`
+security/       JWT filter, GM crypto service (SM2/SM3/SM4), `Sm4Encryptor`, `Sm4FieldConverter`, `RateLimitFilter`
 config/         Security config, DataInitializer (seeds permissions/roles/menus/admin user)
 exception/      GlobalExceptionHandler
 ```
@@ -139,6 +142,31 @@ Articles flow through six statuses: `draft` → `pending_review` → `rejected` 
 - `UserService` encrypts email parameters before calling `existsByEmail` / `existsByEmailAndIdNot` because Spring Data JPA does not apply `AttributeConverter` to query parameters
 - `gm.crypto.enabled=false` disables encryption entirely (plaintext passthrough); missing key when enabled throws `IllegalStateException`
 - Read-time compatibility: if decryption encounters invalid Base64, the raw value is returned as-is (supports legacy plaintext migration)
+- Publish artifacts include an SM3 hex digest computed via `DigestOutputStream` during write; stored in `PublishArtifact.sm3Digest` and persisted as a `.sm3` sidecar file
+- `GET /api/publish/artifacts/{id}/verify` re-computes the on-disk SM3 and returns `ArtifactVerifyResponse`
+
+### Cache
+
+- Spring Cache abstraction enabled via `@EnableCaching` in `GovCmsApplication`
+- Redis-backed cache with `spring.cache.type=redis` in `application-prod.yml`
+- `categoryTree` cache: `CategoryService.getTreeBySiteId(Long)` is `@Cacheable`; mutations evict the cache
+- `userPermissions` cache: `UserService.getPermissionCodes(Long)` is `@Cacheable`; role assignment evicts the cache
+
+### Rate Limiting
+
+- Bucket4j 8.10.1 with Redis-backed `LettuceBasedProxyManager` for distributed rate limiting
+- `RateLimitFilter` (`OncePerRequestFilter`) intercepts requests and enforces token-bucket rules per path
+- Rules are configurable via `app.rate-limit.rules` in `application-prod.yml`
+- Default rules: `/api/auth/login` (5/min), `/api/portal/search` (60/sec), `/api/publish/` (10/min)
+
+### Health Checks
+
+- Spring Boot Actuator exposes `health` and `info` endpoints (`management.endpoints.web.exposure.include`)
+- Custom `HealthIndicator` components:
+  - `DataSourceHealthIndicator` — validates DB connectivity with `SELECT 1`
+  - `RedisHealthIndicator` — pings Redis via `RedisTemplate`
+  - `HibernateSearchHealthIndicator` — checks `SearchMapping.allIndexedEntities()`
+  - `QuartzHealthIndicator` — checks scheduler is started and not in standby
 
 ### Media
 
