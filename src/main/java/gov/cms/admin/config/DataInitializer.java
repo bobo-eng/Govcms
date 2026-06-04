@@ -214,7 +214,15 @@ public class DataInitializer {
     }
 
     private void seedMenus(MenuRepository menuRepository) {
-        upsertMenu(menuRepository, createMenu("仪表盘", "/dashboard", "DashboardOutlined", null, 1, "content:article:view"), null);
+        List<String> legacyPaths = List.of(
+            "/users", "/roles", "/permissions", "/menus",
+            "/navigation", "/topics", "/sites", "/media", "/search-ops"
+        );
+        for (String path : legacyPaths) {
+            menuRepository.findByPath(path).ifPresent(menuRepository::delete);
+        }
+
+        upsertMenu(menuRepository, createMenu("仪表盘", "/dashboard", "DashboardOutlined", null, 1, "sys:dashboard:view"), null);
         upsertMenu(menuRepository, createMenu("用户管理", "/users", "UserOutlined", null, 2, "sys:user"), null);
         upsertMenu(menuRepository, createMenu("角色管理", "/roles", "TeamOutlined", null, 3, "sys:role"), null);
         upsertMenu(menuRepository, createMenu("权限管理", "/permissions", "LockOutlined", null, 4, "sys:permission"), null);
