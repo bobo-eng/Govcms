@@ -61,6 +61,8 @@ public class DataInitializer {
     private List<Permission> buildPermissions() {
         return Arrays.asList(
                 createPermission("sys", "系统管理", "sys", "menu", null, "/system", "SettingOutlined", 1),
+                createPermission("sys:dashboard", "仪表盘", "sys:dashboard:view", "menu", "sys", "/dashboard", "DashboardOutlined", 0),
+                createPermission("sys:audit", "审计日志", "sys:audit:view", "menu", "sys", "/system/audit-logs", "AuditOutlined", 5),
                 createPermission("sys:user", "用户管理", "sys:user", "menu", "sys", "/users", "UserOutlined", 1),
                 createPermission("sys:user:view", "查看用户", "sys:user:view", "button", "sys:user", null, null, 1),
                 createPermission("sys:user:create", "创建用户", "sys:user:create", "button", "sys:user", null, null, 2),
