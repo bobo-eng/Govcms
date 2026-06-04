@@ -23,7 +23,7 @@ public class Notification {
     @Column(nullable = false, length = 20)
     private String type = "info";
 
-    @Column(nullable = false)
+    @Column(nullable = false, name = "`read`")
     private boolean read = false;
 
     @Column(nullable = false)
