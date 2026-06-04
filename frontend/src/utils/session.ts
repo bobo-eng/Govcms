@@ -1,50 +1,40 @@
-const TOKEN_KEY = 'token'
-const USERNAME_KEY = 'username'
-const ROLES_KEY = 'roles'
-const PERMISSIONS_KEY = 'permissions'
+const SESSION_KEY = 'govcms_session'
 
-export interface SessionPayload {
+export interface SessionData {
   token: string
   username: string
   roles?: string[]
   permissions?: string[]
+  rememberMe?: boolean
 }
 
-const parseStringArray = (value: string | null): string[] => {
-  if (!value) {
-    return []
-  }
+export const saveSession = (data: SessionData) => {
+  localStorage.setItem(SESSION_KEY, JSON.stringify(data))
+}
 
+export const loadSession = (): SessionData | null => {
+  const raw = localStorage.getItem(SESSION_KEY)
+  if (!raw) return null
   try {
-    const parsed = JSON.parse(value)
-    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : []
+    return JSON.parse(raw) as SessionData
   } catch {
-    return []
+    return null
   }
-}
-
-export const saveSession = ({ token, username, roles = [], permissions = [] }: SessionPayload) => {
-  localStorage.setItem(TOKEN_KEY, token)
-  localStorage.setItem(USERNAME_KEY, username)
-  localStorage.setItem(ROLES_KEY, JSON.stringify(roles))
-  localStorage.setItem(PERMISSIONS_KEY, JSON.stringify(permissions))
 }
 
 export const clearSession = () => {
-  localStorage.removeItem(TOKEN_KEY)
-  localStorage.removeItem(USERNAME_KEY)
-  localStorage.removeItem(ROLES_KEY)
-  localStorage.removeItem(PERMISSIONS_KEY)
+  localStorage.removeItem(SESSION_KEY)
 }
 
-export const getToken = () => localStorage.getItem(TOKEN_KEY)
+export const getToken = () => loadSession()?.token || null
 
-export const getUsername = () => localStorage.getItem(USERNAME_KEY) || ''
+export const getUsername = () => loadSession()?.username || ''
 
-export const getRoles = () => parseStringArray(localStorage.getItem(ROLES_KEY))
+export const getRoles = () => loadSession()?.roles || []
 
-export const getPermissions = () => parseStringArray(localStorage.getItem(PERMISSIONS_KEY))
+export const getPermissions = () => loadSession()?.permissions || []
 
 export const hasStoredPermissions = () => {
-  return localStorage.getItem(ROLES_KEY) !== null && localStorage.getItem(PERMISSIONS_KEY) !== null
+  const session = loadSession()
+  return session !== null && Array.isArray(session.roles) && Array.isArray(session.permissions)
 }

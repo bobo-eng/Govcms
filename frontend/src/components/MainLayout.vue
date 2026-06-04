@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { h, onMounted, ref, watch } from 'vue'
+import { h, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { Modal } from 'ant-design-vue'
 import {
   DashboardOutlined,
   FileTextOutlined,
@@ -41,6 +42,9 @@ const openKeys = ref<string[]>([])
 const menuItems = ref<MenuItem[]>([])
 const username = ref(getUsername() || 'Admin')
 const roleLabel = ref('\u7528\u6237')
+const notifications = ref<any[]>([])
+const unreadCount = ref(0)
+const notificationVisible = ref(false)
 
 const iconMap: Record<string, any> = {
   DashboardOutlined,
@@ -143,14 +147,61 @@ const handleOpenChange = (keys: string[]) => {
 }
 
 const handleLogout = () => {
-  clearSession()
-  router.push('/login')
+  Modal.confirm({
+    title: '确认退出',
+    content: '您确定要退出当前账号吗？',
+    okText: '退出',
+    cancelText: '取消',
+    onOk: () => {
+      clearSession()
+      router.push('/login')
+    }
+  })
+}
+
+const fetchUnreadCount = async () => {
+  try {
+    const res = await api.get('/notifications/unread-count')
+    unreadCount.value = res.data.count || 0
+  } catch {
+    // silent fail
+  }
+}
+
+const fetchNotifications = async () => {
+  try {
+    const res = await api.get('/notifications?page=0&size=5')
+    notifications.value = res.data.content || []
+  } catch {
+    notifications.value = []
+  }
+}
+
+const markAsRead = async (id: number) => {
+  try {
+    await api.put(`/notifications/${id}/read`)
+    await fetchUnreadCount()
+    await fetchNotifications()
+  } catch {
+    // silent fail
+  }
+}
+
+const markAllAsRead = async () => {
+  try {
+    await api.put('/notifications/read-all')
+    await fetchUnreadCount()
+    await fetchNotifications()
+  } catch {
+    // silent fail
+  }
 }
 
 watch(() => route.path, () => {
   updateSelectedKeys()
 })
 
+let pollInterval: ReturnType<typeof setInterval> | null = null
 
 onMounted(async () => {
   username.value = getUsername() || 'Admin'
@@ -158,6 +209,22 @@ onMounted(async () => {
   roleLabel.value = ({ admin: '\u7ba1\u7406\u5458', site_admin: '\u7ad9\u70b9\u7ba1\u7406\u5458', editor: '\u7f16\u8f91', reviewer: '\u5ba1\u6838\u5458', publisher: '\u53d1\u5e03\u5458' } as Record<string, string>)[roleCode] || '\u7528\u6237'
   await fetchMenus()
   updateSelectedKeys()
+  await fetchUnreadCount()
+  await fetchNotifications()
+
+  pollInterval = setInterval(fetchUnreadCount, 30000)
+  const onVisibilityChange = () => {
+    if (!document.hidden) {
+      fetchUnreadCount()
+    }
+  }
+  document.addEventListener('visibilitychange', onVisibilityChange)
+})
+
+onUnmounted(() => {
+  if (pollInterval) {
+    clearInterval(pollInterval)
+  }
 })
 </script>
 
@@ -230,8 +297,37 @@ onMounted(async () => {
             <kbd>⌘K</kbd>
           </div>
           <div class="header-action">
-            <BellOutlined />
-            <span class="notification-dot"></span>
+            <a-popover
+              v-model:open="notificationVisible"
+              placement="bottomRight"
+              trigger="click"
+              @open-change="(visible: boolean) => { if (visible) fetchNotifications() }"
+            >
+              <template #content>
+                <div style="width: 320px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="font-weight: 600;">消息通知</span>
+                    <a v-if="unreadCount > 0" @click="markAllAsRead">全部已读</a>
+                  </div>
+                  <div v-if="notifications.length === 0" style="color: #94a3b8; text-align: center; padding: 16px;">暂无消息</div>
+                  <div
+                    v-for="n in notifications"
+                    :key="n.id"
+                    style="padding: 8px 0; border-bottom: 1px solid #f1f5f9; cursor: pointer;"
+                    @click="!n.read && markAsRead(n.id)"
+                  >
+                    <div style="display: flex; justify-content: space-between;">
+                      <span :style="{ fontWeight: n.read ? 'normal' : '600', color: '#1e293b' }">{{ n.title }}</span>
+                      <span style="font-size: 12px; color: #94a3b8;">{{ n.createdAt }}</span>
+                    </div>
+                    <div style="font-size: 13px; color: #64748b; margin-top: 4px;">{{ n.content }}</div>
+                  </div>
+                </div>
+              </template>
+              <a-badge :count="unreadCount" :offset="[-4, 4]">
+                <BellOutlined />
+              </a-badge>
+            </a-popover>
           </div>
         </div>
       </header>

@@ -1,16 +1,30 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { reactive, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import axios from 'axios'
-import { clearSession, saveSession } from '../utils/session'
+import { clearSession, saveSession, loadSession } from '../utils/session'
 
 const router = useRouter()
 const loading = ref(false)
 
 const formState = reactive({
   username: '',
-  password: ''
+  password: '',
+  rememberMe: false
+})
+
+onMounted(() => {
+  const session = loadSession()
+  if (session?.token && session?.rememberMe) {
+    const roleCode = session.roles?.[0] || ''
+    const defaultRoute: Record<string, string> = {
+      reviewer: '/content/review',
+      publisher: '/content/publish',
+      editor: '/content'
+    }
+    router.push(defaultRoute[roleCode] || '/dashboard')
+  }
 })
 
 const onFinish = async () => {
@@ -24,7 +38,8 @@ const onFinish = async () => {
   try {
     const res = await axios.post('/api/auth/login', {
       username: formState.username,
-      password: formState.password
+      password: formState.password,
+      rememberMe: formState.rememberMe
     }, { timeout: 10000 })
 
     if (res.data.token) {
@@ -33,7 +48,8 @@ const onFinish = async () => {
         token: res.data.token,
         username: res.data.username || formState.username,
         roles: res.data.roles || [],
-        permissions: res.data.permissions || []
+        permissions: res.data.permissions || [],
+        rememberMe: formState.rememberMe
       })
       message.success('登录成功')
       const roleCode = res.data.roles?.[0] || ''
@@ -63,6 +79,14 @@ const onFinish = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const showForgotPassword = () => {
+  Modal.info({
+    title: '忘记密码？',
+    content: '请联系管理员重置密码。管理员可在"系统管理 > 用户管理"中为您重置。',
+    okText: '知道了'
+  })
 }
 </script>
 
@@ -122,10 +146,10 @@ const onFinish = async () => {
         
         <div class="form-options">
           <label class="checkbox-wrapper">
-            <input type="checkbox" class="checkbox" />
+            <input type="checkbox" class="checkbox" v-model="formState.rememberMe" />
             <span class="checkbox-label">记住我</span>
           </label>
-          <a href="#" class="link">忘记密码？</a>
+          <a href="#" class="link" @click.prevent="showForgotPassword">忘记密码？</a>
         </div>
         
         <button 
