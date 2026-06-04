@@ -58,6 +58,28 @@
 - `docs/deployment-guide.md`
   - 生产环境部署手册，覆盖 DM8 数据库、应用部署、Nginx 配置、备份与回滚、国密密钥生成。
 
+## 实施计划
+
+以下文件按日期记录了已批准的功能设计与实现计划：
+
+### 2026-06-02
+- `docs/plans/2026-06-02-audit-log-ui-design.md` — 审计日志 UI 设计
+- `docs/plans/2026-06-02-audit-log-ui-implementation.md` — 审计日志 UI 实现计划
+- `docs/plans/2026-06-02-gm-crypto-jwt-implementation.md` — JWT SM2 签名 + SM4 加密实现计划
+
+### 2026-06-03
+- `docs/plans/2026-06-03-quartz-multi-env-publishing.md` — Quartz 异步多环境发布 + 审批流设计
+- `docs/plans/2026-06-03-hibernate-search-integration.md` — Hibernate Search + Lucene 集成设计
+- `docs/plans/2026-06-03-redis-suggestion-engine.md` — Redis 搜索建议引擎设计
+- `docs/plans/2026-06-03-dm-sm4-delivery-design.md` — DM8 + SM4 信创交付设计
+- `docs/plans/2026-06-03-dm-sm4-delivery-implementation.md` — DM8 + SM4 信创交付实现计划
+
+### 2026-06-04
+- `docs/plans/2026-06-04-final-delivery-package-design.md` — 最终交付包设计（SM3 摘要、Redis 缓存、限流、健康检查）
+- `docs/plans/2026-06-04-final-delivery-package-implementation.md` — 最终交付包实现计划
+- `docs/plans/2026-06-04-menu-redesign-design.md` — 后台菜单重构设计
+- `docs/plans/2026-06-04-menu-redesign-implementation.md` — 后台菜单重构实现计划
+
 ## 历史参考输入
 
 以下文件保留为历史输入材料和方案来源，不再作为当前项目主口径：

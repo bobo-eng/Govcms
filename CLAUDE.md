@@ -213,13 +213,14 @@ Articles flow through six statuses: `draft` → `pending_review` → `rejected` 
 
 The `docs/` directory is the single source of truth for product requirements and technical design. Key documents:
 
-- `docs/README.md` — document index
+- `docs/README.md` — document index (includes all design docs and implementation plans under `docs/plans/`)
 - `docs/03-backoffice-prd.md` — backoffice product requirements
 - `docs/04-portal-prd.md` — portal product requirements
 - `docs/06-roadmap-and-acceptance.md` — roadmap and milestones
 - `docs/10-publish-render-contract-prd.md` — publish/render contract
 - `docs/16-role-system-definition.md` — role definitions
 - `docs/18-admin-ux-visual-and-interaction-guidelines.md` — admin UI standards
+- `docs/plans/` — approved feature designs and step-by-step implementation plans
 
 When product behavior conflicts with code, the `docs/` directory takes precedence.
 
