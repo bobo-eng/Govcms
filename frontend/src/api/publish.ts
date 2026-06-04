@@ -1,8 +1,13 @@
 import api from '../utils/api'
 
 export const PUBLISH_STATUS_ORDER = [
-  'created', 'queued', 'staging_rendering', 'staging_ready',
-  'approved', 'production_rendering', 'published'
+  'created',
+  'queued',
+  'staging_rendering',
+  'staging_ready',
+  'approved',
+  'production_rendering',
+  'published'
 ] as const
 
 export type PublishStatus = typeof PUBLISH_STATUS_ORDER[number] | 'failed' | 'rejected' | 'rolled_back' | 'rollback_success' | 'rollback_failed'
@@ -22,7 +27,8 @@ export const publishStatusMeta: Record<string, { label: string; color: string; b
   rollback_failed: { label: '回滚失败', color: '#be123c', bg: '#ffe4e6', isException: true }
 }
 
-export const publishStatusLabel = (status: string) => publishStatusMeta[status]?.label || status
+export const publishStatusLabel = (status?: string | null): string =>
+  publishStatusMeta[status || '']?.label || status || '-'
 
 export interface PublishJobItem {
   id: number
