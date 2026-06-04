@@ -163,6 +163,7 @@ public class DataInitializer {
 
         Set<Permission> siteAdminPermissions = permissions.stream()
                 .filter(permission -> Set.of(
+                        "sys:dashboard:view", "sys:audit:view",
                         "content", "content:article:view",
                         "content:category", "content:category:view", "content:category:create", "content:category:update", "content:category:delete",
                         "template:manage", "template:manage:view", "template:manage:create", "template:manage:update", "template:manage:bind", "template:manage:preview", "template:manage:delete",
@@ -179,6 +180,7 @@ public class DataInitializer {
 
         Set<Permission> editorPermissions = permissions.stream()
                 .filter(permission -> Set.of(
+                        "sys:dashboard:view",
                         "content", "content:article", "content:article:view", "content:article:create", "content:article:update",
                         "content:article:delete", "content:article:submit-review", "content:article:history:view",
                         "content:category", "content:category:view", "template:manage", "template:manage:view", "template:manage:preview"
@@ -189,6 +191,7 @@ public class DataInitializer {
 
         Set<Permission> reviewerPermissions = permissions.stream()
                 .filter(permission -> Set.of(
+                        "sys:dashboard:view",
                         "content", "content:article:view", "content:article:review", "content:article:reject", "content:article:history:view",
                         "template:manage:view", "template:manage:preview"
                 ).contains(permission.getCode()))
@@ -198,13 +201,13 @@ public class DataInitializer {
 
         Set<Permission> publisherPermissions = permissions.stream()
                 .filter(permission -> permission.getCode().startsWith("publish:center")
-                        || Set.of("content:article:view", "content:article:offline", "content:article:history:view", "site:manage:view", "template:manage:view", "content:category:view", "navigation:manage:view", "topic:manage:view").contains(permission.getCode()))
+                        || Set.of("sys:dashboard:view", "content:article:view", "content:article:offline", "content:article:history:view", "site:manage:view", "template:manage:view", "content:category:view", "navigation:manage:view", "topic:manage:view").contains(permission.getCode()))
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         upsertRole(roleRepository.findByCode("publisher").orElseGet(Role::new), roleRepository,
                 "发布员", "publisher", "发布执行角色", 5, publisherPermissions);
 
         Set<Permission> viewerPermissions = permissions.stream()
-                .filter(permission -> Set.of("content:article:view", "content:category:view", "template:manage:view", "site:manage:view", "media:manage:view").contains(permission.getCode()))
+                .filter(permission -> Set.of("sys:dashboard:view", "content:article:view", "content:category:view", "template:manage:view", "site:manage:view", "media:manage:view").contains(permission.getCode()))
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         upsertRole(roleRepository.findByCode("viewer").orElseGet(Role::new), roleRepository,
                 "只读", "viewer", "只读访问角色", 6, viewerPermissions);
