@@ -3,7 +3,7 @@ import '../styles/admin-refresh.css'
 
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import { fetchArticles, type ArticleItem } from '../api/articles'
 import { fetchSiteOptions, type SiteOptionItem } from '../api/sites'
 import { fetchCategories } from '../api/categories'
@@ -26,8 +26,11 @@ import {
   fetchPublishJobs,
   fetchPublishLogs,
   fetchPublishRollbackRecords,
+  PUBLISH_STATUS_ORDER,
   publishCheck,
   publishImpact,
+  publishStatusLabel,
+  publishStatusMeta,
   retryPublishJob,
   rollbackPublishJob,
   type AuditLogItem,
@@ -53,6 +56,7 @@ const logs = ref<string[]>([])
 const auditLogs = ref<AuditLogItem[]>([])
 const rollbackRecords = ref<PublishRollbackRecordItem[]>([])
 const detailOpen = ref(false)
+const detailTab = ref('overview')
 const checking = ref(false)
 const impactLoading = ref(false)
 const executing = ref(false)
@@ -65,6 +69,7 @@ const searchIndexLoading = ref(false)
 const rebuildingSearchIndex = ref(false)
 const filters = ref({ siteId: undefined as number | undefined, unitType: 'content', mode: 'incremental', unitId: undefined as number | undefined, operatorComment: '' })
 const jobFilters = ref({ siteId: undefined as number | undefined, status: '', mode: '', unitType: '' })
+const activeStatusFilter = ref('')
 
 const contentStatus = computed(() => filters.value.mode === 'offline' ? 'published' : 'approved')
 const canExecute = computed(() => Boolean(filters.value.siteId && (filters.value.unitType === 'site' || filters.value.unitId)))
@@ -80,6 +85,57 @@ const searchIndexWarnings = computed(() => {
   }
   return Array.from(new Set(items))
 })
+
+const pendingCount = computed(() => jobs.value.filter(j => j.status === 'staging_ready').length)
+const todaySuccessCount = computed(() => {
+  const today = new Date().toISOString().slice(0, 10)
+  return jobs.value.filter(j => (j.status === 'published' || j.status === 'success') && j.finishedAt?.startsWith(today)).length
+})
+const failedCount = computed(() => jobs.value.filter(j => j.status === 'failed' || j.status === 'rollback_failed').length)
+const lastPublishAt = computed(() => {
+  const latest = jobs.value
+    .filter(j => j.status === 'published' || j.status === 'success')
+    .sort((a, b) => (b.finishedAt || '').localeCompare(a.finishedAt || ''))[0]
+  return latest?.finishedAt ? latest.finishedAt.replace('T', ' ').slice(0, 16) : '暂无'
+})
+
+const filteredJobs = computed(() => {
+  let list = jobs.value
+  if (jobFilters.value.siteId) list = list.filter(j => j.siteId === jobFilters.value.siteId)
+  if (jobFilters.value.status) list = list.filter(j => j.status === jobFilters.value.status)
+  if (jobFilters.value.mode) list = list.filter(j => j.mode === jobFilters.value.mode)
+  if (jobFilters.value.unitType) list = list.filter(j => j.unitType === jobFilters.value.unitType)
+  if (activeStatusFilter.value) {
+    if (activeStatusFilter.value === 'pending') list = list.filter(j => j.status === 'staging_ready')
+    else if (activeStatusFilter.value === 'failed') list = list.filter(j => j.status === 'failed' || j.status === 'rollback_failed')
+  }
+  return list.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+})
+
+const stateMachineSteps = computed(() => {
+  const status = selectedJob.value?.status || ''
+  const exceptionStatuses = ['failed', 'rejected', 'rollback_failed']
+  const isException = exceptionStatuses.includes(status)
+  const steps: { key: string; label: string; passed: boolean; current: boolean }[] = PUBLISH_STATUS_ORDER.map((s, i) => {
+    const meta = publishStatusMeta[s]
+    const index = PUBLISH_STATUS_ORDER.indexOf(status as typeof PUBLISH_STATUS_ORDER[number])
+    const passed = index > -1 && i < index
+    const current = s === status
+    return { key: s, label: meta?.label || s, passed, current }
+  })
+  if (isException) {
+    steps.push({ key: status, label: publishStatusMeta[status]?.label || status, passed: false, current: true })
+  }
+  return steps
+})
+
+const statusColor = (status: string) => publishStatusMeta[status]?.color || '#94a3b8'
+const statusBg = (status: string) => publishStatusMeta[status]?.bg || '#f1f5f9'
+
+const isRunning = (status: string) => status === 'staging_rendering' || status === 'production_rendering'
+
+const canRetry = (job: PublishJobItem) => job.status === 'failed'
+const canRollback = (job: PublishJobItem) => job.status === 'published' || job.status === 'success' || job.status === 'rollback_success'
 
 const loadSites = async () => {
   const response = await fetchSiteOptions()
@@ -244,9 +300,8 @@ const doExecute = async () => {
   executing.value = true
   try {
     const response = await createPublishJob(currentPayload())
-    message.success(`发布任务 #${response.data.id} 执行完成`)
+    message.success(`发布任务 #${response.data.id} 已创建`)
     await loadJobs()
-    await openJobDetail(response.data)
     await loadSearchIndexStatus(response.data.siteId)
   } catch (error: any) {
     message.error(error.response?.data?.message || '执行发布失败')
@@ -261,6 +316,7 @@ const selectJob = (job: PublishJobItem) => {
 
 const openJobDetail = async (job: PublishJobItem) => {
   selectedJob.value = job
+  detailTab.value = 'overview'
   detailOpen.value = true
   try {
     const [impactResponse, artifactResponse, logResponse, auditResponse, rollbackResponse] = await Promise.all([
@@ -280,29 +336,41 @@ const openJobDetail = async (job: PublishJobItem) => {
   }
 }
 
-const handleRetry = async (job: PublishJobItem) => {
-  try {
-    const response = await retryPublishJob(job.id)
-    message.success(`已重试任务 #${response.data.id}`)
-    await loadJobs()
-    await openJobDetail(response.data)
-    await loadSearchIndexStatus(response.data.siteId)
-  } catch (error: any) {
-    message.error(error.response?.data?.message || '重试失败')
-  }
+const handleRetry = (job: PublishJobItem) => {
+  Modal.confirm({
+    title: '重试任务',
+    content: `确定重试任务 #${job.id} 吗？`,
+    okText: '重试',
+    cancelText: '取消',
+    async onOk() {
+      try {
+        const response = await retryPublishJob(job.id)
+        message.success(`已重试任务 #${response.data.id}`)
+        await loadJobs()
+      } catch (error: any) {
+        message.error(error.response?.data?.message || '重试失败')
+      }
+    }
+  })
 }
 
-const handleRollback = async (job: PublishJobItem) => {
-  const reason = window.prompt('请输入回滚原因', 'Manual rollback') || 'Manual rollback'
-  try {
-    const response = await rollbackPublishJob(job.id, { siteId: job.siteId, targetJobId: job.id, reason })
-    message.success(`回滚任务 #${response.data.id} 已完成`)
-    await loadJobs()
-    await openJobDetail(response.data)
-    await loadSearchIndexStatus(response.data.siteId)
-  } catch (error: any) {
-    message.error(error.response?.data?.message || '回滚失败')
-  }
+const handleRollback = (job: PublishJobItem) => {
+  Modal.confirm({
+    title: '回滚任务',
+    content: '确定回滚该任务吗？回滚将恢复到上一个可用版本。',
+    okText: '确认回滚',
+    cancelText: '取消',
+    async onOk() {
+      try {
+        const response = await rollbackPublishJob(job.id, { siteId: job.siteId, targetJobId: job.id, reason: 'Manual rollback' })
+        message.success(`回滚任务 #${response.data.id} 已完成`)
+        await loadJobs()
+        await loadSearchIndexStatus(job.siteId)
+      } catch (error: any) {
+        message.error(error.response?.data?.message || '回滚失败')
+      }
+    }
+  })
 }
 
 watch(() => [filters.value.siteId, filters.value.unitType, filters.value.mode], async () => {
@@ -339,13 +407,34 @@ onMounted(async () => {
       </div>
     </div>
 
+    <!-- Hero Stats -->
+    <div class="admin-stats-row">
+      <div class="admin-stat-card" :class="{ active: activeStatusFilter === 'pending' }" @click="activeStatusFilter = activeStatusFilter === 'pending' ? '' : 'pending'">
+        <div class="admin-stat-value" style="color: #d97706;">{{ pendingCount }}</div>
+        <div class="admin-stat-label">待处理</div>
+      </div>
+      <div class="admin-stat-card">
+        <div class="admin-stat-value" style="color: #15803d;">{{ todaySuccessCount }}</div>
+        <div class="admin-stat-label">今日成功</div>
+      </div>
+      <div class="admin-stat-card" :class="{ active: activeStatusFilter === 'failed' }" @click="activeStatusFilter = activeStatusFilter === 'failed' ? '' : 'failed'">
+        <div class="admin-stat-value" style="color: #dc2626;">{{ failedCount }}</div>
+        <div class="admin-stat-label">失败 / 需关注</div>
+      </div>
+      <div class="admin-stat-card">
+        <div class="admin-stat-value" style="font-size: 18px; line-height: 28px; margin-top: 10px;">{{ lastPublishAt }}</div>
+        <div class="admin-stat-label">最近发布</div>
+      </div>
+    </div>
+
+    <!-- Search Index -->
     <div class="admin-card publish-search-card">
       <div class="admin-card-header">
         <h3 class="admin-card-title">搜索索引状态</h3>
-      </div>
-      <div class="admin-toolbar-row">
-        <button class="admin-secondary-btn" :disabled="rebuildingSearchIndex || !filters.siteId" @click="handleRebuildSiteIndex">{{ rebuildingSearchIndex ? '重建中...' : '重建当前站点索引' }}</button>
-        <button class="admin-secondary-btn" :disabled="rebuildingSearchIndex || !canRebuildObjectIndex" @click="handleRebuildObjectIndex">{{ rebuildingSearchIndex ? '处理中...' : `重建${searchIndexObjectLabel}索引` }}</button>
+        <div class="admin-toolbar-row">
+          <button class="admin-secondary-btn" :disabled="rebuildingSearchIndex || !filters.siteId" @click="handleRebuildSiteIndex">{{ rebuildingSearchIndex ? '重建中...' : '重建当前站点索引' }}</button>
+          <button class="admin-secondary-btn" :disabled="rebuildingSearchIndex || !canRebuildObjectIndex" @click="handleRebuildObjectIndex">{{ rebuildingSearchIndex ? '处理中...' : `重建${searchIndexObjectLabel}索引` }}</button>
+        </div>
       </div>
       <div v-if="searchIndexLoading" class="admin-empty-state">正在加载搜索索引状态...</div>
       <div v-else-if="searchIndexStatus">
@@ -370,6 +459,7 @@ onMounted(async () => {
       <div v-else class="admin-empty-state">请选择站点查看搜索索引状态。</div>
     </div>
 
+    <!-- Publish Entry + Summary -->
     <div class="publish-top-grid">
       <div class="admin-card">
         <div class="admin-card-header"><h3 class="admin-card-title">发布入口</h3></div>
@@ -388,7 +478,7 @@ onMounted(async () => {
       </div>
 
       <div class="admin-card">
-        <div class="admin-card-header"><h3 class="admin-card-title">当前摘要</h3></div>
+        <div class="admin-card-header"><h3 class="admin-card-title">实时摘要</h3></div>
         <div v-if="checkResult" class="publish-summary-box">
           <div v-if="checkResult.warnings?.some(item => item.includes('整站'))" class="admin-chip admin-chip--warning">建议整站发布</div>
           <div :class="['admin-status-chip', checkResult.publishable ? 'admin-status-chip--published' : 'admin-status-chip--rejected']">{{ checkResult.publishable ? '可发布' : '不可发布' }}</div>
@@ -398,10 +488,11 @@ onMounted(async () => {
             <li v-for="item in checkResult.warnings" :key="`w-${item}`">{{ item }}</li>
           </ul>
         </div>
-        <div v-else class="admin-empty-state">点击“发布前校验”后，在这里查看当前发布摘要。</div>
+        <div v-else class="admin-empty-state">点击"发布前校验"后，在这里查看当前发布摘要。</div>
       </div>
     </div>
 
+    <!-- Impact Scope -->
     <div class="admin-card">
       <div class="admin-card-header"><h3 class="admin-card-title">影响范围</h3></div>
       <div v-if="impactResult" class="impact-list">
@@ -416,35 +507,58 @@ onMounted(async () => {
           <div class="admin-sub-text">{{ item.summary || '-' }}</div>
         </div>
       </div>
-      <div v-else class="admin-empty-state">点击“影响范围计算”查看受影响页面集合。</div>
+      <div v-else class="admin-empty-state">点击"影响范围计算"查看受影响页面集合。</div>
     </div>
 
+    <!-- Pipeline + Sidebar -->
     <div class="publish-history-grid">
       <div class="admin-card">
-        <div class="admin-card-header"><h3 class="admin-card-title">历史任务</h3></div>
-        <div class="admin-toolbar-row">
-          <select v-model="jobFilters.siteId" class="admin-filter-select small-select"><option :value="undefined">全部站点</option><option v-for="site in sites" :key="site.id" :value="site.id">{{ site.name }}</option></select>
-          <select v-model="jobFilters.status" class="admin-filter-select small-select"><option value="">全部状态</option><option value="success">success</option><option value="failed">failed</option><option value="rollback_success">rollback_success</option><option value="rollback_failed">rollback_failed</option></select>
-          <select v-model="jobFilters.mode" class="admin-filter-select small-select"><option value="">全部模式</option><option value="incremental">incremental</option><option value="full">full</option><option value="offline">offline</option><option value="rollback">rollback</option></select>
-          <select v-model="jobFilters.unitType" class="admin-filter-select small-select"><option value="">全部对象</option><option value="content">content</option><option value="category">category</option><option value="template">template</option><option value="navigation">navigation</option><option value="topic">topic</option><option value="site">site</option></select>
-          <button class="admin-secondary-btn" @click="loadJobs">刷新</button>
+        <div class="admin-card-header">
+          <h3 class="admin-card-title">发布流水线</h3>
+          <div class="admin-toolbar-row">
+            <select v-model="jobFilters.siteId" class="admin-filter-select small-select" @change="loadJobs"><option :value="undefined">全部站点</option><option v-for="site in sites" :key="site.id" :value="site.id">{{ site.name }}</option></select>
+            <select v-model="jobFilters.status" class="admin-filter-select small-select" @change="loadJobs"><option value="">全部状态</option><option value="published">已发布</option><option value="success">已成功</option><option value="failed">失败</option><option value="rollback_success">回滚成功</option><option value="rollback_failed">回滚失败</option></select>
+            <select v-model="jobFilters.mode" class="admin-filter-select small-select" @change="loadJobs"><option value="">全部模式</option><option value="incremental">增量</option><option value="full">全量</option><option value="offline">下线</option></select>
+            <select v-model="jobFilters.unitType" class="admin-filter-select small-select" @change="loadJobs"><option value="">全部对象</option><option value="content">内容</option><option value="category">栏目</option><option value="template">模板</option><option value="navigation">导航</option><option value="topic">专题</option><option value="site">站点</option></select>
+            <button class="admin-secondary-btn" @click="loadJobs">刷新</button>
+          </div>
         </div>
-        <table class="admin-data-table publish-jobs-table">
-          <thead><tr><th>ID</th><th>单位</th><th>模式</th><th>状态</th><th>操作者</th><th>创建时间</th><th>操作</th></tr></thead>
-          <tbody>
-            <tr v-if="jobsLoading"><td colspan="7" class="admin-empty-cell">加载中...</td></tr>
-            <tr v-else-if="!jobs.length"><td colspan="7" class="admin-empty-cell">暂无任务</td></tr>
-            <tr v-for="job in jobs" :key="job.id" :class="{ 'row-active': selectedJob?.id === job.id }" @click="selectJob(job)">
-              <td>#{{ job.id }}</td>
-              <td>{{ job.unitType }} / {{ job.unitIds }}</td>
-              <td>{{ job.mode }}</td>
-              <td><span :class="['admin-status-chip', job.status.includes('success') ? 'admin-status-chip--published' : (job.status.includes('failed') ? 'admin-status-chip--rejected' : 'admin-status-chip--approved')]">{{ job.status }}</span></td>
-              <td>{{ job.operatorName }}</td>
-              <td>{{ job.createdAt ? job.createdAt.replace('T', ' ').slice(0, 16) : '-' }}</td>
-              <td><div class="job-actions"><button class="admin-link-action" @click.stop="openJobDetail(job)">详情</button><button v-if="job.status === 'failed'" class="admin-link-action warning-link" @click.stop="handleRetry(job)">重试</button><button v-if="job.status === 'success' || job.status === 'rollback_success'" class="admin-link-action danger-link" @click.stop="handleRollback(job)">回滚</button></div></td>
-            </tr>
-          </tbody>
-        </table>
+        <div v-if="jobsLoading" class="admin-empty-state">加载中...</div>
+        <ul v-else class="publish-pipeline-list">
+          <li
+            v-for="job in filteredJobs"
+            :key="job.id"
+            class="publish-pipeline-item"
+            :class="{ active: selectedJob?.id === job.id }"
+            :style="{ '--status-color': statusColor(job.status) }"
+            @click="selectJob(job)"
+          >
+            <div class="pipeline-status-bar" />
+            <div class="pipeline-body">
+              <div class="pipeline-header">
+                <div class="pipeline-title">
+                  <span class="pipeline-id">#{{ job.id }}</span>
+                  <span class="pipeline-unit">{{ job.unitType }} · {{ job.mode }}</span>
+                </div>
+                <div class="pipeline-actions">
+                  <button class="admin-link-action" @click.stop="openJobDetail(job)">详情</button>
+                  <button v-if="canRetry(job)" class="admin-link-action" style="color: #d97706;" @click.stop="handleRetry(job)">重试</button>
+                  <button v-if="canRollback(job)" class="admin-link-action" style="color: #dc2626;" @click.stop="handleRollback(job)">回滚</button>
+                </div>
+              </div>
+              <div class="pipeline-meta">
+                <span>{{ job.operatorName }}</span>
+                <span>{{ job.createdAt ? job.createdAt.replace('T', ' ').slice(0, 16) : '-' }}</span>
+              </div>
+              <div class="pipeline-status-row">
+                <span class="pipeline-status-dot" :class="{ pulse: isRunning(job.status) }" :style="{ background: statusColor(job.status) }" />
+                <span class="pipeline-status-label" :style="{ background: statusBg(job.status), color: statusColor(job.status) }">{{ publishStatusLabel(job.status) }}</span>
+              </div>
+              <div v-if="job.failureReason" class="pipeline-error">{{ job.failureReason }}</div>
+            </div>
+          </li>
+          <li v-if="!filteredJobs.length" class="admin-empty-state">暂无发布任务</li>
+        </ul>
       </div>
 
       <div class="admin-card publish-summary-sidebar">
@@ -453,74 +567,115 @@ onMounted(async () => {
           <div class="summary-item"><label>ID</label><strong>#{{ selectedJob.id }}</strong></div>
           <div class="summary-item"><label>对象</label><span>{{ selectedJob.unitType }} / {{ selectedJob.unitIds }}</span></div>
           <div class="summary-item"><label>模式</label><span>{{ selectedJob.mode }}</span></div>
-          <div class="summary-item"><label>状态</label><span :class="['admin-status-chip', selectedJob.status.includes('success') ? 'admin-status-chip--published' : (selectedJob.status.includes('failed') ? 'admin-status-chip--rejected' : 'admin-status-chip--approved')]">{{ selectedJob.status }}</span></div>
+          <div class="summary-item"><label>状态</label><span class="pipeline-status-label" :style="{ background: statusBg(selectedJob.status), color: statusColor(selectedJob.status) }">{{ publishStatusLabel(selectedJob.status) }}</span></div>
+          <div class="summary-item"><label>操作者</label><span>{{ selectedJob.operatorName }}</span></div>
+          <div class="summary-item"><label>时间</label><span>{{ selectedJob.createdAt ? selectedJob.createdAt.replace('T', ' ').slice(0, 16) : '-' }}</span></div>
           <div class="summary-item"><label>摘要</label><p>{{ selectedJob.resultSummary || selectedJob.failureReason || '暂无摘要' }}</p></div>
           <div v-if="searchIndexWarnings.length" class="warning-summary-box">
             <div class="admin-sub-text small-title">风险提示</div>
-            <ul>
-              <li v-for="item in searchIndexWarnings" :key="item">{{ item }}</li>
-            </ul>
+            <ul><li v-for="item in searchIndexWarnings" :key="item">{{ item }}</li></ul>
           </div>
           <div class="admin-toolbar-row sidebar-actions">
             <button class="admin-secondary-btn" @click="openJobDetail(selectedJob)">查看详情</button>
-            <button v-if="selectedJob.status === 'failed'" class="admin-secondary-btn" @click="handleRetry(selectedJob)">重试任务</button>
-            <button v-if="selectedJob.status === 'success' || selectedJob.status === 'rollback_success'" class="admin-danger-btn" @click="handleRollback(selectedJob)">回滚任务</button>
+            <button v-if="canRetry(selectedJob)" class="admin-secondary-btn" @click="handleRetry(selectedJob)">重试任务</button>
+            <button v-if="canRollback(selectedJob)" class="admin-danger-btn" @click="handleRollback(selectedJob)">回滚任务</button>
           </div>
         </div>
         <div v-else class="admin-empty-state">选择左侧任务后，在这里查看任务摘要与快捷操作。</div>
       </div>
     </div>
 
-    <a-modal v-model:open="detailOpen" title="发布任务详情" width="1100px" :footer="null" destroy-on-close>
-      <div v-if="selectedJob" class="detail-grid">
-        <div class="admin-card publish-detail-card">
-          <div class="admin-card-title">任务概览</div>
-          <div class="admin-sub-text">#{{ selectedJob.id }} · {{ selectedJob.unitType }} · {{ selectedJob.mode }} · {{ selectedJob.status }}</div>
-          <div class="admin-sub-text">{{ selectedJob.resultSummary || selectedJob.failureReason || '暂无摘要' }}</div>
-          <div class="footer-actions">
-            <button v-if="selectedJob.status === 'failed'" class="admin-secondary-btn" @click="handleRetry(selectedJob)">重试任务</button>
-            <button v-if="selectedJob.status === 'success' || selectedJob.status === 'rollback_success'" class="admin-danger-btn" @click="handleRollback(selectedJob)">回滚任务</button>
-          </div>
+    <!-- Detail Modal -->
+    <a-modal v-model:open="detailOpen" title="发布任务详情" width="1000px" :footer="null" destroy-on-close>
+      <div v-if="selectedJob" class="detail-modal">
+        <!-- State Machine Bar -->
+        <div class="state-machine-bar">
+          <template v-for="(step, index) in stateMachineSteps" :key="step.key">
+            <div class="state-step" :class="{ passed: step.passed, current: step.current }">
+              <span class="state-dot" :style="{ background: step.current ? '#2563eb' : (step.passed ? '#22c55e' : '#cbd5e1') }" />
+              <span class="state-label">{{ step.label }}</span>
+            </div>
+            <span v-if="index < stateMachineSteps.length - 1" style="color: #cbd5e1;">→</span>
+          </template>
         </div>
-        <div class="admin-card publish-detail-card">
-          <div class="admin-card-title">影响项</div>
-          <div v-if="impacts.length" class="impact-list small">
-            <div v-for="item in impacts" :key="`${item.action}-${item.path}`" class="impact-item"><div>{{ item.pageType }} · {{ item.action }}</div><div class="admin-sub-text">{{ item.path }}</div></div>
-          </div>
-          <div v-else class="admin-empty-state">暂无影响项</div>
-        </div>
-        <div class="admin-card publish-detail-card">
-          <div class="admin-card-title">产物</div>
-          <div v-if="artifacts.length" class="impact-list small">
-            <div v-for="item in artifacts" :key="item.id" class="impact-item"><div>{{ item.artifactType }} · {{ item.outputPath }}</div><div class="admin-sub-text">{{ item.version || '-' }}</div></div>
-          </div>
-          <div v-else class="admin-empty-state">暂无产物</div>
-        </div>
-        <div class="admin-card publish-detail-card">
-          <div class="admin-card-title">审计摘要</div>
-          <div v-if="auditLogs.length" class="impact-list small">
-            <div v-for="item in auditLogs" :key="item.id" class="impact-item"><div>{{ item.actionType }} · {{ item.result }}</div><div class="admin-sub-text">{{ item.summary || item.failureReason || '-' }}</div></div>
-          </div>
-          <div v-else class="admin-empty-state">暂无审计记录</div>
-        </div>
-        <div class="admin-card publish-detail-card">
-          <div class="admin-card-title">索引告警</div>
-          <div v-if="searchIndexWarnings.length" class="impact-list small">
-            <div v-for="item in searchIndexWarnings" :key="item" class="impact-item warning-box">{{ item }}</div>
-          </div>
-          <div v-else class="admin-empty-state">暂无索引告警</div>
-        </div>
-        <div class="admin-card publish-detail-card">
-          <div class="admin-card-title">回滚关系</div>
-          <div v-if="rollbackRecords.length" class="impact-list small">
-            <div v-for="item in rollbackRecords" :key="item.id" class="impact-item"><div>target #{{ item.targetJobId }} / rollback #{{ item.rollbackJobId }}</div><div class="admin-sub-text">{{ item.reason || '-' }}</div></div>
-          </div>
-          <div v-else class="admin-empty-state">暂无回滚关系</div>
-        </div>
-        <div class="admin-card publish-detail-card full-row">
-          <div class="admin-card-title">执行日志</div>
-          <pre class="log-box">{{ logs.join('\n') || '暂无日志' }}</pre>
-        </div>
+
+        <a-tabs v-model:activeKey="detailTab" class="detail-tabs">
+          <a-tab-pane key="overview" tab="概览">
+            <div class="admin-detail-grid">
+              <div class="admin-detail-card">
+                <div class="admin-card-title">任务信息</div>
+                <div class="summary-stack" style="margin-top: 12px;">
+                  <div class="summary-item"><label>ID</label><strong>#{{ selectedJob.id }}</strong></div>
+                  <div class="summary-item"><label>对象</label><span>{{ selectedJob.unitType }} / {{ selectedJob.unitIds }}</span></div>
+                  <div class="summary-item"><label>模式</label><span>{{ selectedJob.mode }}</span></div>
+                  <div class="summary-item"><label>状态</label><span class="pipeline-status-label" :style="{ background: statusBg(selectedJob.status), color: statusColor(selectedJob.status) }">{{ publishStatusLabel(selectedJob.status) }}</span></div>
+                  <div class="summary-item"><label>操作者</label><span>{{ selectedJob.operatorName }}</span></div>
+                  <div class="summary-item"><label>环境</label><span>{{ selectedJob.environment || 'production' }}</span></div>
+                  <div class="summary-item"><label>创建时间</label><span>{{ selectedJob.createdAt ? selectedJob.createdAt.replace('T', ' ').slice(0, 16) : '-' }}</span></div>
+                  <div class="summary-item"><label>完成时间</label><span>{{ selectedJob.finishedAt ? selectedJob.finishedAt.replace('T', ' ').slice(0, 16) : '-' }}</span></div>
+                </div>
+              </div>
+              <div class="admin-detail-card">
+                <div class="admin-card-title">操作</div>
+                <div class="admin-content-box" style="display: flex; flex-direction: column; gap: 12px; justify-content: center;">
+                  <div class="admin-sub-text">{{ selectedJob.resultSummary || selectedJob.failureReason || '暂无摘要' }}</div>
+                  <div class="admin-toolbar-row" style="justify-content: center;">
+                    <button v-if="canRetry(selectedJob)" class="admin-secondary-btn" @click="handleRetry(selectedJob)">重试任务</button>
+                    <button v-if="canRollback(selectedJob)" class="admin-danger-btn" @click="handleRollback(selectedJob)">回滚任务</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </a-tab-pane>
+
+          <a-tab-pane key="impacts" tab="影响项">
+            <div v-if="impacts.length" class="impact-list">
+              <div v-for="item in impacts" :key="`${item.action}-${item.path}`" class="impact-item">
+                <div>{{ item.pageType }} · {{ item.action }}</div>
+                <div class="admin-sub-text">{{ item.path }}</div>
+                <div class="admin-sub-text">{{ item.summary || '-' }}</div>
+              </div>
+            </div>
+            <div v-else class="admin-empty-state">暂无影响项</div>
+          </a-tab-pane>
+
+          <a-tab-pane key="artifacts" tab="产物">
+            <div v-if="artifacts.length" class="impact-list">
+              <div v-for="item in artifacts" :key="item.id" class="impact-item">
+                <div>{{ item.artifactType }} · {{ item.outputPath }}</div>
+                <div class="admin-sub-text">版本: {{ item.version || '-' }} | 校验和: {{ item.checksum || '-' }}</div>
+              </div>
+            </div>
+            <div v-else class="admin-empty-state">暂无产物</div>
+          </a-tab-pane>
+
+          <a-tab-pane key="logs" tab="日志">
+            <pre class="log-box">{{ logs.join('\n') || '暂无日志' }}</pre>
+          </a-tab-pane>
+
+          <a-tab-pane key="audits" tab="审计">
+            <div v-if="auditLogs.length" class="admin-history-list">
+              <div v-for="item in auditLogs" :key="item.id" class="admin-history-item">
+                <div><strong>{{ item.actionType }}</strong> · {{ item.result }}</div>
+                <div class="admin-sub-text">{{ item.operatorName }} · {{ item.createdAt ? item.createdAt.replace('T', ' ').slice(0, 16) : '-' }}</div>
+                <div class="admin-sub-text">{{ item.summary || item.failureReason || '-' }}</div>
+              </div>
+            </div>
+            <div v-else class="admin-empty-state">暂无审计记录</div>
+          </a-tab-pane>
+
+          <a-tab-pane key="rollback" tab="回滚">
+            <div v-if="rollbackRecords.length" class="admin-history-list">
+              <div v-for="item in rollbackRecords" :key="item.id" class="admin-history-item">
+                <div>目标任务 #{{ item.targetJobId }} → 回滚任务 #{{ item.rollbackJobId }}</div>
+                <div class="admin-sub-text">操作者: {{ item.operatorName }}</div>
+                <div class="admin-sub-text">原因: {{ item.reason || '-' }}</div>
+                <div class="admin-sub-text">时间: {{ item.createdAt ? item.createdAt.replace('T', ' ').slice(0, 16) : '-' }}</div>
+              </div>
+            </div>
+            <div v-else class="admin-empty-state">暂无回滚记录</div>
+          </a-tab-pane>
+        </a-tabs>
       </div>
     </a-modal>
   </div>
@@ -531,7 +686,6 @@ onMounted(async () => {
 .publish-page .publish-keyword-grid,
 .publish-page .publish-top-grid,
 .publish-page .publish-history-grid,
-.publish-page .detail-grid,
 .publish-page .publish-form-grid {
   display: grid;
   gap: 16px;
@@ -560,8 +714,7 @@ onMounted(async () => {
 
 .publish-page .publish-keyword-grid,
 .publish-page .publish-top-grid,
-.publish-page .publish-history-grid,
-.publish-page .detail-grid {
+.publish-page .publish-history-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
@@ -581,8 +734,6 @@ onMounted(async () => {
 
 .publish-page .publish-actions,
 .publish-page .sidebar-actions,
-.publish-page .job-actions,
-.publish-page .footer-actions,
 .publish-page .tag-list,
 .publish-page .impact-list {
   display: flex;
@@ -612,14 +763,6 @@ onMounted(async () => {
 
 .publish-page .small-select {
   min-width: 160px;
-}
-
-.publish-page .publish-jobs-table tr {
-  cursor: pointer;
-}
-
-.publish-page .publish-jobs-table tr.row-active td {
-  background: #eff6ff;
 }
 
 .publish-page .summary-stack {
@@ -653,38 +796,13 @@ onMounted(async () => {
   padding-left: 18px;
 }
 
-.publish-page .link-btn {
-  background: transparent;
-  padding: 0;
-  color: #2563eb;
-  border: none;
-  cursor: pointer;
-}
-
-.publish-page .warning-link { color: #b45309; }
-.publish-page .danger-link { color: #dc2626; }
-.publish-page .status-chip { display: inline-flex; padding: 4px 10px; border-radius: 999px; font-size: 12px; }
-.publish-page .status-chip.approved { background: #dbeafe; color: #1d4ed8; }
-.publish-page .status-chip.published { background: #dcfce7; color: #166534; }
-.publish-page .status-chip.rejected { background: #fee2e2; color: #991b1b; }
-.publish-page .panel-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px; }
-.publish-page .panel-title { font-weight: 600; margin-bottom: 12px; }
-.publish-page .sub-text,
-.publish-page .small-title { color: #64748b; font-size: 12px; }
-.publish-page .log-box { background: #0f172a; color: #e2e8f0; border-radius: 12px; padding: 12px; min-height: 220px; white-space: pre-wrap; }
-
 @media (max-width: 1100px) {
   .publish-page .publish-top-grid,
   .publish-page .publish-history-grid,
   .publish-page .publish-keyword-grid,
-  .publish-page .detail-grid,
   .publish-page .publish-form-grid,
   .publish-page .publish-stats-grid {
     grid-template-columns: 1fr;
   }
 }
 </style>
-
-
-
-
