@@ -1,5 +1,29 @@
 import api from '../utils/api'
 
+export const PUBLISH_STATUS_ORDER = [
+  'created', 'queued', 'staging_rendering', 'staging_ready',
+  'approved', 'production_rendering', 'published'
+] as const
+
+export type PublishStatus = typeof PUBLISH_STATUS_ORDER[number] | 'failed' | 'rejected' | 'rolled_back' | 'rollback_success' | 'rollback_failed'
+
+export const publishStatusMeta: Record<string, { label: string; color: string; bg: string; isTerminal?: boolean; isException?: boolean }> = {
+  created: { label: '已创建', color: '#64748b', bg: '#f1f5f9' },
+  queued: { label: '排队中', color: '#64748b', bg: '#f1f5f9' },
+  staging_rendering: { label: 'Staging渲染中', color: '#2563eb', bg: '#dbeafe' },
+  staging_ready: { label: '待审批', color: '#d97706', bg: '#fef3c7' },
+  approved: { label: '已批准', color: '#0891b2', bg: '#cffafe' },
+  production_rendering: { label: 'Production渲染中', color: '#2563eb', bg: '#dbeafe' },
+  published: { label: '已发布', color: '#15803d', bg: '#dcfce7', isTerminal: true },
+  failed: { label: '失败', color: '#dc2626', bg: '#fee2e2', isException: true },
+  rejected: { label: '已拒绝', color: '#991b1b', bg: '#fee2e2', isException: true },
+  rolled_back: { label: '已回滚', color: '#7c3aed', bg: '#ede9fe', isTerminal: true },
+  rollback_success: { label: '回滚成功', color: '#7c3aed', bg: '#ede9fe', isTerminal: true },
+  rollback_failed: { label: '回滚失败', color: '#be123c', bg: '#ffe4e6', isException: true }
+}
+
+export const publishStatusLabel = (status: string) => publishStatusMeta[status]?.label || status
+
 export interface PublishJobItem {
   id: number
   siteId: number
