@@ -51,4 +51,12 @@ public interface ArticleRepository extends JpaRepository<Article, Long> {
     List<Article> findBySiteIdAndPrimaryCategoryIdAndStatusOrderByCreatedAtDescIdDesc(Long siteId, Long primaryCategoryId, ArticleStatus status);
 
     List<Article> findBySiteIdAndStatusOrderByCreatedAtDescIdDesc(Long siteId, ArticleStatus status);
+
+    long countByStatus(ArticleStatus status);
+
+    List<Article> findTop3ByStatusOrderByCreatedAtDesc(ArticleStatus status);
+
+    long countBySiteId(Long siteId);
+
+    long countBySiteIdAndStatus(Long siteId, ArticleStatus status);
 }
