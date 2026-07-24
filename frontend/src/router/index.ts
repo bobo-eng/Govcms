@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Login from '../views/Login.vue'
-import MainLayout from '../components/MainLayout.vue'
+import MainLayout from '../components/layout/MainLayout.vue'
 import Dashboard from '../views/Dashboard.vue'
 import Users from '../views/Users.vue'
 import Roles from '../views/Roles.vue'
