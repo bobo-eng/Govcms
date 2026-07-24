@@ -948,6 +948,8 @@
   .admin-stats-row {
     grid-template-columns: 1fr;
   }
+}
+
 /* Skeleton */
 .admin-skeleton-row {
   height: 48px;

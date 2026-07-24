@@ -114,13 +114,14 @@ const filteredJobs = computed(() => {
 
 const stateMachineSteps = computed(() => {
   const status = selectedJob.value?.status || ''
+  const normalizedStatus = status === 'success' ? 'published' : status
   const exceptionStatuses = ['failed', 'rejected', 'rollback_failed']
   const isException = exceptionStatuses.includes(status)
   const steps: { key: string; label: string; passed: boolean; current: boolean }[] = PUBLISH_STATUS_ORDER.map((s, i) => {
     const meta = publishStatusMeta[s]
-    const index = PUBLISH_STATUS_ORDER.indexOf(status as typeof PUBLISH_STATUS_ORDER[number])
+    const index = PUBLISH_STATUS_ORDER.indexOf(normalizedStatus as typeof PUBLISH_STATUS_ORDER[number])
     const passed = index > -1 && i < index
-    const current = s === status
+    const current = s === normalizedStatus
     return { key: s, label: meta?.label || s, passed, current }
   })
   if (isException) {

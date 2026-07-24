@@ -10,7 +10,7 @@ export const PUBLISH_STATUS_ORDER = [
   'published'
 ] as const
 
-export type PublishStatus = typeof PUBLISH_STATUS_ORDER[number] | 'failed' | 'rejected' | 'rolled_back' | 'rollback_success' | 'rollback_failed'
+export type PublishStatus = typeof PUBLISH_STATUS_ORDER[number] | 'success' | 'failed' | 'rejected' | 'rolled_back' | 'rollback_success' | 'rollback_failed'
 
 export const publishStatusMeta: Record<string, { label: string; color: string; bg: string; isTerminal?: boolean; isException?: boolean }> = {
   created: { label: '已创建', color: '#64748b', bg: '#f1f5f9' },
@@ -20,6 +20,7 @@ export const publishStatusMeta: Record<string, { label: string; color: string; b
   approved: { label: '已批准', color: '#0891b2', bg: '#cffafe' },
   production_rendering: { label: 'Production渲染中', color: '#2563eb', bg: '#dbeafe' },
   published: { label: '已发布', color: '#15803d', bg: '#dcfce7', isTerminal: true },
+  success: { label: '已成功', color: '#15803d', bg: '#dcfce7', isTerminal: true },
   failed: { label: '失败', color: '#dc2626', bg: '#fee2e2', isException: true },
   rejected: { label: '已拒绝', color: '#991b1b', bg: '#fee2e2', isException: true },
   rolled_back: { label: '已回滚', color: '#7c3aed', bg: '#ede9fe', isTerminal: true },
