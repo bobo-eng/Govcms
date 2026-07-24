@@ -22,8 +22,8 @@ import {
   LayoutOutlined,
   SendOutlined
 } from '@ant-design/icons-vue'
-import api from '../utils/api'
-import { clearSession, getRoles, getUsername } from '../utils/session'
+import api from '../../utils/api'
+import { clearSession, getRoles, getUsername } from '../../utils/session'
 
 interface MenuItem {
   key: string
