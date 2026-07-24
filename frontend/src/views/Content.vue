@@ -2,7 +2,7 @@
 import '../styles/admin-refresh.css'
 
 import { computed, onMounted, ref, watch } from 'vue'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
 import { usePermission } from '../composables/usePermission'
 import { fetchCategories } from '../api/categories'
@@ -51,6 +51,16 @@ const historyItems = ref<ArticleLifecycleHistoryItem[]>([])
 const publishCheck = ref<ArticlePublishCheckResponseData | null>(null)
 const filters = ref({ keyword: '', status: '', siteId: undefined as number | undefined, primaryCategoryId: undefined as number | undefined })
 const pagination = ref({ current: 1, pageSize: 10, total: 0 })
+let keywordDebounceTimer: ReturnType<typeof setTimeout> | null = null
+
+watch(() => filters.value.keyword, () => {
+  if (keywordDebounceTimer) clearTimeout(keywordDebounceTimer)
+  keywordDebounceTimer = setTimeout(() => {
+    pagination.value.current = 1
+    loadArticles()
+  }, 300)
+})
+
 const form = ref<ArticleForm>({ title: '', summary: '', author: '', content: '', siteId: undefined, primaryCategoryId: undefined })
 
 const canCreate = computed(() => hasPermission('content:article:create'))
@@ -68,6 +78,14 @@ const statusOptions = [
   { value: 'published', label: '已发布' },
   { value: 'offline', label: '已下线' }
 ]
+
+const statusCounts = computed(() => {
+  const map: Record<string, number> = {}
+  articles.value.forEach(a => {
+    map[a.status || 'draft'] = (map[a.status || 'draft'] || 0) + 1
+  })
+  return map
+})
 
 const statusLabel = (status?: string) => {
   const map: Record<string, string> = {
@@ -105,6 +123,16 @@ const loadCategories = async (siteId?: number) => {
   }
   const response = await fetchCategories({ siteId })
   categoryOptions.value = response.data || []
+}
+
+const clearFilters = async () => {
+  filters.value = { keyword: '', status: '', siteId: undefined, primaryCategoryId: undefined }
+  await onFilterChange()
+}
+
+const onFilterChange = async () => {
+  pagination.value.current = 1
+  await loadArticles()
 }
 
 const loadArticles = async () => {
@@ -214,14 +242,22 @@ const removeArticle = async (record: ArticleItem) => {
     message.warning('没有删除内容权限')
     return
   }
-  if (!window.confirm(`确认删除《${record.title}》吗？`)) return
-  try {
-    await deleteArticle(record.id)
-    message.success('删除成功')
-    await loadArticles()
-  } catch (error: any) {
-    message.error(error.response?.data?.message || '删除失败')
-  }
+  Modal.confirm({
+    title: '确认删除',
+    content: `删除后《${record.title}》将无法恢复，是否继续？`,
+    okText: '删除',
+    okType: 'danger',
+    cancelText: '取消',
+    async onOk() {
+      try {
+        await deleteArticle(record.id)
+        message.success('删除成功')
+        await loadArticles()
+      } catch (error: any) {
+        message.error(error.response?.data?.message || '删除失败')
+      }
+    }
+  })
 }
 
 const submitReviewAction = async (record: ArticleItem) => {
@@ -282,23 +318,37 @@ onMounted(async () => {
       </button>
     </div>
 
+    <div class="admin-stats-row">
+      <div
+        v-for="s in statusOptions.filter(x => x.value)"
+        :key="s.value"
+        class="admin-stat-card"
+        :class="{ active: filters.status === s.value }"
+        @click="filters.status = s.value; pagination.current = 1; loadArticles()"
+      >
+        <span class="admin-stat-value">{{ statusCounts[s.value] || 0 }}</span>
+        <span class="admin-stat-label">{{ s.label }}</span>
+      </div>
+    </div>
+
     <div class="admin-toolbar-card">
       <div class="admin-toolbar-row">
         <div class="admin-search-box">
-          <input v-model="filters.keyword" class="admin-search-input" placeholder="搜索标题、摘要或作者" @keyup.enter="loadArticles" />
+          <input v-model="filters.keyword" class="admin-search-input" placeholder="搜索标题、摘要或作者" />
         </div>
         <select v-model="filters.siteId" class="admin-filter-select">
           <option :value="undefined">全部站点</option>
           <option v-for="site in sites" :key="site.id" :value="site.id">{{ site.name }}</option>
         </select>
-        <select v-model="filters.primaryCategoryId" class="admin-filter-select" @change="loadArticles">
+        <select v-model="filters.primaryCategoryId" class="admin-filter-select" @change="onFilterChange">
           <option :value="undefined">全部栏目</option>
           <option v-for="item in categoryOptions" :key="item.id" :value="item.id">{{ item.name }}</option>
         </select>
-        <select v-model="filters.status" class="admin-filter-select" @change="loadArticles">
+        <select v-model="filters.status" class="admin-filter-select" @change="onFilterChange">
           <option v-for="item in statusOptions" :key="item.value" :value="item.value">{{ item.label }}</option>
         </select>
         <button class="admin-secondary-btn" @click="loadArticles">查询</button>
+        <button class="admin-secondary-btn" @click="clearFilters">清空</button>
       </div>
     </div>
 
@@ -315,11 +365,24 @@ onMounted(async () => {
           </tr>
         </thead>
         <tbody>
-          <tr v-if="loading">
-            <td colspan="6" class="admin-empty-cell">加载中...</td>
-          </tr>
+          <template v-if="loading">
+            <tr v-for="n in 6" :key="`sk-${n}`">
+              <td colspan="6">
+                <div class="admin-skeleton-row" style="margin: 8px 16px;"></div>
+              </td>
+            </tr>
+          </template>
           <tr v-else-if="!articles.length">
-            <td colspan="6" class="admin-empty-cell">暂无数据</td>
+            <td colspan="6">
+              <div class="admin-empty-box">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <rect x="3" y="3" width="18" height="18" rx="4"/>
+                  <path d="M9 9h6H9z"/>
+                </svg>
+                <p>暂无内容稿件</p>
+                <button v-if="canCreate" class="admin-primary-btn" @click="openCreate">新建内容</button>
+              </div>
+            </td>
           </tr>
           <tr v-for="item in articles" :key="item.id">
             <td>
@@ -335,11 +398,21 @@ onMounted(async () => {
             <td>
               <div class="article-actions">
                 <button class="admin-link-action" @click="openEdit(item)">详情</button>
-                <button v-if="canUpdate && (item.status === 'draft' || item.status === 'rejected')" class="admin-link-action" @click="openEdit(item)">编辑</button>
-                <button v-if="canDelete && (item.status === 'draft' || item.status === 'rejected')" class="admin-link-action" @click="removeArticle(item)">删除</button>
-                <button v-if="canSubmit && (item.status === 'draft' || item.status === 'rejected')" class="admin-link-action" @click="submitReviewAction(item)">提交审核</button>
-                <button v-if="item.status === 'approved'" class="admin-link-action" @click="gotoPublish(item, 'incremental')">去发布中心</button>
-                <button v-if="item.status === 'published'" class="admin-link-action" @click="gotoPublish(item, 'offline')">下线</button>
+
+                <template v-if="item.status === 'draft' || item.status === 'rejected'">
+                  <button v-if="canUpdate" class="admin-link-action" @click="openEdit(item)">编辑</button>
+                  <button v-if="canSubmit" class="admin-link-action" @click="submitReviewAction(item)">提交审核</button>
+                  <button v-if="canDelete" class="admin-link-action danger-link" @click="removeArticle(item)">删除</button>
+                </template>
+
+                <template v-if="item.status === 'approved'">
+                  <button class="admin-link-action primary-link" @click="gotoPublish(item, 'incremental')">去发布中心</button>
+                </template>
+
+                <template v-if="item.status === 'published'">
+                  <button class="admin-link-action" @click="gotoPublish(item, 'offline')">下线</button>
+                </template>
+
                 <button class="admin-link-action" @click="viewPublishCheck(item)">发布检查</button>
               </div>
             </td>
@@ -350,6 +423,11 @@ onMounted(async () => {
       <div class="admin-pagination">
         <span class="admin-pagination-total">共 {{ pagination.total }} 条</span>
         <div class="admin-pagination-controls">
+          <select v-model="pagination.pageSize" class="admin-filter-select" @change="pagination.current = 1; loadArticles()">
+            <option :value="10">10 条/页</option>
+            <option :value="20">20 条/页</option>
+            <option :value="50">50 条/页</option>
+          </select>
           <button class="admin-page-btn" :disabled="pagination.current <= 1" @click="pagination.current -= 1; loadArticles()">上一页</button>
           <span class="admin-page-info">第 {{ pagination.current }} 页</span>
           <button class="admin-page-btn" :disabled="pagination.current * pagination.pageSize >= pagination.total" @click="pagination.current += 1; loadArticles()">下一页</button>
@@ -477,5 +555,50 @@ onMounted(async () => {
   margin: 10px 0 0;
   padding-left: 18px;
   color: #334155;
+}
+
+.admin-stats-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.admin-stat-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px 20px;
+  min-width: 100px;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.admin-stat-card:hover,
+.admin-stat-card.active {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.08);
+}
+
+.admin-stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.admin-stat-label {
+  font-size: 13px;
+  color: #64748b;
+  margin-top: 4px;
+}
+
+.primary-link {
+  color: #2563eb;
+  font-weight: 600;
+}
+.danger-link {
+  color: #dc2626;
 }
 </style>
